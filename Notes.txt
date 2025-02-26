@@ -1,0 +1,7 @@
+Idea: Neovim but for writers
+
+Take all functionality provided by docs and make it customizable and binded
+
+AI Integration: Chatbox for large text edits, highlight function for targeted edits. Will have full document context.
+
+Document saving, document upload, account functionality etc.
