@@ -1,4 +1,4 @@
-# 📝 Neovim for Writers – Project Timeline  
+# Neovim for Writers – Project Timeline  
 
 ## Phase 1: Research & Planning 
 - Define: **core features & tech stack**  
