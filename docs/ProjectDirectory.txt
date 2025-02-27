@@ -1,0 +1,73 @@
+PROJECT STRUCTURE CHEATSHEET
+==========================
+
+BACKEND (Rust)
+-------------
+/backend/
+├── Cargo.toml              # Rust package manager and dependency configuration
+│   - Defines project metadata and dependencies (axum, tokio, serde, etc.)
+│
+└── src/
+    └── main.rs            # Main application entry point
+        - Contains server setup, CORS configuration, and route handlers
+        - Uses Axum web framework
+        - Runs on localhost:3000
+
+FRONTEND (SvelteKit)
+-------------------
+/frontend/
+├── src/
+│   ├── app.html          # Base HTML template for all pages
+│   ├── app.css          # Global styles and Tailwind CSS imports
+│   ├── app.d.ts         # TypeScript declarations for the app
+│   │
+│   ├── lib/             # Shared components and utilities
+│   │   └── index.ts     # Exports from lib directory
+│   │
+│   └── routes/          # SvelteKit pages and layouts
+│       ├── +layout.svelte  # Root layout template
+│       └── +page.svelte    # Main page component
+│
+├── .gitignore           # Git ignore rules
+├── .npmrc              # Node.js package manager configuration
+├── .prettierrc         # Code formatting rules
+├── .prettierignore     # Files to exclude from formatting
+├── package.json        # Node.js dependencies and scripts
+├── svelte.config.js    # SvelteKit configuration
+├── tsconfig.json       # TypeScript configuration
+└── vite.config.ts      # Vite bundler configuration
+
+KEY FEATURES
+-----------
+Backend:
+- REST API using Axum framework
+- CORS enabled for frontend communication
+- JSON response handling
+- Async/await support with Tokio
+
+Frontend:
+- SvelteKit for routing and SSR
+- TypeScript support
+- Tailwind CSS for styling
+- Prettier for code formatting
+- Component-based architecture
+- API integration with backend
+- Error handling and loading states
+
+DEVELOPMENT COMMANDS
+------------------
+Backend:
+$ cd backend
+$ cargo run         # Start the backend server
+
+Frontend:
+$ cd frontend
+$ npm install      # Install dependencies
+$ npm run dev      # Start development server
+$ npm run build    # Build for production
+$ npm run preview  # Preview production build
+
+PORTS & URLS
+-----------
+Backend: http://localhost:3000
+Frontend: http://localhost:5173 (development) 
