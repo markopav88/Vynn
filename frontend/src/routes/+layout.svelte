@@ -10,8 +10,6 @@
 	// things we want to be on every page
 	import '../app.css';
 
-
-
 	// Define the props for the layout component
 	let { children } = $props();
 </script>

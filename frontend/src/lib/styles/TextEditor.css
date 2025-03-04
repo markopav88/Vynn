@@ -1,26 +1,29 @@
+/* Text Editor */
 .editor-textarea { 
-    width: 95%;
-    height: 40vh;  
-    margin: 0 auto;
-    padding: .5rem;
-    background-color: rgba(15, 40, 51, 0.7);
+    width: 70%;
+    height: 80%;  
+    margin: 2vh auto;
+    padding: 2rem;
+    background-color: rgba(11, 87, 122, 0.7);
     color: #E5E5E5;
     border: none;
     border-radius: 8px;
     resize: none;
     font-family: 'Courier New', monospace;
-    font-size: 7px;
+    font-size: 14px;
     line-height: 1.6;
     display: block;
 }
 
-.editor-textarea::placeholder {
-    color: #8CBEB9;
-    opacity: 0.7;
-}
-
+/* Focus Effect On Text Editor */
 .editor-textarea:focus {
     outline: none;
     background-color: rgba(15, 40, 51, 0.8);
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Placeholder Text In Text Editor*/
+.editor-textarea::placeholder {
+    color: #8CBEB9;
+    opacity: 0.7;
 }

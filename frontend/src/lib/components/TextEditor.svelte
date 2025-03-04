@@ -105,7 +105,7 @@
     });
 </script>
 
-<div class="flex items-center gap-4">
+<div class="flex w-full h-screen">
     <textarea
         class="editor-textarea"
         bind:this={textArea}

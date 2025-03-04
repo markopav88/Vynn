@@ -1,8 +1,7 @@
 <!-- frontend/src/routes/+page.svelte -->
 
 <!--
-
-    This is our main page. It's the first page that loads when we go to the root URL.
+    This is our root main page. It's the first page that loads when we go to the root URL.
     Svelte is a framework that allows us to build web applications using HTML, CSS, and Typescript.
     In a Svelte file we can have HTML, CSS, and Typescript code.
 -->
@@ -42,6 +41,6 @@
     */
 </script>
 
-<main class="min-h-screen bg-[#0A1721] flex items-center justify-center">
+<main class="min-h-screen flex items-center justify-center">
     <TextEditor />
 </main>
