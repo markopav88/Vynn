@@ -1,2 +1,6 @@
-@import 'tailwindcss';
-@plugin '@tailwindcss/typography';
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Import custom styles */
+@import './lib/styles/TextEditor.css';
