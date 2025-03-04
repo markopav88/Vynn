@@ -1,0 +1,40 @@
+FRONTEND ROUTES DOCUMENTATION
+===========================
+
+ROOT LAYOUT
+----------
+/frontend/src/routes/
+└── +layout.svelte
+    - Global layout that wraps all pages
+    - Imports global CSS and styles
+    - Provides consistent dark theme background
+    - Base text styling for all pages
+
+MAIN ROUTES
+----------
+/frontend/src/routes/
+├── +page.svelte                  # Home Page (/)
+│   - Main landing page
+│
+├── /login/                        # Login Page (/login)
+│   └── +page.svelte
+│       - Login Page
+│       - To be implemented
+│       
+│── /signup/                        # Signup Page (/signup)
+│   └── +page.svelte
+│       - Signup Page
+│       - To be implemented
+│
+│── /drive/                        # Drive Page (/drive)
+│   └── +page.svelte
+│       - Drive Page
+│       - To be implemented
+│       - Holds all your documents
+|
+└── /document/                     # Document Routes
+    └── [id]/                      # Dynamic Document Route (/document/[id])
+        └── +page.svelte
+            - View/edit specific documents
+            - Uses URL parameter for document ID
+            - Shares TextEditor component with home page
