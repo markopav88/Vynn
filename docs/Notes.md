@@ -22,6 +22,7 @@ It will feature **AI-powered editing**, **fine-tuned assistance that mimics the 
 - **Account functionality** – User authentication, document storage, and management.  
 - **Export to PDF?** – Ability to export documents in multiple formats.  
 - **Must** be able to dynamically change keybindings
+- **Create** Projects of files and allow for seamless switching between documents.
 
 ---
 
@@ -39,13 +40,12 @@ It will feature **AI-powered editing**, **fine-tuned assistance that mimics the 
 ### **Frontend (SvelteKit + Tailwind CSS + WASM)**  
 - **SvelteKit** → Reactive, fast UI.  
 - **Tailwind CSS** → Minimalist, distraction-free styling.  
-- **Monaco Editor or Custom WebAssembly Editor** → Powering the Neovim-like writing experience → Could use or make ourselves.  
 
 ### **Backend (Rust + Axum + Redis + Postgres/SurrealDB)**  
 - **Axum** → Fast async Rust web framework.  
 - **Tokio & WebSockets** → Real-time document sync.  
 - **Redis** → Pub/Sub for live collaboration.  
-- **PostgreSQL/SurrealDB/SQLx** → Document storage and versioning.  
+- **PostgreSQL/SQLx** → Document storage and versioning.  
 - **Tonic (gRPC)** → AI model interactions.  
 
 ### **AI Integration**  
