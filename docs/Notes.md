@@ -41,7 +41,7 @@ It will feature **AI-powered editing**, **fine-tuned assistance that mimics the 
 - **SvelteKit** → Reactive, fast UI.  
 - **Tailwind CSS** → Minimalist, distraction-free styling.  
 
-### **Backend (Rust + Axum + Redis + Postgres/SurrealDB)**  
+### **Backend (Rust + Axum + Redis + Postgres/SQLx)**  
 - **Axum** → Fast async Rust web framework.  
 - **Tokio & WebSockets** → Real-time document sync.  
 - **Redis** → Pub/Sub for live collaboration.  
