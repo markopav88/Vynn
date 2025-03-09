@@ -7,16 +7,15 @@ mod models;
 use axum::{
     routing::get,
     Router,
-    Json,
     Extension
 };
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port 
 use std::env; // Allows us read arguments
 use tower_http::cors::{CorsLayer, Any}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS
-use sqlx::Row; // Allows us to use the Row trait to get the result of a query
 use dotenv::dotenv; // Load .Env
 
 use crate::db::pool::create_pool;// Import the connection pool 
+use crate::controllers::db_controller::test_db;
 use crate::controllers::user_controller::user_routes;// Import user routes from user controller
 use crate::db::pool::migrate_db; // Import the migrate_db function
 
@@ -36,6 +35,7 @@ async fn main() {
    // Collect command line arguments
    let args: Vec<String> = env::args().collect();
 
+   // If the user passes the 'migrate' argument, run the migrations
    if args.len() > 1 && args[1] == "migrate" {
        println!("Running migrations...");
        migrate_db(&pool).await;
@@ -60,7 +60,6 @@ async fn main() {
     / When the route is hit, the hello function is called
     */
     let app = Router::new()
-        .route("/api/hello", get(hello))
         .route("/api/test-db", get(test_db))
         .merge(user_routes())  // Merge routes from user_controller,  any routes defined in user controller are now part of the Axum application.
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
@@ -83,37 +82,3 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
-
-/*
-/ Define the hello function
-/ This function is called when the /api/hello route is hit
-/ It returns a JSON object with a message
-/ Should most likely be moved to a controller file later but its here for now
-*/
-async fn hello() -> Json<serde_json::Value> {
-    Json(serde_json::json!({
-        "message": "Hello from Rust!"
-    }))
-}
-
-/*
-/ Define the test_db function
-/ This function is called when the /api/test-db route is hit
-/ It returns a JSON object with a message
-/ Should most likely be moved to a controller file later but its here for now
-*/
-async fn test_db(
-    Extension(pool): Extension<sqlx::PgPool>,
-) -> Json<serde_json::Value> {
-    // Run a simple query to test the database connection.
-    let row = sqlx::query("SELECT 1 as number")
-        .fetch_one(&pool)
-        .await
-        .expect("Query failed");
-
-    let number: i32 = row.try_get("number")
-        .expect("Failed to get column 'number'");
-
-    Json(serde_json::json!({ "result": number }))
-}
-    
