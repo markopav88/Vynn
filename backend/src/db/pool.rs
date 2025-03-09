@@ -1,5 +1,5 @@
 // src/db/pool.rs
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::env;
 //Pgpool- A pool of PostgreSQL connections
 // PgPoolOptions - The "configuration options" for creating a pool (the max number of connections).
@@ -17,9 +17,17 @@ pub async fn create_pool() -> PgPool {
         .expect("Failed to create database pool")
 }
 
-
-
-
+// Function which can be optionally called with CLI arguments
+// This function will run the migrations
+pub async fn migrate_db(pool: &PgPool) -> bool {
+    match sqlx::migrate!("./migrations").run(pool).await {
+        Ok(_) => true,
+        Err(e) => {
+            println!("Failed to migrate the database: {}", e);
+            false
+        }
+    }
+}
 
 
 

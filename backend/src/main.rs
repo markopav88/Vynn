@@ -3,29 +3,44 @@ mod db;
 mod controllers;
 mod models;
 
+// Axum is a web framework for Rust (It is to rust what express is to node.js)
 use axum::{
     routing::get,
     Router,
     Json,
-    Extension,
-}; // Axum is a web framework for Rust (It is to rust what express is to node.js)
+    Extension
+};
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port 
+use std::env; // Allows us read arguments
 use tower_http::cors::{CorsLayer, Any}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS
-use sqlx::Row;
-// Import the connection pool 
-use crate::db::pool::create_pool;
-// Import user-related routes from controller 
-use crate::controllers::user_controller::user_routes;
+use sqlx::Row; // Allows us to use the Row trait to get the result of a query
+use dotenv::dotenv; // Load .Env
+
+use crate::db::pool::create_pool;// Import the connection pool 
+use crate::controllers::user_controller::user_routes;// Import user routes from user controller
+use crate::db::pool::migrate_db; // Import the migrate_db function
+
 
 #[tokio::main] // Indicates that the main function is an async function using tokio
 async fn main() {
-        dotenvy::dotenv().ok();
-    //Creating the Pool using SQLx
-    //Creates the pool before building router
+    // Load environment variables from .env file
+    dotenv().ok();
+    
+    /*
+    / Creating the Pool using SQLx
+    / Creates the pool before building router
+    / connects to db using the DATABASE_URL from environment and returns a PgPool
+    */
     let pool = create_pool().await;
-    //connects to db using the DATABASE_URL from environment and returns a PgPool
-   
-   
+
+   // Collect command line arguments
+   let args: Vec<String> = env::args().collect();
+
+   if args.len() > 1 && args[1] == "migrate" {
+       println!("Running migrations...");
+       migrate_db(&pool).await;
+   }
+
     /*
     / Configure CORS
     / CORS is needed when a frontend (running on one domain or port) 
@@ -65,7 +80,6 @@ async fn main() {
     / Serve the router ie Start the server
     / We will star the server with the configured router and address
     */
-    // Start the Axum server
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
@@ -81,6 +95,13 @@ async fn hello() -> Json<serde_json::Value> {
         "message": "Hello from Rust!"
     }))
 }
+
+/*
+/ Define the test_db function
+/ This function is called when the /api/test-db route is hit
+/ It returns a JSON object with a message
+/ Should most likely be moved to a controller file later but its here for now
+*/
 async fn test_db(
     Extension(pool): Extension<sqlx::PgPool>,
 ) -> Json<serde_json::Value> {
