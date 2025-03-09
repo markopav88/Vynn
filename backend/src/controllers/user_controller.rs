@@ -1,5 +1,5 @@
 // src/controllers/user_controller.rs
-
+//Request Handlers
 use axum::{
     extract::{Extension, Path, Json},
     response::IntoResponse,
@@ -10,15 +10,7 @@ use serde::{Serialize, Deserialize};
 use crate::models::user::User;
 
 /// The User model representing a row in the "users" table.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct User {
-    pub id: i32,
-    pub name: String,
-    pub email: String,
-}
-
 /// Payload for creating a new user.
-#[derive(Debug, Deserialize)]
 pub struct CreateUser {
     pub name: String,
     pub email: String,
@@ -42,12 +34,12 @@ pub async fn get_user(
         Err(_) => "User not found".into_response(),
     }
 }
-use axum::debug_handler;
+#[axum::debug_handler]
 /// POST handler for creating a new user.
 /// Accessible via: POST /api/users
 pub async fn create_user(
-    Json(payload): Json<CreateUser>,
     Extension(pool): Extension<PgPool>,
+    Json(payload): Json<CreateUser>,
 ) -> impl IntoResponse {
     let result = sqlx::query!(
         "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id",
