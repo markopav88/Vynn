@@ -3,13 +3,11 @@ mod db;
 mod controllers;
 mod models;
 
-use hyper::Server;
-
 use axum::{
     routing::get,
     Router,
     Json,
-    Extension
+    Extension,
 }; // Axum is a web framework for Rust (It is to rust what express is to node.js)
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port 
 use tower_http::cors::{CorsLayer, Any}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS
@@ -67,13 +65,9 @@ async fn main() {
     / Serve the router ie Start the server
     / We will star the server with the configured router and address
     */
-    // Start the Axum server using the configured router and address
-    Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
-
-    
+    // Start the Axum server
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
 /*

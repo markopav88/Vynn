@@ -10,7 +10,8 @@ use serde::{Serialize, Deserialize};
 use crate::models::user::User;
 
 /// The User model representing a row in the "users" table.
-/// Payload for creating a new user.
+/// Payload for creating a new user. 
+#[derive(Debug,Serialize, Deserialize)]
 pub struct CreateUser {
     pub name: String,
     pub email: String,
