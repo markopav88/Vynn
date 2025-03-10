@@ -97,7 +97,7 @@ pub async fn api_login(payload: Json<LoginPayload>) -> Result<Json<Value>> {
 
     // IMPL AUTH LOGIN
 
-    // Test example
+    // Test Authentication example
     if payload.email != "Hello@gmail.com" || payload.password != "test" {
         return Err(Error::LoginFail);
     }
