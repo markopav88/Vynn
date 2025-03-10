@@ -50,7 +50,7 @@ async fn test_create_user(hc: &Client) -> Result<()> {
         "/api/users",
         json!({
             "name": "Test User",
-            "email": "test@example.com",
+            "email": "testcreate@example.com",
             "password": "password123"
         })
     ).await?;
@@ -62,8 +62,12 @@ async fn test_create_user(hc: &Client) -> Result<()> {
         return Err(anyhow::anyhow!("User creation failed with status: {}", create_response.status()));
     }
     
-    // Try to get the user
-    let get_response = hc.do_get("/api/users/1").await?;
+    // Extract the user ID from the response body
+    let body = create_response.json_body().expect("Failed to get JSON body");
+    let user_id = body["id"].as_i64().unwrap_or(1);
+    
+    // Try to get the user with the extracted ID
+    let get_response = hc.do_get(&format!("/api/users/{}", user_id)).await?;
     get_response.print().await?;
     
     // Check if the get request was successful

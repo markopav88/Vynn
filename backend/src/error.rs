@@ -9,7 +9,8 @@ pub enum Error {
     LoginFail,
     DatabaseConnectionError,
     UserNotFound,
-    UserCreationError
+    UserCreationError,
+    InvalidRequestFormat,
 }
 
 impl IntoResponse for Error {
@@ -20,6 +21,7 @@ impl IntoResponse for Error {
             Self::DatabaseConnectionError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_SERVER_ERROR").into_response(),
             Self::UserNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
             Self::UserCreationError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::InvalidRequestFormat => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
         }
     }
 }

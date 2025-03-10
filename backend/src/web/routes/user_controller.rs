@@ -55,7 +55,7 @@ pub async fn create_user(
 ) -> Result<Json<User>> {
     println!("->> {:<12} - create_user", "HANDLER");
 
-    // First insert the user and get the ID
+    // First insert the user
     let result = sqlx::query!(
         "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id",
         payload.name,
@@ -65,24 +65,30 @@ pub async fn create_user(
     .fetch_one(&pool)
     .await;
 
-    // Then fetch the complete user record
+    // Check if insertion was successful
     match result {
         Ok(record) => {
-            let user_id = record.id;
+            // Then fetch the user by email
             let user = sqlx::query_as!(
                 User,
                 r#"SELECT id, name, email FROM users WHERE id = $1"#,
-                user_id
+                record.id
             )
             .fetch_one(&pool)
             .await;
             
             match user {
                 Ok(user) => Ok(Json(user)),
-                Err(_) => Err(Error::UserNotFound),
+                Err(e) => {
+                    println!("Error fetching user: {:?}", e);
+                    Err(Error::UserNotFound)
+                }
             }
         },
-        Err(_) => Err(Error::UserCreationError),
+        Err(e) => {
+            println!("Error creating user: {:?}", e);
+            Err(Error::UserCreationError)
+        }
     }
 }
 

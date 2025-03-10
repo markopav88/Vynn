@@ -15,13 +15,23 @@ pub async fn test_db(
     Extension(pool): Extension<sqlx::PgPool>,
 ) -> Result<Json<Value>> {
     // Run a simple query to test the database connection.
-    let row = sqlx::query("SELECT 1 as number")
+    let result_row = sqlx::query!("SELECT 1 as number")
         .fetch_one(&pool)
-        .await
-        .expect("Query failed");
+        .await;
 
-    let number: i32 = row.try_get("number")
+    match result_row {
+        Ok(record) => {
+            // 
+            let number: i32 = result_row.try_get("number")
         .expect("Failed to get column 'number'");
+        }
+        Err(_) => {
+            println!("Error connecting to database: {:?}", e);
+            Err(Error::DatabaseConnectionError)
+        }
+    }
+
+    
 
     // Create Success
     let success = Json(json!({
