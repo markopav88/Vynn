@@ -33,7 +33,7 @@
 ### **TODO**
 
 - **Flesh out the rest of the APIS**
-- **Implement Middleware for authentication/other checks**
+- **Implement Middleware for authentication/other checks/setting cookies in APIS**
 - **Expand Editor Functions**
 - **Flesh out frontend**
 - **AI Integration**
