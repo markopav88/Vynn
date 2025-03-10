@@ -1,14 +1,14 @@
 /*
  / HOW TO USE BACKEND TESTS
- / ENSURE WATCH IS INSTALLED $ cargo install cargo-watch --locked
- / In Terminal 1: 'cargo watch -q -c -w src/ -x run'
+ / ENSURE WATCH IS INSTALLED '$ cargo install cargo-watch --locked'
+ / In Terminal 1: 'cargo watch -q -c -w src/ -x run' 
  / In Terminal 2: 'cargo watch -q -c -w tests/ -x "test -q test_http -- --nocapture"'
  / Now you can see LIVE Updates of API calls
 */
 
 #![allow(unused)]
 
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use serde_json::json;
 use httpc_test::Client;
 
@@ -23,6 +23,7 @@ async fn test_http() -> Result<()> {
     let user_result = test_create_user(&hc).await;
     let good_login_result = test_good_login(&hc).await;
     let bad_login_result = test_bad_login(&hc).await;
+    let wipe_db_result = test_wipe_db(&hc).await;
     
     // Print summary
     println!("\n===== TEST RESULTS =====");
@@ -30,15 +31,17 @@ async fn test_http() -> Result<()> {
     println!("User Creation: {}", result_to_string(&user_result));
     println!("Good Login: {}", result_to_string(&good_login_result));
     println!("Bad Login: {}", result_to_string(&bad_login_result));
+    println!("Wipe Database: {}", result_to_string(&wipe_db_result));
     println!("=====================\n");
 
     Ok(())
 }
 
-fn result_to_string<T>(result: &Result<T>) -> &str {
-    match result {
-        Ok(_) => "✅ PASSED",
-        Err(_) => "❌ FAILED",
+fn result_to_string(result: &anyhow::Result<()>) -> &str {
+    if result.is_ok() {
+        "PASSED"
+    } else {
+        "FAILED"
     }
 }
 
@@ -80,36 +83,66 @@ async fn test_create_user(hc: &Client) -> Result<()> {
 
 async fn test_database(hc: &Client) -> Result<()> {
     print!("TEST - Database Connection");
-    hc.do_get("/api/test-db").await?.print().await?;
+    let response = hc.do_get("/api/test-db").await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!("Test Database failed with status: {}", response.status()));
+    }
 
     Ok(())
 }
 
 async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");
-    let req_login = hc.do_post("/api/login", json!({
+    let response = hc.do_post("/api/login", json!({
         "email": "Hello@gmail.com",
         "password": "test"
-    }));
-    req_login.await?.print().await?;
+    })).await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!("Login failed with status: {}", response.status()));
+    }
 
     Ok(())
 }
 
 async fn trigger_fallback(hc: &Client) -> Result<()> {
     print!("TEST - Trigger Fallback Route");
-    hc.do_get("/src/main.rs").await?.print().await?;
+    let response = hc.do_get("/src/main.rs").await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!("Fallback failed with status: {}", response.status()));
+    }
     
     Ok(())
 }
 
 async fn test_bad_login(hc: &Client) -> Result<()> {
     print!("TEST - Bad Login");
-    let req_login = hc.do_post("/api/login", json!({
+    let response = hc.do_post("/api/login", json!({
         "email": "Hell2o@gmail.com",
         "password": "test"
-    }));
-    req_login.await?.print().await?;
+    })).await?;
+    response.print().await?;
+
+    if response.status().is_success() {
+        return Err(anyhow::anyhow!("Bad login Succeed with status: {}", response.status()));
+    }
+
+    Ok(())
+}
+
+async fn test_wipe_db(hc: &Client) -> Result<()> {
+    print!("TEST - Wipe Database");
+    let response = hc.do_get("/api/wipe-db?secret=secret_key").await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!("Wipe DB failed with status: {}", response.status()));
+    }
 
     Ok(())
 }

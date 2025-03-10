@@ -39,3 +39,5 @@ CREATE TABLE document_projects (
     PRIMARY KEY (document_id, project_id)
 );
 
+-- Dummy User
+INSERT INTO users(name,email,password) VALUES('Christian','CFdefence@gmail.com','MyPassword');
