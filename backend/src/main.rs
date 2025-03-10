@@ -6,6 +6,7 @@ mod error;
 mod models;
 mod web;
 
+use axum::middleware;
 // Axum is a web framework for Rust (It is to rust what express is to node.js)
 use axum::{routing::get_service, Extension, Router};
 use dotenv::dotenv;
@@ -15,8 +16,8 @@ use tower_http::cors::{Any, CorsLayer}; // Provides support for GET/POST/PUT/DEL
 use tower_http::services::ServeDir;
 
 use crate::db::pool::{create_pool, migrate_db}; // Import the connection pool
-use crate::web::routes::user_controller::user_routes; // Import user routes from user controller // Import the migrate_db function
 use crate::web::routes::db_controller::db_routes;
+use crate::web::routes::user_controller::user_routes; // Import user routes from user controller // Import the migrate_db function
 
 #[tokio::main] // Indicates that the main function is an async function using tokiopub mod web;
 async fn main() {
@@ -29,7 +30,7 @@ async fn main() {
     / connects to db using the DATABASE_URL from environment and returns a PgPool
     */
     let pool = create_pool().await;
-    
+
     /*
     / Configure CORS
     / CORS is needed when a frontend (running on one domain or port)

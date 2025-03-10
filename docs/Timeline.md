@@ -1,27 +1,40 @@
-# Neovim for Writers – Project Timeline  
+# Neovim for Writers – Project Timeline
 
-## Phase 1: Research & Planning 
-- Define: **core features & tech stack**  
-- Prototype: **Flesh out project skeleton**
-- **Deploy: Proposal Document (1-2 pages)**
+## Phase 1: Research & Planning
 
-## Phase 2: Flesh Out Editor 
-- Build: **core editor with intuitive UI**  
-- Implement: **Typing features and seamless utility**
-- Implement: **Database Connection and Utility**
-- Deploy: Text Editor and Database Integration
+- Define: **core features & tech stack** ✅
+- Prototype: **Flesh out project skeleton** ✅
+- **Deploy: Proposal Document (1-2 pages)** 🚧
 
-## Phase 3: Account Functionality and Vim Functionality 
+## Phase 2: Flesh Out Editor
+
+- Build: **core editor with intuitive UI** 🚧
+- Implement: **Typing features and seamless utility** 🚧
+- Implement: **Database Connection and Utility** 🚧
+- Deploy: Text Editor and Database Integration ✅
+
+## Phase 3: Account Functionality and Vim Functionality
+
 - Build: Account Functionality and Vim Functions
-- Deploy: **stable version & finalize documentation**  
+- Deploy: **stable version & finalize documentation**
 
 ## Phase 4: Customizable Binding and Additional Fun Features
+
 - Build: Customizable Binding UI
 - Deploy: Other Fun Features
 - Implement: Addition Project Requirements
 
-## Phase 5: AI Integration  
-- Integrate: **AI-assisted editing & auto-complete**  
-- Fine-tune: **AI responses**  
-- Implement: **real-time collaborative AI features**  
+## Phase 5: AI Integration
 
+- Integrate: **AI-assisted editing & auto-complete**
+- Fine-tune: **AI responses**
+- Implement: **real-time collaborative AI features**
+
+### **TODO**
+
+- **Flesh out the rest of the APIS**
+- **Implement Middleware for authentication/other checks**
+- **Expand Editor Functions**
+- **Flesh out frontend**
+- **AI Integration**
+- **Deploy**

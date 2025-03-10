@@ -1,26 +1,26 @@
 // src/controllers/user_controller.rs
 // Request Handlers
-use axum::{
-    extract::{Extension, Path, Json},
-    Router,
-};
-use sqlx::PgPool;
-use serde::Deserialize;
-use serde_json::{Value, json};
 use crate::models::user::User;
 use crate::{Error, Result};
 use axum::routing::{get, post};
+use axum::{
+    extract::{Extension, Json, Path},
+    Router,
+};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use sqlx::PgPool;
 
 /// The User model representing a row in the "users" table.
 /// Payload for creating a new user.
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CreateUserPayload {
     pub name: String,
     pub email: String,
-    pub password: String
+    pub password: String,
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LoginPayload {
     pub email: String,
     pub password: String,
@@ -76,7 +76,7 @@ pub async fn create_user(
             )
             .fetch_one(&pool)
             .await;
-            
+
             match user {
                 Ok(user) => Ok(Json(user)),
                 Err(e) => {
@@ -84,7 +84,7 @@ pub async fn create_user(
                     Err(Error::UserNotFound)
                 }
             }
-        },
+        }
         Err(e) => {
             println!("Error creating user: {:?}", e);
             Err(Error::UserCreationError)
