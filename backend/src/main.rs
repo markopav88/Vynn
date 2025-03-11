@@ -7,15 +7,15 @@ mod models;
 mod web;
 
 use axum::middleware;
+
 // Axum is a web framework for Rust (It is to rust what express is to node.js)
 use axum::{routing::get_service, Extension, Router};
 use dotenv::dotenv;
-use std::env; // Allows us read arguments
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port
 use tower_http::cors::{Any, CorsLayer}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS // Load .Env
 use tower_http::services::ServeDir;
 
-use crate::db::pool::{create_pool, migrate_db}; // Import the connection pool
+use crate::db::pool::create_pool; // Import the connection pool
 use crate::web::routes::db_controller::db_routes;
 use crate::web::routes::user_controller::user_routes; // Import user routes from user controller // Import the migrate_db function
 
