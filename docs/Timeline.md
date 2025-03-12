@@ -25,3 +25,5 @@
 - Fine-tune: **AI responses**  
 - Implement: **real-time collaborative AI features**  
 
+##Summary of work for Mar 12, 2025
+    -Built a Rust-based backend web server built with the Axum framework connected to a PostgreSQL database containerized inside of a Docker container. The application features a modular structure with separate controllers, models, and database connections. It implements a RESTful API with endpoints to check server status (/api/hello), test database connectivity (/api/test-db), and perform CRUD operations on user data (/api/users). The server uses asynchronous programming with Tokio for handling concurrent requests and SQLx for type-safe database interactions.So far progress demonstrates proper separation of concerns with route handlers, database queries, and model definitions organized in their respective modules.

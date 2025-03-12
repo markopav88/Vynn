@@ -52,3 +52,4 @@ It will feature **AI-powered editing**, **fine-tuned assistance that mimics the 
 - **Fine-tuned GPT Model** (via OpenAI API or local LLaMA/Claude model).  
 - **LangChain or Custom AI Pipeline** for personalized writing suggestions.  
 - **Sentence Embeddings** to learn user writing patterns.  
+
