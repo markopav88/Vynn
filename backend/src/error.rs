@@ -6,26 +6,45 @@ use axum::response::Response;
 
 #[derive(Debug)]
 pub enum Error {
-    LoginFail,
-    DatabaseConnectionError,
-    UserNotFound,
-    UserCreationError,
-    InvalidRequestFormat,
+    // Database Errors
     MigrationExecutionError,
     MigrationKeyError,
+    DatabaseConnectionError,
+
+    // User Errors
+    UserUpdateError,
+    UserNotFoundError,
+    UserCreationError,
+    LoginFailError,
+
+    // Document Errors
+    DocumentNotFoundError,
+    DocumentUpdateError,
+    
+    // General Errors
+    InvalidRequestFormatError,
+
+    // Document Permission Errors
+    PermissionError,
+    PermissionDeniedError,
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         println!("->> {:<12} - {self:?}", "ERROR");
         match self {
-            Self::LoginFail => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::LoginFailError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
             Self::DatabaseConnectionError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_SERVER_ERROR").into_response(),
-            Self::UserNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::UserNotFoundError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
             Self::UserCreationError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
-            Self::InvalidRequestFormat => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::InvalidRequestFormatError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
             Self::MigrationExecutionError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
             Self::MigrationKeyError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::UserUpdateError=> (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::DocumentNotFoundError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::PermissionError => (StatusCode::INTERNAL_SERVER_ERROR, "PERMISSION_ERROR").into_response(),
+            Self::PermissionDeniedError => (StatusCode::FORBIDDEN, "PERMISSION_DENIED").into_response(),
+            Self::DocumentUpdateError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
         }
     }
 }

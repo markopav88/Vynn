@@ -29,7 +29,7 @@ pub async fn get_user(
 
     match result {
         Ok(user) => Ok(Json(user)),
-        Err(_) => Err(Error::UserNotFound),
+        Err(_) => Err(Error::UserNotFoundError),
     }
 }
 /// POST handler for creating a new user.
@@ -53,7 +53,7 @@ pub async fn api_create_user(
     // Check if insertion was successful
     match result {
         Ok(record) => {
-            // Then fetch the user by email
+            // Then fetch the user by id
             let user = sqlx::query_as!(
                 User,
                 r#"SELECT id, name, email FROM users WHERE id = $1"#,
@@ -66,7 +66,7 @@ pub async fn api_create_user(
                 Ok(user) => Ok(Json(user)),
                 Err(e) => {
                     println!("Error fetching user: {:?}", e);
-                    Err(Error::UserNotFound)
+                    Err(Error::UserNotFoundError)
                 }
             }
         }
@@ -80,11 +80,36 @@ pub async fn api_create_user(
 pub async fn api_update_user(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateUserPayload>,
-) -> Result<()> {
+) -> Result<Json<Value>> {
     println!("->> {:<12} - update_user", "HANDLER");
 
-    // ! Need to check cookie here
-    Ok(())
+    // ! Need to check cookie here to get user id
+    
+    // temp user id
+
+    let user_id = 1;
+
+    // perform update
+    let result = sqlx::query!(
+        "UPDATE users
+         SET name = $1, email = $2, password = $3
+         WHERE id = $4;",
+        payload.name,
+        payload.email,
+        payload.password,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await;
+
+    match result {
+        Ok(_) => Ok(Json(json!({
+            "result": {
+                "success": true
+            }
+        }))),
+        Err(_) => Err(Error::UserUpdateError),
+    }
 }
 
 pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Result<Json<Value>> {
@@ -94,7 +119,7 @@ pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Re
 
     // ? Test Authentication example
     if payload.email != "Hello@gmail.com" || payload.password != "test" {
-        return Err(Error::LoginFail);
+        return Err(Error::LoginFailError);
     }
 
     // ! IMPL SET COOKIES -> Change to encryption
@@ -114,6 +139,7 @@ pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Re
 pub fn user_routes() -> Router {
     Router::new()
         .route("/login", post(api_user_login))
-        .route("/users/:id", get(get_user))
         .route("/users", post(api_create_user))
+        .route("/users/:id", get(get_user))
+        .route("/users/:id", post(api_update_user))
 }
