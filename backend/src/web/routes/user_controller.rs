@@ -1,30 +1,15 @@
 // src/controllers/user_controller.rs
 // Request Handlers
-use crate::models::user::User;
+use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
 use axum::routing::{get, post};
 use axum::{
     extract::{Extension, Json, Path},
     Router,
 };
-use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::PgPool;
-
-/// The User model representing a row in the "users" table.
-/// Payload for creating a new user.
-#[derive(Debug, Deserialize)]
-pub struct CreateUserPayload {
-    pub name: String,
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LoginPayload {
-    pub email: String,
-    pub password: String,
-}
+use tower_cookies::{Cookies, Cookie};
 
 /// GET handler for retrieving a user by ID.
 /// Accessible via: GET /api/users/:id
@@ -49,7 +34,7 @@ pub async fn get_user(
 }
 /// POST handler for creating a new user.
 /// Accessible via: POST /api/users
-pub async fn create_user(
+pub async fn api_create_user(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreateUserPayload>,
 ) -> Result<Json<User>> {
@@ -92,17 +77,28 @@ pub async fn create_user(
     }
 }
 
-pub async fn api_login(payload: Json<LoginPayload>) -> Result<Json<Value>> {
+pub async fn api_update_user(
+    Extension(pool): Extension<PgPool>,
+    Json(payload): Json<UpdateUserPayload>,
+) -> Result<()> {
+    println!("->> {:<12} - update_user", "HANDLER");
+
+    // ! Need to check cookie here
+    Ok(())
+}
+
+pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
 
-    // IMPL AUTH LOGIN
+    // ! IMPL AUTH LOGIN
 
-    // Test Authentication example
+    // ? Test Authentication example
     if payload.email != "Hello@gmail.com" || payload.password != "test" {
         return Err(Error::LoginFail);
     }
 
-    // IMPL SET COOKIES
+    // ! IMPL SET COOKIES -> Change to encryption
+    cookies.add(Cookie::new("auth-token", "user-1.exp.sign"));
 
     // Create Success
     let success = Json(json!({
@@ -117,7 +113,7 @@ pub async fn api_login(payload: Json<LoginPayload>) -> Result<Json<Value>> {
 /// Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
-        .route("/api/login", post(api_login))
-        .route("/api/users/:id", get(get_user))
-        .route("/api/users", post(create_user))
+        .route("/login", post(api_user_login))
+        .route("/users/:id", get(get_user))
+        .route("/users", post(api_create_user))
 }
