@@ -26,21 +26,21 @@ async fn test_documents() -> Result<()> {
     println!("\n===== RUNNING DOCUMENT API TESTS =====\n");
 
     // Run all tests and collect results
-    //let create_result = test_create_document(&hc).await;
-    //let get_result = test_get_document(&hc).await;
-    //let update_result = test_update_document(&hc).await;
-    //let get_users_result = test_get_document_users(&hc).await;
+    let create_result = test_create_document(&hc).await;
+    let get_result = test_get_document(&hc).await;
+    let update_result = test_update_document(&hc).await;
+    let get_users_result = test_get_document_users(&hc).await;
     let permission_result = test_document_permissions(&hc).await;
-    //let wipe_db = backend::test_wipe_db(&hc).await;
+    let wipe_db = backend::test_wipe_db(&hc).await;
 
     // Print summary
     println!("\n===== TEST RESULTS =====");
-    //println!("Create Document: {}", result_to_string(&create_result));
-    //println!("Get Document: {}", result_to_string(&get_result));
-    //println!("Update Document: {}", result_to_string(&update_result));
-    //println!("Get Document Users: {}", result_to_string(&get_users_result));
+    println!("Create Document: {}", result_to_string(&create_result));
+    println!("Get Document: {}", result_to_string(&get_result));
+    println!("Update Document: {}", result_to_string(&update_result));
+    println!("Get Document Users: {}", result_to_string(&get_users_result));
     println!("Document Permissions: {}", result_to_string(&permission_result));
-    //println!("Wipe Database: {}", result_to_string(&wipe_db));
+    println!("Wipe Database: {}", result_to_string(&wipe_db));
     println!("=====================\n");
 
     Ok(())
@@ -166,7 +166,6 @@ async fn test_document_permissions(hc: &Client) -> Result<()> {
     if !grant_response.status().is_success() {
         return Err(anyhow::anyhow!("Failed to grant permission"));
     }
-    Ok(())/* 
     
     // 2. Get document users
     let users_response = hc.do_get("/api/document/1/permissions").await?;
@@ -194,7 +193,6 @@ async fn test_document_permissions(hc: &Client) -> Result<()> {
     }
 
     Ok(())
-    */
 }
 
 async fn test_get_document_users(hc: &Client) -> Result<()> {
