@@ -1,5 +1,6 @@
 // src/controllers/user_controller.rs
 // Request Handlers
+// ! Needs signout method which wipes cookies
 use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
 use axum::routing::{get, post};
@@ -122,7 +123,7 @@ pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Re
         return Err(Error::LoginFailError);
     }
 
-    // ! IMPL SET COOKIES -> Change to encryption
+    // ! EXAMPLE OF SETTING COOKIES -> Change to encryption
     cookies.add(Cookie::new("auth-token", "user-1.exp.sign"));
 
     // Create Success

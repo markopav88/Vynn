@@ -59,7 +59,7 @@ async fn main() {
         .nest("/api/document", doc_api_routes) // Merge routes from document_controller 
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::map_response(main_response_mapper))
-        .layer(CookieManagerLayer::new())
+        .layer(CookieManagerLayer::new())  // ! Cookie Manager -> Should have many of these within different routers I think
         .fallback_service(routes_static()); // Fallback route if route cannot be found above
 
     /*
