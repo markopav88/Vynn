@@ -11,12 +11,12 @@ pub struct DocumentPermission {
 
 #[derive(Debug, Deserialize)]
 pub struct CreatePermissionPayload {
-    pub document_id: i32,
     pub user_id: i32,
     pub role: String
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdatePermissionPayload {
+    pub user_id: i32,
     pub role: String
 } 

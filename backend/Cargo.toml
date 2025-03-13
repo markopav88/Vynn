@@ -15,6 +15,8 @@ dotenvy = "0.15"
 hyper = { version = "0.14.32", features = ["server"] }
 dotenv = "0.15.0"
 chrono = { version = "0.4.31", features = ["serde"] }
+anyhow = "1"
+httpc-test = "0.1.1"
 
 [dev-dependencies]
 anyhow = "1"

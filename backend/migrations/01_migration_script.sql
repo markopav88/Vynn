@@ -56,3 +56,17 @@ CREATE INDEX idx_document_permissions_user_id ON document_permissions(user_id);
 INSERT INTO users(name,email,password) 
 VALUES('Christian','CFdefence@gmail.com','MyPassword')
 ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO users(name,email,password) 
+VALUES('Marko','MarkoP@gmail.com','MarkosPassword')
+ON CONFLICT (email) DO NOTHING;
+
+-- Create a test document owned by user 1
+INSERT INTO documents(id, name, content, user_id)
+VALUES(1, 'Test Document', 'Test content', 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Ensure user 1 has owner permission for document 1
+INSERT INTO document_permissions(document_id, user_id, role)
+VALUES(1, 1, 'owner')
+ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'owner';

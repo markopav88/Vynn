@@ -51,10 +51,12 @@ async fn main() {
     / When the route is hit, the hello function is called
     */
     let user_api_routes = web::routes::user_controller::user_routes();
+    let doc_api_routes = web::routes::doc_controller::doc_routes();
 
     let app = Router::new()
         .merge(web::routes::db_controller::db_routes())
         .nest("/api", user_api_routes) // Merge routes from user_controller,  any routes defined in user controller are now part of the Axum application.
+        .nest("/api/document", doc_api_routes) // Merge routes from document_controller 
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::map_response(main_response_mapper))
         .layer(CookieManagerLayer::new())

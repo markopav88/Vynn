@@ -2,13 +2,12 @@ use axum::{
     Router,
     extract::{Extension, Query},
     response::Json,
-    routing::{get,post}
+    routing::get,
 };
 use serde::Deserialize;
 use crate::{Error, Result};
 use serde_json::{Value, json};
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 #[derive(Deserialize)]
 struct WipeParams {
