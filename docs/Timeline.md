@@ -31,7 +31,6 @@
 - Implement: **real-time collaborative AI features**
 
 ### **TODO**
-
 - **Flesh out the rest of the APIS**
 - **Implement Middleware for authentication/other checks/setting cookies in APIS**
 - **Expand Editor Functions**
