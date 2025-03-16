@@ -14,7 +14,7 @@ use axum::{routing::get_service, Extension, Router};
 use dotenv::dotenv;
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port
 use tower_cookies::CookieManagerLayer;
-// use tower_http::cors::{Any, CorsLayer}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS // Load .Env
+use tower_http::cors::{Any, CorsLayer}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS // Load .Env
 use tower_http::services::ServeDir;
 
 use crate::db::pool::create_pool; // Import the connection pool
@@ -37,12 +37,11 @@ async fn main() {
     / wants to send HTTP requests to a backend running on another domain or port.
     / This is needed for the frontend to send requests to the backend.
     / We allow all origins, methods, and headers currently, but this should be changed later for security.
-    / ADD BACK LATER FOR SECURITY
+    */
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
-    */
 
     /*
     / Initialize our router
@@ -56,10 +55,11 @@ async fn main() {
     let app = Router::new()
         .merge(web::routes::db_controller::db_routes())
         .nest("/api", user_api_routes) // Merge routes from user_controller,  any routes defined in user controller are now part of the Axum application.
-        .nest("/api/document", doc_api_routes) // Merge routes from document_controller 
+        .nest("/api/document", doc_api_routes) // Merge routes from document_controller
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::map_response(main_response_mapper))
-        .layer(CookieManagerLayer::new())  // ! Cookie Manager -> Should have many of these within different routers I think
+        .layer(CookieManagerLayer::new()) // ! Cookie Manager -> Should have many of these within different routers I think
+        .layer(cors) // Add the CORS layer
         .fallback_service(routes_static()); // Fallback route if route cannot be found above
 
     /*
@@ -84,9 +84,9 @@ async fn main() {
 
 // Fallback Route If One Cannot Be Resolved
 fn routes_static() -> Router {
+    println!("->> {:<12} - routes_static", "FALLBACK HIT");
     Router::new().nest_service("/", get_service(ServeDir::new("./")))
 }
-
 
 async fn main_response_mapper(response: Response) -> Response {
     println!("->> {:<12} - main_response_mapper", "RES_MAPPER");
