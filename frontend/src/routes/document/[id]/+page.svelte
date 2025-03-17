@@ -44,12 +44,6 @@
 		}
 	});
 
-	// Manual save function for when we want to bind this 
-	async function saveDocument() {
-		if (documentData) {
-			lastSaveStatus = await update_document(documentData);
-		}
-	}
 </script>
 
 <main class="flex min-h-screen flex-col items-center justify-center bg-[#0A1721] text-[#E5E5E5]">

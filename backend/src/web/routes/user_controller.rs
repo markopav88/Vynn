@@ -113,27 +113,39 @@ pub async fn api_update_user(
     }
 }
 
-pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Result<Json<Value>> {
+pub async fn api_user_login(
+    cookies: Cookies, 
+    Extension(pool): Extension<PgPool>,
+    Json(payload): Json<LoginPayload>
+) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
 
-    // ! IMPL AUTH LOGIN
+    // Grab email and password from database and compare it to the payload
+    let result = sqlx::query!(
+        "SELECT email, password
+         FROM users
+         WHERE email = $1;",
+         payload.email
+    )
+    .fetch_one(&pool)
+    .await;
 
-    // ? Test Authentication example
-    if payload.email != "Hello@gmail.com" || payload.password != "test" {
-        return Err(Error::LoginFailError);
-    }
-
-    // ! EXAMPLE OF SETTING COOKIES -> Change to encryption
-    cookies.add(Cookie::new("auth-token", "user-1.exp.sign"));
-
-    // Create Success
-    let success = Json(json!({
-        "result": {
-            "success": true
+    match result {
+        Ok(record) => {
+            if payload.email == record.email && payload.password == record.password {
+                // Set cookie
+                cookies.add(Cookie::new("auth-token", "user-1.exp.sign"));
+                
+                // Return success
+                return Ok(Json(json!({
+                    "result": true
+                })));
+            } else {
+                return Err(Error::LoginFailError);
+            }
         }
-    }));
-
-    Ok(success)
+        Err(_) => return Err(Error::LoginFailError),
+    }
 }
 
 /// Combine user-related routes into one Router instance.
@@ -144,3 +156,4 @@ pub fn user_routes() -> Router {
         .route("/users/:id", get(get_user))
         .route("/users/:id", post(api_update_user))
 }
+

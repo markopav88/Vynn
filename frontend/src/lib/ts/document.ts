@@ -6,9 +6,9 @@
 /
 / Summary:
 / Class Document: Mapper of a class to how we are storing documents in db
-/ loadDocument: Function ran on mount of /document/:id that will call GET API
-/ updateDocument: Function to call update document POST API and pass in new document state
-/ setupAutoSave: Function to setup interval of 30 seconds for auto-save 
+/ load_document: Function ran on mount of /document/:id that will call GET API
+/ update_document: Function to call update document POST API and pass in new document state
+/ setup_auto_save: Function to setup interval of 30 seconds for auto-save 
 /
 /
 */
@@ -69,12 +69,12 @@ export async function load_document(documentId: number): Promise<Document | null
 				data.updated_at
 			);
 			return document;
-		} catch (e) {
-			console.error('Error parsing document data:', e);
+		} catch (error) {
+			console.error('Error parsing document data:', error);
 			return null;
 		}
-	} catch (e) {
-		console.error('Error loading document:', e);
+	} catch (error) {
+		console.error('Error loading document:', error);
 		return null;
 	}
 }
@@ -113,8 +113,8 @@ export async function update_document(document: Document): Promise<boolean> {
 		
 		console.log("Document updated successfully");
 		return true;
-	} catch (e) {
-		console.error('Error updating document:', e);
+	} catch (error) {
+		console.error('Error updating document:', error);
 		return false;
 	}
 }
@@ -142,4 +142,12 @@ export function setup_auto_save(document: Document, onSave?: (success: boolean) 
 		clearInterval(intervalId);
 		console.log('Auto-save disabled');
 	};
+}
+
+// Manual save function for when we want to bind this 
+export async function saveDocument(documentData: Document): Promise<boolean | null> {
+	if (documentData) {
+		return await update_document(documentData);
+	}
+	return null;
 }
