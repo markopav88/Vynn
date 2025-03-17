@@ -81,5 +81,5 @@ export async function loadDocument(documentId: number): Promise<Document | null>
 
 // Function to take the current state of the document and update it in the database
 export function updateDocument(document: Document) {
-
+		// Call update API with current document
 }
