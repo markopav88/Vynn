@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, afterUpdate } from 'svelte';
 	export let documentData: {
 		id: number;
 		name: string;
@@ -9,7 +9,7 @@
 	};
 
 	// Editor state
-	let editorContent = documentData.content;
+	let editorContent = documentData.content || '';
 	let undoStack: string[] = [];
 	let redoStack: string[] = [];
 	let isBold = false;
@@ -31,6 +31,9 @@
 				undoStack = undoStack; // Trigger reactivity
 				redoStack = []; // Clear redo stack on new changes
 				lastSavedContent = editorContent;
+				
+				// Update the document content
+				documentData.content = editorContent;
 			}
 		}, 500);
 	}
@@ -104,6 +107,11 @@
 	function handleInput() {
 		saveState();
 	}
+
+	// Keep documentData in sync with editorContent
+	afterUpdate(() => {
+		documentData.content = editorContent;
+	});
 
 	onMount(() => {
 		if (textArea) {

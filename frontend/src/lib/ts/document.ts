@@ -80,6 +80,66 @@ export async function loadDocument(documentId: number): Promise<Document | null>
 }
 
 // Function to take the current state of the document and update it in the database
-export function updateDocument(document: Document) {
-		// Call update API with current document
+export async function updateDocument(document: Document): Promise<boolean> {
+	try {
+		// Use the correct backend API URL
+		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
+		
+		// Format the timestamp in the format expected by the backend (NaiveDateTime)
+		const now = new Date().toISOString().replace('Z', '');
+		
+		// Create payload with explicit content handling
+		const payload = {
+			name: document.name,
+			content: document.content || "", // Ensure content is never null/undefined
+			updated_at: now
+		};
+		
+		console.log("Sending update with payload:", payload);
+		
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(payload),
+		});
+		
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error("Update failed:", response.status, errorText);
+			return false;
+		}
+		
+		console.log("Document updated successfully");
+		return true;
+	} catch (e) {
+		console.error('Error updating document:', e);
+		return false;
+	}
+}
+
+// Function to set up auto-save interval for a document
+export function setupAutoSave(document: Document, onSave?: (success: boolean) => void): () => void {
+	// Set up interval to save every 30 seconds
+	const intervalId = setInterval(async () => {
+		console.log('Auto-saving document...');
+		const success = await updateDocument(document);
+		
+		if (onSave) {
+			onSave(success);
+		}
+		
+		if (success) {
+			console.log('Document saved successfully');
+		} else {
+			console.error('Failed to save document');
+		}
+	}, 30000); // 30 seconds in milliseconds
+	
+	// Return a cleanup function to clear the interval
+	return () => {
+		clearInterval(intervalId);
+		console.log('Auto-save disabled');
+	};
 }
