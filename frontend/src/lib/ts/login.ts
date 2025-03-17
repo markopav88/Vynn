@@ -36,7 +36,7 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
             body: JSON.stringify(login_payload),
         });
 
-        // Check if the response is successful (status code 200-299)
+        // Check if the response is successful
         if (response.ok) {
             return true;
         } else {

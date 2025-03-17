@@ -41,6 +41,28 @@ pub async fn api_create_user(
 ) -> Result<Json<User>> {
     println!("->> {:<12} - create_user", "HANDLER");
 
+    // Check for duplicate email
+    let existing_user = sqlx::query!(
+        "SELECT id FROM users WHERE email = $1",
+        payload.email
+    )
+    .fetch_optional(&pool)
+    .await;
+
+    // If a user with this email already exists, return an error
+    match existing_user {
+        Ok(Some(_)) => {
+            return Err(Error::EmailAlreadyExistsError);
+        }
+        Ok(None) => {
+            // Email is available, proceed with user creation
+        }
+        Err(e) => {
+            println!("Error checking for existing user: {:?}", e);
+            return Err(Error::DatabaseError);
+        }
+    }
+
     // First insert the user
     let result = sqlx::query!(
         "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id",

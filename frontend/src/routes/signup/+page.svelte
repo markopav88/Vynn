@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { attempt_signup, Signup} from "$lib/ts/signup"
     
     let name = '';
     let email = '';
@@ -13,11 +14,24 @@
         errorMessage = '';
         
         try {
-            // Simulate API call delay
+            // Create login payload with form information
+            let login_payload = new Signup(name, email, password, confirmPassword);
             
+            // Call Post API to try to login
+            let result = await attempt_signup(login_payload);
+
+            if (result) {
+                // Login successful
+                console.log("Signup Success");
+                // Redirect to login page
+                window.location.href = '/login';
+            } else {
+                // signup failed
+                errorMessage = 'Bad Signup Information';
+            }
         } catch (error) {
-            errorMessage = 'An error occurred during signup';
-            console.error('Signup error:', error);
+            errorMessage = 'An error occurred during login';
+            console.error('Login error:', error);
         } finally {
             isLoading = false;
         }

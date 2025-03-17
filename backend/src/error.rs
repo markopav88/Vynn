@@ -27,6 +27,10 @@ pub enum Error {
     // Document Permission Errors
     PermissionError,
     PermissionDeniedError,
+
+    // Signup errors
+    EmailAlreadyExistsError,
+    DatabaseError,
 }
 
 impl IntoResponse for Error {
@@ -45,6 +49,8 @@ impl IntoResponse for Error {
             Self::PermissionError => (StatusCode::INTERNAL_SERVER_ERROR, "PERMISSION_ERROR").into_response(),
             Self::PermissionDeniedError => (StatusCode::FORBIDDEN, "PERMISSION_DENIED").into_response(),
             Self::DocumentUpdateError => (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response(),
+            Self::EmailAlreadyExistsError => (StatusCode::CONFLICT, "EMAIL_ALREADY_EXISTS").into_response(),
+            Self::DatabaseError => (StatusCode::INTERNAL_SERVER_ERROR, "DATABASE_ERROR").into_response(),
         }
     }
 }
