@@ -4,11 +4,11 @@
 / File containing functions and logic required for frontend handling of documents
 / Will provide the communication with the backend and pass necessary information to API calls
 /
-/ Content:
+/ Summary:
 / Class Document: Mapper of a class to how we are storing documents in db
 / loadDocument: Function ran on mount of /document/:id that will call GET API
-/ updateDocument: Function ran every 30 seconds while within a document that updates db instance
-/
+/ updateDocument: Function to call update document POST API and pass in new document state
+/ setupAutoSave: Function to setup interval of 30 seconds for auto-save 
 /
 /
 */
@@ -36,7 +36,7 @@ export class Document {
 }
 
 // Function to parse the saved document state into how it is supposed to look
-export async function loadDocument(documentId: number): Promise<Document | null> {
+export async function load_document(documentId: number): Promise<Document | null> {
 	try {
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
@@ -80,7 +80,7 @@ export async function loadDocument(documentId: number): Promise<Document | null>
 }
 
 // Function to take the current state of the document and update it in the database
-export async function updateDocument(document: Document): Promise<boolean> {
+export async function update_document(document: Document): Promise<boolean> {
 	try {
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
@@ -120,11 +120,11 @@ export async function updateDocument(document: Document): Promise<boolean> {
 }
 
 // Function to set up auto-save interval for a document
-export function setupAutoSave(document: Document, onSave?: (success: boolean) => void): () => void {
+export function setup_auto_save(document: Document, onSave?: (success: boolean) => void): () => void {
 	// Set up interval to save every 30 seconds
 	const intervalId = setInterval(async () => {
 		console.log('Auto-saving document...');
-		const success = await updateDocument(document);
+		const success = await update_document(document);
 		
 		if (onSave) {
 			onSave(success);

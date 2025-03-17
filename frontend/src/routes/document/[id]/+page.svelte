@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import TextEditor from '$lib/components/TextEditor.svelte';
-	import { loadDocument, updateDocument, setupAutoSave, type Document } from '$lib/ts/document';
+	import { load_document, update_document, setup_auto_save, type Document } from '$lib/ts/document';
 
 	
 	import { page } from '$app/stores'; // to access dynamic parameters from URL
@@ -9,21 +9,21 @@
 	$: documentId = $page.params.id; // Access the dynamic parameter from the URL
 	$: console.log('Document ID:', documentId); // Reactive statement to log the documentId
 	let documentData: Document | null = null; // Document Data to be parsed
-	let loading = true;
-	let error = false;
-	let lastSaveStatus: boolean | null = null;
-	let cleanupAutoSave: (() => void) | null = null;
+	let loading = true; // save state for UI
+	let error = false; // save state for UI
+	let lastSaveStatus: boolean | null = null; // tracks success/failure of last save operation
+	let cleanupAutoSave: (() => void) | null = null; //function to stop auto-saving when page is left
 
 	// On page load
 	onMount(async () => {
 		try {
-			documentData = await loadDocument(Number(documentId)); // get document data
+			documentData = await load_document(Number(documentId)); // get document data
 			loading = false;
 			
 			// If we find the document data from API call
 			if (documentData) {
 				// Set up auto-save when document is loaded
-				cleanupAutoSave = setupAutoSave(documentData, (success) => {
+				cleanupAutoSave = setup_auto_save(documentData, (success) => {
 					lastSaveStatus = success;
 					// You could update UI to show save status
 				});
@@ -47,7 +47,7 @@
 	// Manual save function for when we want to bind this 
 	async function saveDocument() {
 		if (documentData) {
-			lastSaveStatus = await updateDocument(documentData);
+			lastSaveStatus = await update_document(documentData);
 		}
 	}
 </script>
