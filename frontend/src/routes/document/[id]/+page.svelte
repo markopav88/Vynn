@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import TextEditor from '$lib/components/TextEditor.svelte';
-	import { loadDocument, saveDocument, Document } from '$lib/ts/document';
+	import { loadDocument, updateDocument, Document } from '$lib/ts/document';
 
 	// If you want to access dynamic parameters from the URL, use the `page` store
 	import { page } from '$app/stores';

@@ -1,6 +1,18 @@
-import { Exception } from 'sass';
+/*
+/ Document.ts
+/
+/ File containing functions and logic required for frontend handling of documents
+/ Will provide the communication with the backend and pass necessary information to API calls
+/
+/ Content:
+/ Class Document: Mapper of a class to how we are storing documents in db
+/ loadDocument: Function ran on mount of /document/:id that will call GET API
+/ updateDocument: Function ran every 30 seconds while within a document that updates db instance
+/
+/
+/
+*/
 
-// Logic for document functiionality
 export class Document {
 	id: number;
 	name: string;
@@ -67,4 +79,7 @@ export async function loadDocument(documentId: number): Promise<Document | null>
 	}
 }
 
-export function saveDocument(document: Document) {}
+// Function to take the current state of the document and update it in the database
+export function updateDocument(document: Document) {
+
+}
