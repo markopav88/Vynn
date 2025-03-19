@@ -7,6 +7,19 @@
     let password = '';
     let errorMessage = '';
     let isLoading = false;
+    let cookieStatus = 'Checking cookies...';
+    
+    // Check cookie status on page load
+    onMount(() => {
+        // We can't directly check HttpOnly cookies with JavaScript
+        // But we can show if cookies are enabled
+        // Need to enfore cookie usage due to how we handle logins
+        if (navigator.cookieEnabled) {
+            cookieStatus = 'Cookies are enabled in your browser';
+        } else {
+            cookieStatus = 'Cookies are disabled in your browser';
+        }
+    });
     
     async function handleLogin() {
         isLoading = true;
@@ -22,16 +35,17 @@
             if (result) {
                 // Login successful
                 console.log("Login Success");
-                // Redirect to home page or dashboard
+                
+                // Redirect to homepage 
                 window.location.href = '/';
             } else {
                 // Login failed
                 errorMessage = 'Invalid email or password';
+                isLoading = false;
             }
         } catch (error) {
             errorMessage = 'An error occurred during login';
             console.error('Login error:', error);
-        } finally {
             isLoading = false;
         }
     }

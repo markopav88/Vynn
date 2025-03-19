@@ -8,11 +8,13 @@
 
 #![allow(unused)]
 
+use std::any;
+
 use anyhow::Result;
 use axum::http::response;
+use backend::result_to_string;
 use httpc_test::Client;
 use serde_json::json;
-use backend::result_to_string;
 
 #[tokio::test]
 async fn test_users() -> Result<()> {
@@ -24,7 +26,8 @@ async fn test_users() -> Result<()> {
     let user_result = test_create_user(&hc).await;
     let good_login_result = test_good_login(&hc).await;
     let bad_login_result = test_bad_login(&hc).await;
-    let test_get_user_result = test_get_user(&hc).await;
+    let get_user_result = test_get_user(&hc).await;
+    let logout_result = test_logout(&hc).await;
     let wipe_db_result = backend::test_wipe_db(&hc).await;
 
     // Print summary
@@ -32,7 +35,8 @@ async fn test_users() -> Result<()> {
     println!("User Creation: {}", result_to_string(&user_result));
     println!("Good Login: {}", result_to_string(&good_login_result));
     println!("Bad Login: {}", result_to_string(&bad_login_result));
-    println!("Get User: {}", result_to_string(&test_get_user_result));
+    println!("Get User: {}", result_to_string(&get_user_result));
+    println!("Logout: {}", result_to_string(&logout_result));
     println!("Wipe Database: {}", result_to_string(&wipe_db_result));
     println!("=====================\n");
 
@@ -41,8 +45,6 @@ async fn test_users() -> Result<()> {
 
 async fn test_create_user(hc: &Client) -> Result<()> {
     println!("TEST - User Creation");
-
-    // Create user
     let create_response = hc
         .do_post(
             "/api/users",
@@ -56,7 +58,6 @@ async fn test_create_user(hc: &Client) -> Result<()> {
 
     create_response.print().await?;
 
-    // Check if the creation was successful (status code 2xx)
     if !create_response.status().is_success() {
         return Err(anyhow::anyhow!(
             "User creation failed with status: {}",
@@ -64,17 +65,14 @@ async fn test_create_user(hc: &Client) -> Result<()> {
         ));
     }
 
-    // Extract the user ID from the response body
     let body = create_response
         .json_body()
         .expect("Failed to get JSON body");
     let user_id = body["id"].as_i64().unwrap_or(1);
 
-    // Try to get the user with the extracted ID
     let get_response = hc.do_get(&format!("/api/users/{}", user_id)).await?;
     get_response.print().await?;
 
-    // Check if the get request was successful
     if !get_response.status().is_success() {
         return Err(anyhow::anyhow!("Failed to get created user"));
     }
@@ -82,6 +80,7 @@ async fn test_create_user(hc: &Client) -> Result<()> {
     Ok(())
 }
 
+//async fn test_update_user(hc: &Client)
 
 async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");
@@ -89,8 +88,8 @@ async fn test_good_login(hc: &Client) -> Result<()> {
         .do_post(
             "/api/login",
             json!({
-                "email": "Hello@gmail.com",
-                "password": "test"
+                "email": "testcreate@example.com",
+                "password": "password123"
             }),
         )
         .await?;
@@ -106,7 +105,6 @@ async fn test_good_login(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-
 async fn test_bad_login(hc: &Client) -> Result<()> {
     print!("TEST - Bad Login");
     let response = hc
@@ -114,7 +112,7 @@ async fn test_bad_login(hc: &Client) -> Result<()> {
             "/api/login",
             json!({
                 "email": "Hell2o@gmail.com",
-                "password": "test"
+                "password": "bad password"
             }),
         )
         .await?;
@@ -138,6 +136,21 @@ async fn test_get_user(hc: &Client) -> Result<()> {
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(
             "Get User failed with status: {}",
+            response.status()
+        ));
+    }
+
+    Ok(())
+}
+
+async fn test_logout(hc: &Client) -> Result<()> {
+    print!("TEST - Logout");
+    let response = hc.do_get("/api/users/logout").await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Logout failed with status: {}",
             response.status()
         ));
     }

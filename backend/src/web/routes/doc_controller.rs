@@ -3,7 +3,7 @@
 use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
 use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload};
 use crate::{Error, Result};
-use axum::routing::{get, post, delete, put};
+use axum::routing::{delete, get, post, put};
 use axum::{
     extract::{Extension, Json, Path},
     Router,
@@ -173,7 +173,8 @@ pub async fn api_update_document(
 }
 
 /// Grant permission to a user for a document
-pub async fn grant_document_permission(Path(document_id): Path<i32>,
+pub async fn grant_document_permission(
+    Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreatePermissionPayload>,
 ) -> Result<Json<Value>> {
@@ -186,7 +187,7 @@ pub async fn grant_document_permission(Path(document_id): Path<i32>,
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
-        return Err(Error::PermissionError)
+        return Err(Error::PermissionError);
     }
 
     // Insert the permission
@@ -229,7 +230,7 @@ pub async fn get_document_users(
     let permissions = check_document_permission(&pool, user_id, document_id, "viewer").await?;
 
     if !permissions {
-        return Err(Error::PermissionError)
+        return Err(Error::PermissionError);
     }
     let result = sqlx::query!(
         r#"SELECT dp.user_id, u.name, u.email, dp.role 
@@ -271,17 +272,17 @@ pub async fn update_document_permission(
     Json(payload): Json<UpdatePermissionPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - update_document_permission", "HANDLER");
-    
+
     // Get user_id from auth (for now hardcoded)
     let user_id = 1;
-    
+
     // Check if user has owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
-    
+
     if !has_permission {
         return Err(Error::PermissionDeniedError);
     }
-    
+
     // Update the permission
     let result = sqlx::query!(
         "UPDATE document_permissions 
@@ -289,11 +290,11 @@ pub async fn update_document_permission(
          WHERE document_id = $2 AND user_id = $3",
         payload.role,
         document_id,
-        payload.user_id  // The user whose permission is being updated
+        payload.user_id // The user whose permission is being updated
     )
     .execute(&pool)
     .await;
-    
+
     match result {
         Ok(_) => Ok(Json(json!({
             "result": {
@@ -314,17 +315,17 @@ pub async fn remove_document_permission(
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - remove_document_permission", "HANDLER");
-    
+
     // Get user_id from auth (for now hardcoded)
     let user_id = 1;
-    
+
     // Check if user has owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
-    
+
     if !has_permission {
         return Err(Error::PermissionDeniedError);
     }
-    
+
     // Prevent removing the last owner
     let owners_count_result = sqlx::query!(
         "SELECT COUNT(*) as count FROM document_permissions 
@@ -333,7 +334,7 @@ pub async fn remove_document_permission(
     )
     .fetch_one(&pool)
     .await;
-    
+
     let is_target_owner = sqlx::query!(
         "SELECT role FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
@@ -342,14 +343,14 @@ pub async fn remove_document_permission(
     )
     .fetch_optional(&pool)
     .await;
-    
+
     // If we're removing an owner and there's only one owner, prevent it
     if let (Ok(owners_count), Ok(Some(record))) = (&owners_count_result, &is_target_owner) {
         if record.role == "owner" && owners_count.count.unwrap_or(0) <= 1 {
             return Err(Error::PermissionDeniedError);
         }
     }
-    
+
     // Remove the permission
     let result = sqlx::query!(
         "DELETE FROM document_permissions 
@@ -359,7 +360,7 @@ pub async fn remove_document_permission(
     )
     .execute(&pool)
     .await;
-    
+
     match result {
         Ok(_) => Ok(Json(json!({
             "result": {
@@ -381,6 +382,9 @@ pub fn doc_routes() -> Router {
         .route("/:id", post(api_update_document))
         .route("/:id/permissions", get(get_document_users))
         .route("/:id/permissions", post(grant_document_permission))
-        .route("/:id/permissions/:user_id", delete(remove_document_permission))
+        .route(
+            "/:id/permissions/:user_id",
+            delete(remove_document_permission),
+        )
         .route("/:id/permissions", put(update_document_permission))
 }

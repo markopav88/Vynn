@@ -41,8 +41,12 @@ export async function load_document(documentId: number): Promise<Document | null
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
 
-		const response = await fetch(apiUrl);
+		// Call GET API
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
 
+		// check response status
 		if (!response.ok) {
 			throw new Error(`Failed to fetch document: ${response.statusText}`);
 		}
@@ -103,6 +107,7 @@ export async function update_document(document: Document): Promise<boolean> {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify(payload),
+			credentials: 'include'
 		});
 		
 		if (!response.ok) {

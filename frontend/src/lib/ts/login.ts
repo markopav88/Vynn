@@ -34,6 +34,7 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(login_payload),
+            credentials: 'include'
         });
 
         // Check if the response is successful
@@ -48,5 +49,27 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
     } catch (error) {
         console.error("Login request error:", error);
         return false;
+    }
+}
+
+export async function logout() {
+    const apiUrl = `http://localhost:3001/api/users/logout`;
+    // Call GET API
+    const response = await fetch(apiUrl, {
+        credentials: 'include'
+    });
+
+    // check response status
+    if (!response.ok) {
+        throw new Error(`Failed to logout: ${response.statusText}`);
+    }
+
+    // Check if the response is JSON
+    const contentType = response.headers.get('Content-Type');
+    if (!contentType || !contentType.includes('application/json')) {
+        // If the response is not JSON, log it and return null
+        const text = await response.text(); // Read the response as text to inspect it
+        console.error('Expected JSON, but received:', text);
+        return null;
     }
 }
