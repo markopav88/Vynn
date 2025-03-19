@@ -16,20 +16,3 @@ pub async fn create_pool() -> PgPool {
         .await
         .expect("Failed to create database pool")
 }
-
-// Function which can be optionally called with CLI arguments
-// This function will run the migrations
-pub async fn migrate_db(pool: &PgPool) -> bool {
-    match sqlx::migrate!("./migrations").run(pool).await {
-        Ok(_) => true,
-        Err(e) => {
-            println!("Failed to migrate the database: {}", e);
-            false
-        }
-    }
-}
-
-
-
-
-

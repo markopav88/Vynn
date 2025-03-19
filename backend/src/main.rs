@@ -1,30 +1,29 @@
 // backend/src/main.rs
+pub use self::error::{Error, Result}; // export types
+
 mod db;
-mod controllers;
+mod error;
 mod models;
+mod web;
 
+use axum::middleware;
+
+use axum::response::Response;
 // Axum is a web framework for Rust (It is to rust what express is to node.js)
-use axum::{
-    routing::get,
-    Router,
-    Extension
-};
-use std::net::SocketAddr; // Allows us to bind the backend to a specific port 
-use std::env; // Allows us read arguments
-use tower_http::cors::{CorsLayer, Any}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS
-use dotenv::dotenv; // Load .Env
+use axum::{routing::get_service, Extension, Router};
+use dotenv::dotenv;
+use std::net::SocketAddr; // Allows us to bind the backend to a specific port
+use tower_cookies::CookieManagerLayer;
+// use tower_http::cors::{Any, CorsLayer}; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS // Load .Env
+use tower_http::services::ServeDir;
 
-use crate::db::pool::create_pool;// Import the connection pool 
-use crate::controllers::db_controller::test_db;
-use crate::controllers::user_controller::user_routes;// Import user routes from user controller
-use crate::db::pool::migrate_db; // Import the migrate_db function
+use crate::db::pool::create_pool; // Import the connection pool
 
-
-#[tokio::main] // Indicates that the main function is an async function using tokio
+#[tokio::main] // Indicates that the main function is an async function using tokiopub mod web;
 async fn main() {
     // Load environment variables from .env file
     dotenv().ok();
-    
+
     /*
     / Creating the Pool using SQLx
     / Creates the pool before building router
@@ -32,26 +31,18 @@ async fn main() {
     */
     let pool = create_pool().await;
 
-   // Collect command line arguments
-   let args: Vec<String> = env::args().collect();
-
-   // If the user passes the 'migrate' argument, run the migrations
-   if args.len() > 1 && args[1] == "migrate" {
-       println!("Running migrations...");
-       migrate_db(&pool).await;
-   }
-
     /*
     / Configure CORS
-    / CORS is needed when a frontend (running on one domain or port) 
+    / CORS is needed when a frontend (running on one domain or port)
     / wants to send HTTP requests to a backend running on another domain or port.
     / This is needed for the frontend to send requests to the backend.
     / We allow all origins, methods, and headers currently, but this should be changed later for security.
-    */
+    / ADD BACK LATER FOR SECURITY
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
+    */
 
     /*
     / Initialize our router
@@ -59,26 +50,48 @@ async fn main() {
     / This route is used to test the backend
     / When the route is hit, the hello function is called
     */
+    let user_api_routes = web::routes::user_controller::user_routes();
+    let doc_api_routes = web::routes::doc_controller::doc_routes();
+
     let app = Router::new()
-        .route("/api/test-db", get(test_db))
-        .merge(user_routes())  // Merge routes from user_controller,  any routes defined in user controller are now part of the Axum application.
+        .merge(web::routes::db_controller::db_routes())
+        .nest("/api", user_api_routes) // Merge routes from user_controller,  any routes defined in user controller are now part of the Axum application.
+        .nest("/api/document", doc_api_routes) // Merge routes from document_controller 
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
-        .layer(cors);
+        .layer(middleware::map_response(main_response_mapper))
+        .layer(CookieManagerLayer::new())  // ! Cookie Manager -> Should have many of these within different routers I think
+        .fallback_service(routes_static()); // Fallback route if route cannot be found above
 
     /*
     / Bind the router to a specific port
     / We use the SocketAddr struct to bind the router to the port
     / We use the 0.0.0.0 address to bind the router to localhost
-    / We will bind to port 3000 for now 
+    / We will bind to port 3001 for now
     / We print a message to the console to indicate that the server is starting
     */
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    println!("Server starting on http://localhost:3000");
-    
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
+    println!("Server starting on http://localhost:3001");
+
     /*
     / Serve the router ie Start the server
-    / We will star the server with the configured router and address
+    / We will start the server with the configured router and address
     */
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
+
+// Fallback Route If One Cannot Be Resolved
+fn routes_static() -> Router {
+    Router::new().nest_service("/", get_service(ServeDir::new("./")))
+}
+
+
+async fn main_response_mapper(response: Response) -> Response {
+    println!("->> {:<12} - main_response_mapper", "RES_MAPPER");
+
+    println!();
+
+    response
 }
