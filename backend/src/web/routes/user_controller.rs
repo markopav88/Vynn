@@ -1,6 +1,5 @@
 // src/controllers/user_controller.rs
 // Request Handlers
-// ! Needs signout method which wipes cookies
 use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
 use axum::routing::{get, post};
@@ -10,7 +9,8 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use tower_cookies::{Cookies, Cookie};
+use tower_cookies::cookie::time::Duration;
+use tower_cookies::{Cookie, Cookies};
 
 /// GET handler for retrieving a user by ID.
 /// Accessible via: GET /api/users/:id
@@ -40,6 +40,25 @@ pub async fn api_create_user(
     Json(payload): Json<CreateUserPayload>,
 ) -> Result<Json<User>> {
     println!("->> {:<12} - create_user", "HANDLER");
+
+    // Check for duplicate email
+    let existing_user = sqlx::query!("SELECT id FROM users WHERE email = $1", payload.email)
+        .fetch_optional(&pool)
+        .await;
+
+    // If a user with this email already exists, return an error
+    match existing_user {
+        Ok(Some(_)) => {
+            return Err(Error::EmailAlreadyExistsError);
+        }
+        Ok(None) => {
+            // Email is available, proceed with user creation
+        }
+        Err(e) => {
+            println!("Error checking for existing user: {:?}", e);
+            return Err(Error::DatabaseError);
+        }
+    }
 
     // First insert the user
     let result = sqlx::query!(
@@ -85,7 +104,7 @@ pub async fn api_update_user(
     println!("->> {:<12} - update_user", "HANDLER");
 
     // ! Need to check cookie here to get user id
-    
+
     // temp user id
 
     let user_id = 1;
@@ -113,34 +132,93 @@ pub async fn api_update_user(
     }
 }
 
-pub async fn api_user_login(cookies: Cookies, payload: Json<LoginPayload>) -> Result<Json<Value>> {
+pub async fn api_user_login(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+    Json(payload): Json<LoginPayload>,
+) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
 
-    // ! IMPL AUTH LOGIN
+    // Grab email and password from database and compare it to the payload
+    let result = sqlx::query!(
+        "SELECT id, email, password
+         FROM users
+         WHERE email = $1;",
+        payload.email
+    )
+    .fetch_one(&pool)
+    .await;
 
-    // ? Test Authentication example
-    if payload.email != "Hello@gmail.com" || payload.password != "test" {
-        return Err(Error::LoginFailError);
+    match result {
+        Ok(record) => {
+            if payload.email == record.email && payload.password == record.password {
+                // Get environment variables with fallbacks for development
+                let domain = option_env!("DOMAIN").unwrap_or("localhost");
+                let app_env = option_env!("APP_ENV").unwrap_or("development");
+                let on_production = app_env == "production";
+                
+                // Create a token value (in a real app, this would be a JWT or similar)
+                let token_value = format!("user-{}.exp.sign", record.id);
+                
+                // Build the cookie with enhanced security
+                let cookie = Cookie::build("auth-token", token_value)
+                    .domain(domain.to_string())
+                    .path("/")
+                    .secure(on_production)
+                    .http_only(true)
+                    .max_age(Duration::days(3))
+                    .finish();
+
+                // Add the cookie
+                cookies.add(cookie);
+
+                // Return success
+                return Ok(Json(json!({
+                    "result": {
+                        "success": true,
+                        "user_id": record.id
+                    }
+                })));
+            } else {
+                return Err(Error::LoginFailError);
+            }
+        }
+        Err(_) => return Err(Error::LoginFailError),
     }
+}
 
-    // ! EXAMPLE OF SETTING COOKIES -> Change to encryption
-    cookies.add(Cookie::new("auth-token", "user-1.exp.sign"));
+// Logout function to wipe user session and cookies
+pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
+    // Get environment variables with fallbacks for development
+    let domain = option_env!("DOMAIN").unwrap_or("localhost");
+    let app_env = option_env!("APP_ENV").unwrap_or("development");
+    let on_production = app_env == "production";
+    
+    // Build a cookie with the same properties as the login cookie
+    let cookie = Cookie::build("auth-token", "")
+        .domain(domain.to_string())
+        .path("/")
+        .secure(on_production)
+        .http_only(true)
+        .max_age(Duration::days(0))  // Expire immediately
+        .finish();
 
-    // Create Success
-    let success = Json(json!({
+    // Remove the private cookie
+    cookies.remove(cookie);
+
+    return Ok(Json(json!({
         "result": {
             "success": true
         }
-    }));
-
-    Ok(success)
+    })));
 }
 
-/// Combine user-related routes into one Router instance.
+// Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
         .route("/login", post(api_user_login))
         .route("/users", post(api_create_user))
         .route("/users/:id", get(get_user))
         .route("/users/:id", post(api_update_user))
+        .route("/users/logout", get(api_logout))
 }

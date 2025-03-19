@@ -6,44 +6,30 @@
     In a Svelte file we can have HTML, CSS, and Typescript code.
 -->
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import TextEditor from '$lib/components/TextEditor.svelte';
-
-    let message = '';
-    let error = '';
-    let loading = false;
+    import { logout } from "$lib/ts/login";
     
-    /* Example backend interaction
-    async function fetchMessage() {
-        loading = true;
-        error = '';
-        
+    async function handleLogout() {
         try {
-            const response = await fetch('http://localhost:3000/api/hello');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            message = data.message;
-        } catch (e) {
-            error = e instanceof Error ? e.message : 'Failed to fetch message';
-            console.error('Error:', e);
-        } finally {
-            loading = false;
+            await logout();
+            // Refresh the page after logout
+            window.location.reload();
+        } catch (error) {
+            console.error("Logout error:", error);
+            alert("Failed to logout. Please try again.");
         }
     }
-    
-
-    // Optional: fetch on page load
-    onMount(() => {
-        fetchMessage();
-    });
-    */
 </script>
 
 <main class="min-h-screen bg-[#0A1721] flex flex-col items-center justify-center text-[#E5E5E5]">
     <h1 class="text-4xl mb-4">Home</h1>
-    <p class="text-lg max-w-2xl text-center">
+    <p class="text-lg max-w-2xl text-center mb-8">
         This is the Home page. You can add your content here.
     </p>
+    
+    <button 
+        on:click={handleLogout}
+        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+    >
+        Test Logout
+    </button>
 </main> 
