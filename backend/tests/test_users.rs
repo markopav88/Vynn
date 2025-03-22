@@ -80,7 +80,14 @@ async fn test_create_user(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-//async fn test_update_user(hc: &Client)
+async fn test_update_user(hc: &Client) -> Result<()> {
+    print!("TEST - Update User");
+
+    // attempt api call on user 1
+    let response = hc.do_post("/api/users/1", json!({
+        
+    }))
+}
 
 async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");

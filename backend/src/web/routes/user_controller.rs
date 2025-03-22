@@ -105,10 +105,6 @@ pub async fn api_update_user(
 
     // ! Need to check cookie here to get user id
 
-    // temp user id
-
-    let user_id = 1;
-
     // perform update
     let result = sqlx::query!(
         "UPDATE users
@@ -156,10 +152,10 @@ pub async fn api_user_login(
                 let domain = option_env!("DOMAIN").unwrap_or("localhost");
                 let app_env = option_env!("APP_ENV").unwrap_or("development");
                 let on_production = app_env == "production";
-                
+
                 // Create a token value (in a real app, this would be a JWT or similar)
                 let token_value = format!("user-{}.exp.sign", record.id);
-                
+
                 // Build the cookie with enhanced security
                 let cookie = Cookie::build("auth-token", token_value)
                     .domain(domain.to_string())
@@ -193,14 +189,14 @@ pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     let domain = option_env!("DOMAIN").unwrap_or("localhost");
     let app_env = option_env!("APP_ENV").unwrap_or("development");
     let on_production = app_env == "production";
-    
+
     // Build a cookie with the same properties as the login cookie
     let cookie = Cookie::build("auth-token", "")
         .domain(domain.to_string())
         .path("/")
         .secure(on_production)
         .http_only(true)
-        .max_age(Duration::days(0))  // Expire immediately
+        .max_age(Duration::days(0)) // Expire immediately
         .finish();
 
     // Remove the private cookie
