@@ -80,7 +80,7 @@ async fn test_create_user(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn test_good_login(hc: &Client) -> Result<()> {
+pub async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");
     let response = hc
         .do_post(

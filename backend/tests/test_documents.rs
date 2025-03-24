@@ -26,31 +26,56 @@ async fn test_documents() -> Result<()> {
     println!("\n===== RUNNING DOCUMENT API TESTS =====\n");
 
     // Run all tests and collect results
+    let login_result = test_good_login(&hc).await;
     let create_result = test_create_document(&hc).await;
     let get_result = test_get_document(&hc).await;
     let update_result = test_update_document(&hc).await;
-    let get_users_result = test_get_document_users(&hc).await;
-    let permission_result = test_document_permissions(&hc).await;
+    let add_permissions = test_add_permissions(&hc).await;
+    let update_permissions = test_update_permissions(&hc).await;
+    let get_permissions = test_get_permissions(&hc).await;
     let wipe_db = backend::test_wipe_db(&hc).await;
 
     // Print summary
     println!("\n===== TEST RESULTS =====");
+    println!("Login as User 1 {}", result_to_string(&login_result));
     println!("Create Document: {}", result_to_string(&create_result));
     println!("Get Document: {}", result_to_string(&get_result));
     println!("Update Document: {}", result_to_string(&update_result));
-    println!("Get Document Users: {}", result_to_string(&get_users_result));
-    println!("Document Permissions: {}", result_to_string(&permission_result));
+    println!("Add Permissions: {}", result_to_string(&add_permissions));
+    println!("Update Permissions: {}", result_to_string(&update_permissions));
+    println!("Get Users w Permissions: {}", result_to_string(&get_permissions));
     println!("Wipe Database: {}", result_to_string(&wipe_db));
     println!("=====================\n");
 
     Ok(())
 }
 
+// Test login to set the auth cookie and allow for validation
+pub async fn test_good_login(hc: &Client) -> Result<()> {
+    print!("TEST - Good Login");
+    let response = hc
+        .do_post(
+            "/api/login",
+            json!({
+                "email": "CFdefence@gmail.com",
+                "password": "MyPassword"
+            }),
+        )
+        .await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Login failed with status: {}",
+            response.status()
+        ));
+    }
+
+    Ok(())
+}
+
 async fn test_create_document(hc: &Client) -> Result<()> {
     println!("TEST - Document Creation");
-
-    // Using hardcoded user_id 1 which always exists in the database
-    let user_id = 1;
     
     // Create document
     let now = Utc::now().naive_utc();
@@ -60,7 +85,6 @@ async fn test_create_document(hc: &Client) -> Result<()> {
             json!({
                 "name": "Test Document",
                 "content": "This is a test document content",
-                "user_id": user_id,
                 "created_at": now,
                 "updated_at": now
             }),
@@ -82,6 +106,7 @@ async fn test_create_document(hc: &Client) -> Result<()> {
         .json_body()
         .expect("Failed to get JSON body");
     let document_id = body["id"].as_i64().unwrap_or(1);
+    print!("document_id {}", document_id);
 
     // Try to get the document with the extracted ID
     let get_response = hc.do_get(&format!("/api/document/{}", document_id)).await?;
@@ -144,12 +169,12 @@ async fn test_update_document(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn test_document_permissions(hc: &Client) -> Result<()> {
-    println!("TEST - Document Permissions");
-    
+async fn test_add_permissions(hc: &Client) -> Result<()> {
+    println!("TEST - Add Document Permissions");
+
     // Using hardcoded user_id 2 which always exists in the database
     let user_id = 2;
-    
+        
     // 1. Grant permission to a user
     let grant_response = hc
         .do_post(
@@ -162,44 +187,41 @@ async fn test_document_permissions(hc: &Client) -> Result<()> {
         .await?;
 
     grant_response.print().await?;
-    
+
     if !grant_response.status().is_success() {
         return Err(anyhow::anyhow!("Failed to grant permission"));
-    }
-    
-    // 2. Get document users
-    let users_response = hc.do_get("/api/document/1/permissions").await?;
-    users_response.print().await?;
-    
-    if !users_response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to get document users"));
-    }
-    
-    // 3. Update permission
-    let update_response = hc
-        .do_put(
-            "/api/document/1/permissions",
-            json!({
-                "user_id": user_id,
-                "role": "editor"
-            }),
-        )
-        .await?;
-        
-    update_response.print().await?;
-    
-    if !update_response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to update permission"));
     }
 
     Ok(())
 }
 
-async fn test_get_document_users(hc: &Client) -> Result<()> {
+async fn test_update_permissions(hc: &Client) -> Result<()> {
+    println!("TEST - Update Document Permissions");
+
+    // Update permission of user_id 2 which should always exist in the database
+    let update_response = hc
+    .do_put(
+        "/api/document/1/permissions",
+        json!({
+            "user_id": 2,
+            "role": "editor"
+        }),
+    )
+    .await?;
+
+    update_response.print().await?;
+
+    if !update_response.status().is_success() {
+    return Err(anyhow::anyhow!("Failed to update permission"));
+    }
+
+    Ok(())
+}
+
+async fn test_get_permissions(hc: &Client) -> Result<()> {
     println!("TEST - Get Document Users");
     
     // Now get all users with permissions for document 1
-
 
     let users_response = hc.do_get("/api/document/1/permissions").await?;
     users_response.print().await?;
@@ -214,3 +236,4 @@ async fn test_get_document_users(hc: &Client) -> Result<()> {
     
     Ok(())
 }
+

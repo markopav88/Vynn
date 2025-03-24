@@ -35,8 +35,23 @@ export class Document {
 	}
 }
 
+// Define a User type for document permissions
+export class DocumentUser {
+	id: number;
+	name: string;
+	email: string;
+	role: string;
+
+	constructor(new_id: number, new_name: string, new_email: string, new_role: string) {
+		this.id = new_id;
+		this.name = new_name;
+		this.email = new_email;
+		this.role = new_role;
+	}
+}
+
 // Function to parse the saved document state into how it is supposed to look
-export async function load_document(documentId: number): Promise<Document | null> {
+export async function get_document(documentId: number): Promise<Document | null> {
 	try {
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
@@ -155,4 +170,48 @@ export async function saveDocument(documentData: Document): Promise<boolean | nu
 		return await update_document(documentData);
 	}
 	return null;
+}
+
+// Function to get all users with permissions to a given document
+// To return a list of DocumentUser objects with access to the document or null 
+export async function get_document_users(documentData: Document): Promise<DocumentUser[] | null> {
+	try {
+		// Use the correct backend API URL
+		const apiUrl = `http://localhost:3001/api/document/${documentData.id}/permissions`;
+
+		// Call GET API with credentials for auth cookies
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+
+		// Check response status
+		if (!response.ok) {
+			throw new Error(`Failed to fetch document users: ${response.statusText}`);
+		}
+
+		// Parse the response JSON
+		const data = await response.json();
+
+		console.log(data);
+		
+		// Return the users array from the response
+		return data.users || null;
+	} catch (error) {
+		console.error('Error loading document users:', error);
+		return null;
+	}
+}
+
+// TODO Function to attempt to update a users permissions will return a boolean
+// that indicates the success or failure of the operation
+export async function update_document_permissions(documentData: Document): Promise<boolean> {
+	// Use correct backend API URL
+
+	// Create payload to send to API
+
+	// Call API
+
+	// Check results of API call
+	return true;
+	
 }

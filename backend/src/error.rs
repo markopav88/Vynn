@@ -21,13 +21,14 @@ pub enum Error {
     // Document Errors
     DocumentNotFoundError,
     DocumentUpdateError,
+    DocumentCreationError,
 
     // General Errors
     InvalidRequestFormatError,
 
     // Document Permission Errors
     PermissionError,
-    PermissionDeniedError,
+    PermissionCreationError,
 
     // Signup errors
     EmailAlreadyExistsError,
@@ -68,9 +69,6 @@ impl IntoResponse for Error {
             Self::PermissionError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "PERMISSION_ERROR").into_response()
             }
-            Self::PermissionDeniedError => {
-                (StatusCode::FORBIDDEN, "PERMISSION_DENIED").into_response()
-            }
             Self::DocumentUpdateError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
             }
@@ -82,6 +80,12 @@ impl IntoResponse for Error {
             }
             Self::UserIdUpdateError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "USER_ID_NOT_FOUND").into_response()
+            }
+            Self::DocumentCreationError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
+            }
+            Self::PermissionCreationError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
             }
         }
     }

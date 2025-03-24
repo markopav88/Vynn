@@ -70,3 +70,10 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO document_permissions(document_id, user_id, role)
 VALUES(1, 1, 'owner')
 ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'owner';
+
+INSERT INTO document_permissions(document_id, user_id, role)
+VALUES(1, 2, 'editor')
+ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'editor';
+
+-- Add this after your document inserts
+SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));

@@ -15,7 +15,6 @@ pub struct Document {
 pub struct CreateDocumentPayload {
     pub name: String,
     pub content: Option<String>,
-    pub user_id: Option<i32>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime
 }
