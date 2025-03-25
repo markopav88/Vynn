@@ -1,6 +1,15 @@
-// src/controllers/user_controller.rs
-// Request Handlers
-use axum::routing::{get, put, post};
+/*
+/ src/controllers/user_controller.rs
+/ Request Handlers
+/
+/ File containing various API Backend endpoints for manipulating a user
+/
+/ API Summary:
+/
+/
+*/
+
+use axum::routing::{get, post, put};
 use axum::{
     extract::{Extension, Json, Path},
     Router,

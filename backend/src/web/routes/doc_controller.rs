@@ -1,16 +1,26 @@
-// src/controllers/user_controller.rs
-// Request Handlers
-use crate::models::document::{self, CreateDocumentPayload, Document, UpdateDocumentPayload};
-use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload};
-use crate::{Error, Result};
+/*
+/ src/controllers/doc_controller.rs
+/ Request Handlers
+/
+/ File containing various API Backend endpoints for manipulating a document and its permissions
+/
+/ API Summary:
+/
+/
+*/
+
 use axum::routing::{delete, get, post, put};
 use axum::{
     extract::{Extension, Json, Path},
     Router,
 };
 use serde_json::{json, Value};
-use sqlx::{pool, PgPool};
+use sqlx::PgPool;
 use tower_cookies::Cookies;
+
+use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
+use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload};
+use crate::{Error, Result};
 
 use backend::get_user_id_from_cookie;
 
