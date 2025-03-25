@@ -1,6 +1,6 @@
 // src/controllers/user_controller.rs
 // Request Handlers
-use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
+use crate::models::document::{self, CreateDocumentPayload, Document, UpdateDocumentPayload};
 use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload};
 use crate::{Error, Result};
 use axum::routing::{delete, get, post, put};
@@ -9,7 +9,7 @@ use axum::{
     Router,
 };
 use serde_json::{json, Value};
-use sqlx::PgPool;
+use sqlx::{pool, PgPool};
 use tower_cookies::Cookies;
 
 use backend::get_user_id_from_cookie;
@@ -24,11 +24,8 @@ pub async fn api_get_document(
     println!("->> {:<12} - get_document", "HANDLER");
 
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
-    
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
     // need to ensure the user has permissions to view this document
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
 
@@ -47,7 +44,7 @@ pub async fn api_get_document(
         )
         .fetch_one(&pool)
         .await;
-    
+
         match result {
             Ok(document) => Ok(Json(document)),
             Err(_) => Err(Error::UserNotFoundError),
@@ -65,12 +62,9 @@ pub async fn api_create_document(
     Json(payload): Json<CreateDocumentPayload>,
 ) -> Result<Json<Document>> {
     println!("->> {:<12} - create_document", "HANDLER");
-    
+
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     // First insert the document
     let result = sqlx::query!(
@@ -133,40 +127,6 @@ pub async fn api_create_document(
     }
 }
 
-async fn check_document_permission(
-    pool: &PgPool,
-    user_id: i32,
-    document_id: i32,
-    required_role: &str,
-) -> Result<bool> {
-    let result = sqlx::query!(
-        r#"SELECT role FROM document_permissions 
-           WHERE document_id = $1 AND user_id = $2"#,
-        document_id,
-        user_id
-    )
-    .fetch_optional(pool)
-    .await;
-
-    match result {
-        Ok(Some(record)) => {
-            let has_permission = match required_role {
-                "viewer" => true, // Any role can view
-                "editor" => record.role == "editor" || record.role == "owner",
-                "owner" => record.role == "owner",
-                _ => false,
-            };
-
-            Ok(has_permission)
-        }
-        Ok(None) => Ok(false),
-        Err(e) => {
-            println!("Error checking permission: {:?}", e);
-            Err(Error::PermissionError)
-        }
-    }
-}
-
 pub async fn api_update_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -176,10 +136,7 @@ pub async fn api_update_document(
     println!("->> {:<12} - update_document", "HANDLER");
 
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     // Check if user has editor or owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
@@ -214,8 +171,104 @@ pub async fn api_update_document(
     }
 }
 
+async fn delete_document(
+    cookies: Cookies,
+    Path(document_id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    // First check if the current user has owner permission
+    // get user_id from cookies
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // delete all rows from document permissions table where document id = one being delete
+    let result = sqlx::query!(
+        "DELETE FROM document_permissions
+        WHERE document_id =  $1",
+        document_id
+    )
+    .execute(&pool)
+    .await;
+
+    // return error if the query did nothing
+    if result.as_ref().unwrap().rows_affected() == 0 {
+        return Err(Error::DocumentNotFoundError);
+    }
+
+    // check result
+    match result {
+        Ok(_) => {
+            // if we sucessfully delete the delete the document from the database
+            let result = sqlx::query!(
+                "DELETE FROM Documents
+                 WHERE id =  $1",
+                document_id
+            )
+            .execute(&pool)
+            .await;
+
+            // return error if the query did nothing
+            if result.as_ref().unwrap().rows_affected() == 0 {
+                return Err(Error::DocumentNotFoundError);
+            }
+
+            match result {
+                Ok(_) => {
+                    return Ok(Json(json!({
+                        "result": {
+                            "success": true
+                        }
+
+                    })))
+                }
+                Err(_) => return Err(Error::DocumentDeletionError),
+            }
+        }
+        Err(_) => return Err(Error::DocumentDeletionError),
+    }
+}
+
+async fn check_document_permission(
+    pool: &PgPool,
+    user_id: i32,
+    document_id: i32,
+    required_role: &str,
+) -> Result<bool> {
+    let result = sqlx::query!(
+        r#"SELECT role FROM document_permissions 
+           WHERE document_id = $1 AND user_id = $2"#,
+        document_id,
+        user_id
+    )
+    .fetch_optional(pool)
+    .await;
+
+    match result {
+        Ok(Some(record)) => {
+            let has_permission = match required_role {
+                "viewer" => true, // Any role can view
+                "editor" => record.role == "editor" || record.role == "owner",
+                "owner" => record.role == "owner",
+                _ => false,
+            };
+
+            Ok(has_permission)
+        }
+        Ok(None) => Ok(false),
+        Err(e) => {
+            println!("Error checking permission: {:?}", e);
+            Err(Error::PermissionError)
+        }
+    }
+}
+
 /// Grant permission to a user for a document
-pub async fn grant_document_permission(
+pub async fn api_add_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
@@ -225,10 +278,7 @@ pub async fn grant_document_permission(
 
     // First check if the current user has owner permission
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
@@ -263,7 +313,7 @@ pub async fn grant_document_permission(
 }
 
 /// Get all users with access to a document
-pub async fn get_document_users(
+pub async fn api_get_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
@@ -271,10 +321,7 @@ pub async fn get_document_users(
     println!("->> {:<12} - get_document_users", "HANDLER");
 
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     let permissions = check_document_permission(&pool, user_id, document_id, "viewer").await?;
 
@@ -315,7 +362,7 @@ pub async fn get_document_users(
 }
 
 /// Update a user's permission for a document
-pub async fn update_document_permission(
+pub async fn api_update_permission(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
@@ -324,10 +371,7 @@ pub async fn update_document_permission(
     println!("->> {:<12} - update_document_permission", "HANDLER");
 
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     // Check if user has owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
@@ -362,7 +406,7 @@ pub async fn update_document_permission(
 }
 
 /// Remove a user's permission for a document
-pub async fn remove_document_permission(
+pub async fn api_remove_permissions(
     cookies: Cookies,
     Path((document_id, target_user_id)): Path<(i32, i32)>,
     Extension(pool): Extension<PgPool>,
@@ -370,10 +414,7 @@ pub async fn remove_document_permission(
     println!("->> {:<12} - remove_document_permission", "HANDLER");
 
     // get user_id from cookies
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return Err(Error::PermissionError),
-    };
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     // Check if user has owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
@@ -436,11 +477,9 @@ pub fn doc_routes() -> Router {
         .route("/", post(api_create_document))
         .route("/:id", get(api_get_document))
         .route("/:id", post(api_update_document))
-        .route("/:id/permissions", get(get_document_users))
-        .route("/:id/permissions", post(grant_document_permission))
-        .route(
-            "/:id/permissions/:user_id",
-            delete(remove_document_permission),
-        )
-        .route("/:id/permissions", put(update_document_permission))
+        .route("/:id", delete(delete_document))
+        .route("/:id/permissions", get(api_get_permissions))
+        .route("/:id/permissions", post(api_add_permissions))
+        .route("/:id/permissions/:user_id", delete(api_remove_permissions))
+        .route("/:id/permissions", put(api_update_permission))
 }

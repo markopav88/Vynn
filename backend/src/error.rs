@@ -22,6 +22,7 @@ pub enum Error {
     DocumentNotFoundError,
     DocumentUpdateError,
     DocumentCreationError,
+    DocumentDeletionError,
 
     // General Errors
     InvalidRequestFormatError,
@@ -85,6 +86,9 @@ impl IntoResponse for Error {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
             }
             Self::PermissionCreationError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
+            }
+            Self::DocumentDeletionError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
             }
         }
