@@ -10,43 +10,67 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
+use tower_cookies::Cookies;
+
+use backend::get_user_id_from_cookie;
 
 /// GET handler for retrieving a document by ID.
 /// Accessible via: GET /api/document/:id
 pub async fn api_get_document(
+    cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<Document>> {
     println!("->> {:<12} - get_document", "HANDLER");
 
-    let result = sqlx::query_as!(
-        Document,
-        r#"SELECT 
-            id, 
-            name, 
-            content, 
-            created_at, 
-            updated_at, 
-            user_id 
-        FROM documents WHERE id = $1"#,
-        document_id
-    )
-    .fetch_one(&pool)
-    .await;
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
+    
+    // need to ensure the user has permissions to view this document
+    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
 
-    match result {
-        Ok(document) => Ok(Json(document)),
-        Err(_) => Err(Error::UserNotFoundError),
+    if has_permission {
+        let result = sqlx::query_as!(
+            Document,
+            r#"SELECT 
+                id, 
+                name, 
+                content, 
+                created_at, 
+                updated_at, 
+                user_id 
+            FROM documents WHERE id = $1"#,
+            document_id
+        )
+        .fetch_one(&pool)
+        .await;
+    
+        match result {
+            Ok(document) => Ok(Json(document)),
+            Err(_) => Err(Error::UserNotFoundError),
+        }
+    } else {
+        Err(Error::PermissionError)
     }
 }
 
 /// POST handler for creating a new document.
 /// Accessible via: POST /api/document
 pub async fn api_create_document(
+    cookies: Cookies,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreateDocumentPayload>,
 ) -> Result<Json<Document>> {
     println!("->> {:<12} - create_document", "HANDLER");
+    
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
 
     // First insert the document
     let result = sqlx::query!(
@@ -54,7 +78,7 @@ pub async fn api_create_document(
          VALUES ($1, $2, $3, $4, $5) RETURNING id",
         payload.name,
         payload.content,
-        payload.user_id,
+        user_id,
         payload.created_at,
         payload.updated_at
     )
@@ -64,6 +88,20 @@ pub async fn api_create_document(
     // Check if insertion was successful
     match result {
         Ok(record) => {
+            // Add owner permission for the creator
+            let permissions = sqlx::query!(
+                "INSERT INTO document_permissions (document_id, user_id, role)
+                VALUES ($1, $2, 'owner')",
+                record.id,
+                user_id
+            )
+            .execute(&pool)
+            .await;
+
+            if let Err(_) = permissions {
+                return Err(Error::PermissionCreationError);
+            }
+
             // Then fetch the document by id
             let document = sqlx::query_as!(
                 Document,
@@ -90,7 +128,7 @@ pub async fn api_create_document(
         }
         Err(e) => {
             println!("Error creating user: {:?}", e);
-            Err(Error::UserCreationError)
+            Err(Error::DocumentCreationError)
         }
     }
 }
@@ -130,20 +168,24 @@ async fn check_document_permission(
 }
 
 pub async fn api_update_document(
+    cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateDocumentPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - update_document", "HANDLER");
 
-    // Get user_id from token (for now hardcoded)
-    let user_id = 1;
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
 
     // Check if user has editor or owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
 
     if !has_permission {
-        return Err(Error::PermissionDeniedError);
+        return Err(Error::PermissionError);
     }
 
     // Proceed with update...
@@ -174,6 +216,7 @@ pub async fn api_update_document(
 
 /// Grant permission to a user for a document
 pub async fn grant_document_permission(
+    cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreatePermissionPayload>,
@@ -181,8 +224,11 @@ pub async fn grant_document_permission(
     println!("->> {:<12} - grant_document_permission", "HANDLER");
 
     // First check if the current user has owner permission
-    // (This would be implemented with cookie/auth check)
-    let user_id = 1; // for now we will hardcode and use user 1
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
 
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
@@ -218,14 +264,17 @@ pub async fn grant_document_permission(
 
 /// Get all users with access to a document
 pub async fn get_document_users(
+    cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - get_document_users", "HANDLER");
 
-    // need to check if current logged in user can view this type of information
-    // hardcode user_id 1 for now
-    let user_id = 1;
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
 
     let permissions = check_document_permission(&pool, user_id, document_id, "viewer").await?;
 
@@ -267,20 +316,24 @@ pub async fn get_document_users(
 
 /// Update a user's permission for a document
 pub async fn update_document_permission(
+    cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdatePermissionPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - update_document_permission", "HANDLER");
 
-    // Get user_id from auth (for now hardcoded)
-    let user_id = 1;
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
 
     // Check if user has owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
-        return Err(Error::PermissionDeniedError);
+        return Err(Error::PermissionError);
     }
 
     // Update the permission
@@ -299,7 +352,6 @@ pub async fn update_document_permission(
         Ok(_) => Ok(Json(json!({
             "result": {
                 "success": true,
-                "message": "Permission updated successfully"
             }
         }))),
         Err(e) => {
@@ -311,19 +363,23 @@ pub async fn update_document_permission(
 
 /// Remove a user's permission for a document
 pub async fn remove_document_permission(
+    cookies: Cookies,
     Path((document_id, target_user_id)): Path<(i32, i32)>,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - remove_document_permission", "HANDLER");
 
-    // Get user_id from auth (for now hardcoded)
-    let user_id = 1;
+    // get user_id from cookies
+    let user_id = match get_user_id_from_cookie(&cookies) {
+        Some(id) => id,
+        None => return Err(Error::PermissionError),
+    };
 
     // Check if user has owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
-        return Err(Error::PermissionDeniedError);
+        return Err(Error::PermissionError);
     }
 
     // Prevent removing the last owner
@@ -347,7 +403,7 @@ pub async fn remove_document_permission(
     // If we're removing an owner and there's only one owner, prevent it
     if let (Ok(owners_count), Ok(Some(record))) = (&owners_count_result, &is_target_owner) {
         if record.role == "owner" && owners_count.count.unwrap_or(0) <= 1 {
-            return Err(Error::PermissionDeniedError);
+            return Err(Error::PermissionError);
         }
     }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import TextEditor from '$lib/components/TextEditor.svelte';
-	import { load_document, update_document, setup_auto_save, type Document } from '$lib/ts/document';
+	import { get_document, update_document, get_document_users, setup_auto_save, type Document, type DocumentUser } from '$lib/ts/document';
 
 	
 	import { page } from '$app/stores'; // to access dynamic parameters from URL
@@ -14,14 +14,32 @@
 	let lastSaveStatus: boolean | null = null; // tracks success/failure of last save operation
 	let cleanupAutoSave: (() => void) | null = null; //function to stop auto-saving when page is left
 
+	// Function to fetch and log document users
+	async function fetchDocumentUsers(doc: Document) {
+		console.log("Fetching document users...");
+		const users = await get_document_users(doc);
+		
+		if (users) {
+			console.log("Document users:", users);
+			users.forEach(user => {
+				console.log(`User: ${user.name} (${user.email}) - Role: ${user.role}`);
+			});
+		} else {
+			console.log("No users found or error fetching users");
+		}
+	}
+
 	// On page load
 	onMount(async () => {
 		try {
-			documentData = await load_document(Number(documentId)); // get document data
+			documentData = await get_document(Number(documentId)); // get document data
 			loading = false;
 			
 			// If we find the document data from API call
 			if (documentData) {
+				// test function to console log users with permissions to current doc
+				fetchDocumentUsers(documentData);
+				
 				// Set up auto-save when document is loaded
 				cleanupAutoSave = setup_auto_save(documentData, (success) => {
 					lastSaveStatus = success;

@@ -23,18 +23,20 @@ async fn test_users() -> Result<()> {
     println!("\n===== RUNNING USER API TESTS =====\n");
 
     // Run all tests and collect results
-    let user_result = test_create_user(&hc).await;
+    let create_user_result = test_create_user(&hc).await;
     let good_login_result = test_good_login(&hc).await;
     let bad_login_result = test_bad_login(&hc).await;
+    let update_user_result = test_update_user(&hc).await;
     let get_user_result = test_get_user(&hc).await;
     let logout_result = test_logout(&hc).await;
     let wipe_db_result = backend::test_wipe_db(&hc).await;
 
     // Print summary
     println!("\n===== TEST RESULTS =====");
-    println!("User Creation: {}", result_to_string(&user_result));
+    println!("User Creation: {}", result_to_string(&create_user_result));
     println!("Good Login: {}", result_to_string(&good_login_result));
     println!("Bad Login: {}", result_to_string(&bad_login_result));
+    println!("Update User: {}", result_to_string(&update_user_result));
     println!("Get User: {}", result_to_string(&get_user_result));
     println!("Logout: {}", result_to_string(&logout_result));
     println!("Wipe Database: {}", result_to_string(&wipe_db_result));
@@ -45,29 +47,27 @@ async fn test_users() -> Result<()> {
 
 async fn test_create_user(hc: &Client) -> Result<()> {
     println!("TEST - User Creation");
-    let create_response = hc
+    let response = hc
         .do_post(
             "/api/users",
             json!({
-                "name": "Test User",
-                "email": "testcreate@example.com",
-                "password": "password123"
+                    "name": "Test User",
+                    "email": "testcreate@example.com",
+                    "password": "password123"
             }),
         )
         .await?;
 
-    create_response.print().await?;
+    response.print().await?;
 
-    if !create_response.status().is_success() {
+    if !response.status().is_success() {
         return Err(anyhow::anyhow!(
             "User creation failed with status: {}",
-            create_response.status()
+            response.status()
         ));
     }
 
-    let body = create_response
-        .json_body()
-        .expect("Failed to get JSON body");
+    let body = response.json_body().expect("Failed to get JSON body");
     let user_id = body["id"].as_i64().unwrap_or(1);
 
     let get_response = hc.do_get(&format!("/api/users/{}", user_id)).await?;
@@ -80,9 +80,7 @@ async fn test_create_user(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-//async fn test_update_user(hc: &Client)
-
-async fn test_good_login(hc: &Client) -> Result<()> {
+pub async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");
     let response = hc
         .do_post(
@@ -98,6 +96,33 @@ async fn test_good_login(hc: &Client) -> Result<()> {
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(
             "Login failed with status: {}",
+            response.status()
+        ));
+    }
+
+    Ok(())
+}
+
+async fn test_update_user(hc: &Client) -> Result<()> {
+    print!("TEST - Update User");
+    // attempt api call on user 1
+    let response = hc
+        .do_put(
+            "/api/users/update",
+            json!({
+                "name": "updated_name",
+                "email": "updated_email",
+                "password": "updated_password",
+
+            }),
+        )
+        .await?;
+
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "User creation failed with status: {}",
             response.status()
         ));
     }
@@ -130,7 +155,9 @@ async fn test_bad_login(hc: &Client) -> Result<()> {
 
 async fn test_get_user(hc: &Client) -> Result<()> {
     print!("TEST - Get User");
-    let response = hc.do_get("/api/users/1").await?;
+
+    // Get user id 3
+    let response = hc.do_get("/api/users/3").await?;
     response.print().await?;
 
     if !response.status().is_success() {

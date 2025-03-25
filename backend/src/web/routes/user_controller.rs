@@ -1,8 +1,6 @@
 // src/controllers/user_controller.rs
 // Request Handlers
-use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
-use crate::{Error, Result};
-use axum::routing::{get, post};
+use axum::routing::{get, put, post};
 use axum::{
     extract::{Extension, Json, Path},
     Router,
@@ -11,6 +9,10 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower_cookies::cookie::time::Duration;
 use tower_cookies::{Cookie, Cookies};
+
+use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
+use crate::{Error, Result};
+use backend::get_user_id_from_cookie;
 
 /// GET handler for retrieving a user by ID.
 /// Accessible via: GET /api/users/:id
@@ -98,16 +100,19 @@ pub async fn api_create_user(
 }
 
 pub async fn api_update_user(
+    cookies: Cookies,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateUserPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - update_user", "HANDLER");
 
-    // ! Need to check cookie here to get user id
+    // Need to check cookie here to get user id
+    let user_id = get_user_id_from_cookie(&cookies);
 
-    // temp user id
-
-    let user_id = 1;
+    // if we cant parse a user's id
+    if user_id == None {
+        return Err(Error::UserIdUpdateError);
+    }
 
     // perform update
     let result = sqlx::query!(
@@ -119,17 +124,20 @@ pub async fn api_update_user(
         payload.password,
         user_id
     )
-    .fetch_one(&pool)
-    .await;
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
 
-    match result {
-        Ok(_) => Ok(Json(json!({
-            "result": {
-                "success": true
-            }
-        }))),
-        Err(_) => Err(Error::UserUpdateError),
+    // if the update doesnt affect any rows it failed
+    if result.rows_affected() == 0 {
+        return Err(Error::UserNotFoundError);
     }
+
+    Ok(Json(json!({
+        "result": {
+            "success": true
+        }
+    })))
 }
 
 pub async fn api_user_login(
@@ -156,10 +164,10 @@ pub async fn api_user_login(
                 let domain = option_env!("DOMAIN").unwrap_or("localhost");
                 let app_env = option_env!("APP_ENV").unwrap_or("development");
                 let on_production = app_env == "production";
-                
+
                 // Create a token value (in a real app, this would be a JWT or similar)
                 let token_value = format!("user-{}.exp.sign", record.id);
-                
+
                 // Build the cookie with enhanced security
                 let cookie = Cookie::build("auth-token", token_value)
                     .domain(domain.to_string())
@@ -193,14 +201,14 @@ pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     let domain = option_env!("DOMAIN").unwrap_or("localhost");
     let app_env = option_env!("APP_ENV").unwrap_or("development");
     let on_production = app_env == "production";
-    
+
     // Build a cookie with the same properties as the login cookie
     let cookie = Cookie::build("auth-token", "")
         .domain(domain.to_string())
         .path("/")
         .secure(on_production)
         .http_only(true)
-        .max_age(Duration::days(0))  // Expire immediately
+        .max_age(Duration::days(0)) // Expire immediately
         .finish();
 
     // Remove the private cookie
@@ -218,7 +226,7 @@ pub fn user_routes() -> Router {
     Router::new()
         .route("/login", post(api_user_login))
         .route("/users", post(api_create_user))
+        .route("/users/update", put(api_update_user))
         .route("/users/:id", get(get_user))
-        .route("/users/:id", post(api_update_user))
         .route("/users/logout", get(api_logout))
 }
