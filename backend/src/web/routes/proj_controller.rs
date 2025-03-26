@@ -186,7 +186,7 @@ async fn api_delete_project(
     cookies: Cookies,
     Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
-) -> impl IntoResponse {
+) -> Result<Json<Value>>{
     println!("->> {:<12} - api_delete_project", "HANDLER");
 
     // Get user ID from cookie
