@@ -12,12 +12,12 @@ use axum::response::Response;
 // Axum is a web framework for Rust (It is to rust what express is to node.js)
 use axum::{routing::get_service, Extension, Router};
 use dotenv::dotenv;
+use http::header::{HeaderName, HeaderValue};
+use http::Method;
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::CorsLayer; // Provides support for GET/POST/PUT/DELETE/PATCH/OPTIONS // Load .Env
 use tower_http::services::ServeDir;
-use http::header::{HeaderName, HeaderValue};
-use http::Method;
 
 use crate::db::pool::create_pool; // Import the connection pool
 
@@ -64,12 +64,13 @@ async fn main() {
     */
     let user_api_routes = web::routes::user_controller::user_routes();
     let doc_api_routes = web::routes::doc_controller::doc_routes();
+    let db_api_routes = web::routes::db_controller::db_routes();
 
     let cookie_layer = CookieManagerLayer::new();
 
     let app = Router::new()
-        .merge(web::routes::db_controller::db_routes())
-        .nest("/api", user_api_routes) // Merge routes from user_controller,  any routes defined in user controller are now part of the Axum application.
+        .nest("/api/db", db_api_routes) // Merge routes from db_controller
+        .nest("/api", user_api_routes) // Merge routes from user_controller
         .nest("/api/document", doc_api_routes) // Merge routes from document_controller
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::map_response(main_response_mapper))

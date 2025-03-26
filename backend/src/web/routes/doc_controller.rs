@@ -5,7 +5,14 @@
 / File containing various API Backend endpoints for manipulating a document and its permissions
 /
 / API Summary:
-/
+/ api_create_document       POST    /                   - Create a New Document In Database
+/ api_get_document          GET     /:id                - Get Current Document By Path
+/ api_update_document       PUT     /:id                - Update The Current Document By Path
+/ delete_document           DELETE  /:id                - Delete The Current Document By Path
+/ api_add_permissions       POST    /:id/permissions    - Add Permissions to User on Current Document
+/ api_get_permissions       GET     /:id/permissions    - Get Users With Permissions to Current Document
+/ api_update_permission     PUT     /:id/permissions    - Update Permissions on User to Current Document
+/ api_remove_permissions    DELETE  /:id/permissions/:user_id - Delete Permissions on User to Current Document
 /
 */
 
@@ -415,7 +422,7 @@ pub async fn api_update_permission(
     }
 }
 
-/// Remove a user's permission for a document
+// ! FIX REMOVE :user_id Remove a user's permission for a document
 pub async fn api_remove_permissions(
     cookies: Cookies,
     Path((document_id, target_user_id)): Path<(i32, i32)>,
@@ -486,10 +493,10 @@ pub fn doc_routes() -> Router {
     Router::new()
         .route("/", post(api_create_document))
         .route("/:id", get(api_get_document))
-        .route("/:id", post(api_update_document))
+        .route("/:id", put(api_update_document))
         .route("/:id", delete(delete_document))
-        .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", post(api_add_permissions))
-        .route("/:id/permissions/:user_id", delete(api_remove_permissions))
+        .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", put(api_update_permission))
+        .route("/:id/permissions/:user_id", delete(api_remove_permissions))
 }

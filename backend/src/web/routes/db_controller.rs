@@ -5,7 +5,8 @@
 / File containing various API Backend endpoints for manipulating the database and environment
 /
 / API Summary:
-/
+/ api_test_db   GET    /test    - Test The Database Connection
+/ api_wipe_db   GET    /wipe    - Wipe The Database If Secret Code Matches
 /
 */
 
@@ -23,10 +24,10 @@ use crate::{Error, Result};
 
 /*
 / Define the test_db function
-/ This function is called when the /api/test-db route is hit
+/ This function is called when the /api/db/test route is hit
 / It returns a JSON object with a message
 */
-pub async fn test_db(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
+pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
     println!("->> {:<12} - test_db", "HANDLER");
 
     // Run a simple query to test the database connection.
@@ -54,11 +55,11 @@ pub async fn test_db(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Va
 
 /*
 / Define the wipe_db function
-/ This function is called when the /api/wipe-db route is hit and a special key is passed
+/ This function is called when the /api/db/wipe route is hit and a special key is passed
 / It will execute the migration script which will reset the database
 / It returns a JSON object with a message
 */
-async fn wipe_db(
+async fn api_db_wipe(
     Extension(pool): Extension<sqlx::PgPool>,
     Query(params): Query<WipeParams>,
 ) -> Result<Json<Value>> {
@@ -99,6 +100,6 @@ async fn wipe_db(
 
 pub fn db_routes() -> Router {
     Router::new()
-        .route("/api/test-db", get(test_db))
-        .route("/api/wipe-db", get(wipe_db))
+        .route("/test", get(api_db_test))
+        .route("/wipe", get(api_db_wipe))
 }

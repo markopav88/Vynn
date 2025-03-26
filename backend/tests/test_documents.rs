@@ -32,10 +32,11 @@ async fn test_documents() -> Result<()> {
     let create_result = test_create_document(&hc).await;
     let get_result = test_get_document(&hc).await;
     let update_result = test_update_document(&hc).await;
-    let delete_result = test_delete_document(&hc).await;
     let add_permissions = test_add_permissions(&hc).await;
     let update_permissions = test_update_permissions(&hc).await;
     let get_permissions = test_get_permissions(&hc).await;
+    let delete_result = test_delete_document(&hc).await;
+    let get_bad_result = test_get_document(&hc).await;
     let wipe_db = backend::test_wipe_db(&hc).await;
 
     // Print summary
@@ -44,7 +45,6 @@ async fn test_documents() -> Result<()> {
     println!("Create Document: {}", result_to_string(&create_result));
     println!("Get Document: {}", result_to_string(&get_result));
     println!("Update Document: {}", result_to_string(&update_result));
-    println!("Delete Document {}", result_to_string(&delete_result));
     println!("Add Permissions: {}", result_to_string(&add_permissions));
     println!(
         "Update Permissions: {}",
@@ -54,6 +54,8 @@ async fn test_documents() -> Result<()> {
         "Get Users w Permissions: {}",
         result_to_string(&get_permissions)
     );
+    println!("Delete Document {}", result_to_string(&delete_result));
+    println!("Get Bad Document: {}", result_to_string(&get_result));
     println!("Wipe Database: {}", result_to_string(&wipe_db));
     println!("=====================\n");
 
@@ -156,7 +158,7 @@ async fn test_update_document(hc: &Client) -> Result<()> {
 
     // Now update the document we just created (we should have permission as this post will always look for user_id 1
     let update_response = hc
-        .do_post(
+        .do_put(
             &format!("/api/document/1"),
             json!({
                 "name": "Updated Test Document",

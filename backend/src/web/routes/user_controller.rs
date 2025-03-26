@@ -5,13 +5,17 @@
 / File containing various API Backend endpoints for manipulating a user
 /
 / API Summary:
-/
+/ api_create_user       POST    /users          - Create a New User In The Database
+/ api_get_user          GET     /users          - Get Current User By Cookies
+/ api_update_user       PUT     /users/update   - Update The Current User By Cookies
+/ api_login             POST    /login          - Attempt Login And Set Cookies
+/ api_logout            GET     /logout         - Logout By Wiping Cookies
 /
 */
 
 use axum::routing::{get, post, put};
 use axum::{
-    extract::{Extension, Json, Path},
+    extract::{Extension, Json},
     Router,
 };
 use serde_json::{json, Value};
@@ -23,13 +27,21 @@ use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, Us
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
-/// GET handler for retrieving a user by ID.
-/// Accessible via: GET /api/users/:id
-pub async fn get_user(
-    Path(user_id): Path<i32>,
+/// GET handler for retrieving a user by ID in cookies.
+/// Accessible via: GET /api/users/
+pub async fn api_get_user(
+    cookies: Cookies,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<User>> {
     println!("->> {:<12} - get_user", "HANDLER");
+
+    // Need to check cookie here to get user id
+    let user_id = get_user_id_from_cookie(&cookies);
+
+    // if we cant parse a user's id
+    if user_id == None {
+        return Err(Error::UserIdUpdateError);
+    }
 
     let result = sqlx::query_as!(
         User,
@@ -149,7 +161,7 @@ pub async fn api_update_user(
     })))
 }
 
-pub async fn api_user_login(
+pub async fn api_login(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<LoginPayload>,
@@ -233,9 +245,9 @@ pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
-        .route("/login", post(api_user_login))
+        .route("/login", post(api_login))
         .route("/users", post(api_create_user))
         .route("/users/update", put(api_update_user))
-        .route("/users/:id", get(get_user))
+        .route("/users/:id", get(api_get_user))
         .route("/users/logout", get(api_logout))
 }
