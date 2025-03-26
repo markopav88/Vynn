@@ -134,49 +134,52 @@ async fn api_update_project(
     Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateProjectPayload>,
-) -> impl IntoResponse {
+) -> Result<Json<Value>> {
     println!("->> {:<12} - api_update_project", "HANDLER");
+    //Result<Json<Value>> is the return type, meaning on success this function will produce a Json<Value> 
+    //(Axum’s wrapper for returning JSON data), and on failure it will return an error variant (Err(...)).
 
     // Get user ID from cookie
-   /* let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return (StatusCode::UNAUTHORIZED, "Not authenticated").into_response(),
-    };*/
-    
-
-    // Validate inputs
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?; 
+    //Validate inputs?
     if let Some(name) = &payload.name {
         if name.trim().is_empty() {
-            return (StatusCode::BAD_REQUEST, "Project name cannot be empty").into_response();
+            // Return your error or custom error type
+            // e.g. Err(Error::ProjectValidationError("Project name cannot be empty".into()))
+            return Err(Error::ProjectNotFoundError);
         }
     }
-    // lets match the result of what we got for looking for the project
-            // Now lets query to try to update
-            match sqlx::query!(
-                r#"
-                UPDATE projects
-                SET name = $1
-                WHERE id = $2  
-                RETURNING id, name, user_id;
-                "#,
-                payload.name,
-                id
-            )
-            .fetch_one(&pool)
-            .await
-           //Update 
-           //Delete Project
+
+
+
+    let result= sqlx::query!(
+        r#"
+        UPDATE projects 
+        SET name = $1
+        WHERE id = $2 AND user_id = $3
+        RETURNING id,name,user_id;
+        "#,
+        payload.name,
+        id,
+        user_id
+    )
+        .fetch_one(&pool)
+    .await;
+
+    match result {
+        Ok(project_) => {
+            Ok(Json(json!({
+                "result": {
+                    "id": project.id,
+                    "name": project.name,
+                    "user_id": project.user_id
+                }
+            })))
         }
-        Err(e) => {
-            println!("Error fetching project: {:?}", e);
-            (
-                StatusCode::NOT_FOUND,
-                "Project not found or you don't have access",
-            )
-                .into_response()
-        }
+        Err(_) => return Err(Error::ProjectNotFoundError),
     }
 }
+    
 
 async fn api_delete_project(
     cookies: Cookies,
