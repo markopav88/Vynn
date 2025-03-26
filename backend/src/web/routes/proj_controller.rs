@@ -167,7 +167,7 @@ async fn api_update_project(
     .await;
 
     match result {
-        Ok(project_) => {
+        Ok(project) => {
             Ok(Json(json!({
                 "result": {
                     "id": project.id,
