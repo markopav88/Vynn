@@ -142,13 +142,14 @@ async fn api_update_project(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?; 
     //Validate inputs?
-    if let Some(name) = &payload.name {
+    /*if let Some(name) = &payload.name {
         if name.trim().is_empty() {
             // Return your error or custom error type
             // e.g. Err(Error::ProjectValidationError("Project name cannot be empty".into()))
             return Err(Error::ProjectNotFoundError);
         }
     }
+    */
 
 
 
