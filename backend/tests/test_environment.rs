@@ -10,9 +10,9 @@
 
 use anyhow::Result;
 use axum::http::response;
+use backend::result_to_string;
 use httpc_test::Client;
 use serde_json::json;
-use backend::result_to_string;
 
 #[tokio::test]
 async fn test_environment() -> Result<()> {
@@ -52,7 +52,7 @@ async fn trigger_fallback(hc: &Client) -> Result<()> {
 
 async fn test_database(hc: &Client) -> Result<()> {
     print!("TEST - Database Connection");
-    let response = hc.do_get("/api/test-db").await?;
+    let response = hc.do_get("/api/db/test").await?;
     response.print().await?;
 
     if !response.status().is_success() {

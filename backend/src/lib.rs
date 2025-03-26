@@ -13,7 +13,7 @@ pub fn result_to_string(result: &anyhow::Result<()>) -> &str {
 
 pub async fn test_wipe_db(hc: &Client) -> Result<()> {
     print!("TEST - Wipe Database");
-    let response = hc.do_get("/api/wipe-db?secret=secret_key").await?;
+    let response = hc.do_get("/api/db/wipe?secret=secret_key").await?;
     response.print().await?;
 
     if !response.status().is_success() {
