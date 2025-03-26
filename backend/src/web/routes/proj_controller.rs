@@ -10,62 +10,47 @@
 */
 
 use crate::models::project::{CreateProjectPayload, Project, UpdateProjectPayload};
+use axum::routing::{get, post, put};
 use axum::{
     extract::{Extension, Json, Path},
-    http::StatusCode,
-    response::IntoResponse,
-    routing::{delete, get, post, put},
     Router,
 };
-use http::Error;
-use serde_json::json;
+use serde_json::{json, Value};
 use sqlx::PgPool;
-use tower_cookies::Cookies;
+use tower_cookies::{Cookie, Cookies};
 
-async fn get_project(cookies: Cookies, Extension(pool): Extension<PgPool>) -> impl IntoResponse {
-    // Get user ID from cookie
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return (StatusCode::UNAUTHORIZED, "Not authenticated").into_response(),
-    };
+use crate::{Error, Result};
+use backend::get_user_id_from_cookie;
 
-    match sqlx::query!(
-        r#"SELECT id, name, description, owner_id, created_at, updated_at 
-           FROM projects 
-           WHERE owner_id = $1
-           ORDER BY created_at DESC"#,
+async fn get_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> Result<Json<Value>> {
+    // get user_id from cookies
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let result = sqlx::query!(
+        r#"SELECT id, name, user_id 
+           FROM projects
+           WHERE user_id = $1"#,
         user_id
     )
     .fetch_all(&pool)
-    .await
-    {
-        Ok(rows) => {
-            let projects: Vec<Project> = rows
-                .into_iter()
-                .filter_map(|row| {
-                    // Only include rows where ownider_id is not null
-                    let owner_id = row.owner_id?;
+    .await;
 
-                    Some(Project {
-                        id: row.id,
-                        name: row.name,
-                        description: row.description,
-                        owner_id,
-                        created_at: row.created_at.to_utc_datetime(),
-                        updated_at: row.updated_at.to_utc_datetime(),
+    match result {
+        Ok(_) => {
+            let projects_json: Vec<Value> = result
+                .into_iter()
+                .map(|project| {
+                    json!({
+                        "id": project.id,
+                        "name": project.name,
+                        "user_id": project.user_id,
                     })
                 })
                 .collect();
-            Json(projects).into_response()
+
+            Ok(Json(json!({ "project": projects_json })))
         }
-        Err(e) => {
-            println!("Error fetching projects: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to fetch projects: {}", e),
-            )
-                .into_response()
-        }
+        Err(_) => return Err(Error::ProjectNotFoundError),
     }
 }
 
@@ -76,49 +61,30 @@ async fn api_get_project(
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_get_project", "HANDLER");
 
-    // Get user ID from cookie
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return (StatusCode::UNAUTHORIZED, "Not authenticated").into_response(),
-    };
+    // get user_id from cookies
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    match sqlx::query!(
-        r#"SELECT id, name, description, owner_id, created_at, updated_at 
+    let result = sqlx::query!(
+        r#"SELECT id, name, user_id
            FROM projects 
-           WHERE id = $1 AND owner_id = $2"#,
+           WHERE id = $1 AND user_id = $2"#,
         id,
         user_id
     )
     .fetch_one(&pool)
-    .await
-    {
-        Ok(row) => {
-            if let Some(owner_id) = row.owner_id {
-                let project = Project {
-                    id: row.id,
-                    name: row.name,
-                    description: row.description,
-                    owner_id,
-                    created_at: row.created_at.to_utc_datetime(),
-                    updated_at: row.updated_at.to_utc_datetime(),
-                };
-                Json(project).into_response()
-            } else {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Invalid project data: missing owner_id",
-                )
-                    .into_response()
-            }
+    .await;
+
+    match result {
+        Ok(_) => {
+            return Ok(Json(json!({
+                "result": {
+                    "id": result.id,
+                    "name": result.name,
+                    "user_id": result.user_id
+                }
+            })))
         }
-        Err(e) => {
-            println!("Error fetching project: {:?}", e);
-            (
-                StatusCode::NOT_FOUND,
-                "Project not found or you don't have access",
-            )
-                .into_response()
-        }
+        Err(_) => return Err(Error::ProjectNotFoundError),
     }
 }
 

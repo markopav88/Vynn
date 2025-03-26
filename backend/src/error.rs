@@ -34,6 +34,9 @@ pub enum Error {
     // Signup errors
     EmailAlreadyExistsError,
     DatabaseError,
+
+    // Project errors
+    ProjectNotFoundError,
 }
 
 impl IntoResponse for Error {
@@ -89,6 +92,9 @@ impl IntoResponse for Error {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
             }
             Self::DocumentDeletionError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
+            }
+            Self::ProjectNotFoundError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
             }
         }
