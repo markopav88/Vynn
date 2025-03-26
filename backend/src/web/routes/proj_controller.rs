@@ -205,10 +205,10 @@ async fn api_delete_project(
     .fetch_one(&pool)
     .await;
     match result {
-        Ok(project_row) => {
+        Ok(project) => {
         // If you want to return the deleted project ID (for example)
             Ok(Json(json!({
-            "deleted_id": project_row.id
+            "deleted_id": project.id
         })))
     }
     Err(_) => Err(Error::ProjectNotFoundError),
