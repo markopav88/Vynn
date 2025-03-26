@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 
 #[derive(Debug, sqlx::FromRow, Serialize, Deserialize)]
 pub struct DocumentPermission {
     pub document_id: i32,
     pub user_id: i32,
     pub role: String,
-    pub created_at: DateTime<Utc>
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Deserialize)]

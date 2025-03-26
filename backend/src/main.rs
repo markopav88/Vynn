@@ -65,6 +65,7 @@ async fn main() {
     let user_api_routes = web::routes::user_controller::user_routes();
     let doc_api_routes = web::routes::doc_controller::doc_routes();
     let db_api_routes = web::routes::db_controller::db_routes();
+    let project_api_routes = web::routes::proj_controller::project_routes();
 
     let cookie_layer = CookieManagerLayer::new();
 
@@ -72,6 +73,7 @@ async fn main() {
         .nest("/api/db", db_api_routes) // Merge routes from db_controller
         .nest("/api", user_api_routes) // Merge routes from user_controller
         .nest("/api/document", doc_api_routes) // Merge routes from document_controller
+        .nest("/api/project", project_api_routes)
         .layer(Extension(pool)) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::map_response(main_response_mapper))
         .layer(cookie_layer)

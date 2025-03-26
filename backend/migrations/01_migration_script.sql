@@ -45,7 +45,7 @@ CREATE TABLE document_permissions (
     document_id INT REFERENCES documents(id) ON DELETE CASCADE,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
     role VARCHAR(20) NOT NULL CHECK (role IN ('viewer', 'editor', 'owner')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (document_id, user_id)
 );
 

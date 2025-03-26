@@ -26,7 +26,7 @@ use sqlx::PgPool;
 use tower_cookies::Cookies;
 
 use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
-use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload};
+use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload, DocumentPermission};
 use crate::{Error, Result};
 
 use backend::get_user_id_from_cookie;
@@ -175,17 +175,17 @@ pub async fn api_update_document(
     .execute(&pool)
     .await;
 
-    match result {
-        Ok(_) => Ok(Json(json!({
-            "result": {
-                "success": true
-            }
-        }))),
-        Err(e) => {
-            println!("Error updating document: {:?}", e);
-            Err(Error::DocumentUpdateError)
-        }
+    // if the update doesnt affect any rows it failed
+    if result.as_ref().unwrap().rows_affected() == 0 {
+        return Err(Error::DocumentUpdateError);
     }
+
+    // otherwise it passes
+    Ok(Json(json!({
+        "result": {
+            "success": true
+        }
+    })))
 }
 
 async fn delete_document(
@@ -214,40 +214,31 @@ async fn delete_document(
 
     // return error if the query did nothing
     if result.as_ref().unwrap().rows_affected() == 0 {
-        return Err(Error::DocumentNotFoundError);
+        return Err(Error::DocumentDeletionError);
     }
 
-    // check result
-    match result {
-        Ok(_) => {
-            // if we sucessfully delete the delete the document from the database
-            let result = sqlx::query!(
-                "DELETE FROM Documents
-                 WHERE id =  $1",
-                document_id
-            )
-            .execute(&pool)
-            .await;
+    // otherwise now we can sucessfully delete the delete the document from the database
+            
+    let result = sqlx::query!(
+        "DELETE FROM Documents
+            WHERE id =  $1",
+        document_id
+    )
+    .execute(&pool)
+    .await;
 
-            // return error if the query did nothing
-            if result.as_ref().unwrap().rows_affected() == 0 {
-                return Err(Error::DocumentNotFoundError);
-            }
+    // return error if the query did nothing
+    if result.as_ref().unwrap().rows_affected() == 0 {
+        return Err(Error::DocumentDeletionError);
+    }
 
-            match result {
-                Ok(_) => {
-                    return Ok(Json(json!({
-                        "result": {
-                            "success": true
-                        }
-
-                    })))
-                }
-                Err(_) => return Err(Error::DocumentDeletionError),
-            }
+    // otherwise its success
+    return Ok(Json(json!({
+        "result": {
+            "success": true
         }
-        Err(_) => return Err(Error::DocumentDeletionError),
-    }
+
+    })))
 }
 
 async fn check_document_permission(
@@ -284,13 +275,13 @@ async fn check_document_permission(
     }
 }
 
-/// Grant permission to a user for a document
+// Grant permission to a user for a document
 pub async fn api_add_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreatePermissionPayload>,
-) -> Result<Json<Value>> {
+) -> Result<Json<DocumentPermission>> {
     println!("->> {:<12} - grant_document_permission", "HANDLER");
 
     // First check if the current user has owner permission
@@ -304,28 +295,23 @@ pub async fn api_add_permissions(
     }
 
     // Insert the permission
-    let result = sqlx::query!(
+    let result = sqlx::query_as!(
+        DocumentPermission,
         "INSERT INTO document_permissions (document_id, user_id, role)
         VALUES ($1, $2, $3)
         ON CONFLICT (document_id, user_id) 
-        DO UPDATE SET role = $3",
+        DO UPDATE SET role = $3
+        RETURNING document_id, user_id, role, created_at",
         document_id,
         payload.user_id,
         payload.role
     )
-    .execute(&pool)
+    .fetch_one(&pool)
     .await;
 
     match result {
-        Ok(_) => Ok(Json(json!({
-            "result": {
-                "success": true
-            }
-        }))),
-        Err(e) => {
-            println!("Error granting permission: {:?}", e);
-            Err(Error::PermissionError)
-        }
+        Ok(permission) => Ok(Json(permission)),
+        Err(_) => Err(Error::PermissionError)
     }
 }
 

@@ -10,23 +10,23 @@
 */
 
 use crate::models::project::{CreateProjectPayload, Project, UpdateProjectPayload};
-use axum::routing::{get, post, put};
+use axum::routing::{get, post, put, delete};
 use axum::{
     extract::{Extension, Json, Path},
     Router,
 };
-use serde_json::{json, Value};
 use sqlx::PgPool;
-use tower_cookies::{Cookie, Cookies};
+use tower_cookies::Cookies;
 
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
-async fn get_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> Result<Json<Value>> {
+async fn api_get_all_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Project>>> {
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    let result = sqlx::query!(
+    let result = sqlx::query_as!(
+        Project,
         r#"SELECT id, name, user_id 
            FROM projects
            WHERE user_id = $1"#,
@@ -36,21 +36,8 @@ async fn get_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> R
     .await;
 
     match result {
-        Ok(_) => {
-            let projects_json: Vec<Value> = result
-                .into_iter()
-                .map(|project| {
-                    json!({
-                        "id": project.id,
-                        "name": project.name,
-                        "user_id": project.user_id,
-                    })
-                })
-                .collect();
-
-            Ok(Json(json!({ "project": projects_json })))
-        }
-        Err(_) => return Err(Error::ProjectNotFoundError),
+        Ok(projects) => Ok(Json(projects)),
+        Err(_) => Err(Error::ProjectNotFoundError),
     }
 }
 
@@ -58,13 +45,14 @@ async fn api_get_project(
     cookies: Cookies,
     Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
-) -> Result<Json<Value>> {
+) -> Result<Json<Project>> {
     println!("->> {:<12} - api_get_project", "HANDLER");
 
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    let result = sqlx::query!(
+    let result = sqlx::query_as!(
+        Project,
         r#"SELECT id, name, user_id
            FROM projects 
            WHERE id = $1 AND user_id = $2"#,
@@ -75,15 +63,7 @@ async fn api_get_project(
     .await;
 
     match result {
-        Ok(_) => {
-            return Ok(Json(json!({
-                "result": {
-                    "id": result.id,
-                    "name": result.name,
-                    "user_id": result.user_id
-                }
-            })))
-        }
+        Ok(project) => Ok(Json(project)),
         Err(_) => return Err(Error::ProjectNotFoundError),
     }
 }
@@ -92,40 +72,31 @@ async fn api_create_project(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreateProjectPayload>,
-) -> Result<Json<Value>> {
-    println!("->> {:<12} - api_login", "HANDLER");
+) -> Result<Json<Project>> {
+    println!("->> {:<12} - api_create_project", "HANDLER");
 
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
-    let result=sqlx::query!(
+    
+    // Use query_as! to directly map to Project struct
+    let result = sqlx::query_as!(
+        Project,
         r#"
-        INSERT INTO projects (name,user_id)
+        INSERT INTO projects (name, user_id)
         VALUES ($1, $2)
-        RETURNING id,name,user_id;
+        RETURNING id, name, user_id
         "#,
-        payload.name,
+        payload._name,
         user_id
     )
     .fetch_one(&pool)
     .await;
 
     match result {
-        Ok(_) => {
-            return Ok(Json(json!({
-                "result": {
-                    "id": result.id,
-                    "name": result.name,
-                    "user_id": result.user_id
-                }
-            })))
-        }
-        Err(_) => return Err(Error::ProjectNotFoundError),
+        Ok(project) => Ok(Json(project)),
+        Err(_) => Err(Error::ProjectNotFoundError),
     }
-    
-        
-    } 
-        
-    
+}
 
 //
 async fn api_update_project(
@@ -134,92 +105,71 @@ async fn api_update_project(
     Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<UpdateProjectPayload>,
-) -> Result<Json<Value>> {
+) -> Result<Json<Project>> {
     println!("->> {:<12} - api_update_project", "HANDLER");
-    //Result<Json<Value>> is the return type, meaning on success this function will produce a Json<Value> 
+    //Result<Json<Value>> is the return type, meaning on success this function will produce a Json<Value>
     //(Axum's wrapper for returning JSON data), and on failure it will return an error variant (Err(...)).
 
     // Get user ID from cookie
-    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?; 
-    //Validate inputs?
-    /*if let Some(name) = &payload.name {
-        if name.trim().is_empty() {
-            // Return your error or custom error type
-            // e.g. Err(Error::ProjectValidationError("Project name cannot be empty".into()))
-            return Err(Error::ProjectNotFoundError);
-        }
-    }
-    */
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-
-
-    let result= sqlx::query!(
+    let result = sqlx::query_as!(
+        Project,
         r#"
         UPDATE projects 
         SET name = $1
         WHERE id = $2 AND user_id = $3
         RETURNING id,name,user_id;
         "#,
-        payload.name,
+        payload._name,
         id,
         user_id
     )
-        .fetch_one(&pool)
+    .fetch_one(&pool)
     .await;
 
     match result {
-        Ok(_) => {
-            Ok(Json(json!({
-                "result": {
-                    "id": project.id,
-                    "name": project.name,
-                    "user_id": project.user_id
-                }
-            })))
-        }
+        Ok(project) => Ok(Json(project)),
         Err(_) => return Err(Error::ProjectNotFoundError),
     }
 }
-    
 
 async fn api_delete_project(
     cookies: Cookies,
     Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
-) -> Result<Json<Value>>{
+) -> Result<Json<Project>> {
     println!("->> {:<12} - api_delete_project", "HANDLER");
 
     // Get user ID from cookie
-   let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // delete project make sure user has permissions to do so
-    let result = sqlx::query!(
-        //user can only remove their own project
+    // ! Confirm user ID is owner of the project
+
+    // delete the project id
+    let result = sqlx::query_as!(
+        Project,
         r#"DELETE FROM projects 
-        WHERE id = $1 AND user_id = $2 
-        RETURNING id;
+        WHERE id = $1 and user_id = $2
+        RETURNING id, name, user_id;
         "#,
         id,
         user_id
     )
     .fetch_one(&pool)
     .await;
+
     match result {
-        Ok(project) => {
-        // If you want to return the deleted project ID (for example)
-            Ok(Json(json!({
-            "deleted_id": project.id
-        })))
+        Ok(project) => Ok(Json(project)),
+        Err(_) => Err(Error::ProjectNotFoundError),
     }
-    Err(_) => Err(Error::ProjectNotFoundError),
-}
 }
 
-pub fn routes() -> Router {
+pub fn project_routes() -> Router {
     Router::new()
-        .route("/", get(fetch_projects))
-        .route("/:id", get(api_get_project))
+        .route("/", get(api_get_all_projects))
         .route("/", post(api_create_project))
+        .route("/:id", get(api_get_project))
         .route("/:id", put(api_update_project))
         .route("/:id", delete(api_delete_project))
 }
