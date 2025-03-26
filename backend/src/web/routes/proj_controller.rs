@@ -137,7 +137,7 @@ async fn api_update_project(
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_update_project", "HANDLER");
     //Result<Json<Value>> is the return type, meaning on success this function will produce a Json<Value> 
-    //(Axum’s wrapper for returning JSON data), and on failure it will return an error variant (Err(...)).
+    //(Axum's wrapper for returning JSON data), and on failure it will return an error variant (Err(...)).
 
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?; 
@@ -190,20 +190,30 @@ async fn api_delete_project(
     println!("->> {:<12} - api_delete_project", "HANDLER");
 
     // Get user ID from cookie
-    let user_id = match get_user_id_from_cookie(&cookies) {
-        Some(id) => id,
-        None => return (StatusCode::UNAUTHORIZED, "Not authenticated").into_response(),
-    };
+   let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     // delete project make sure user has permissions to do so
-    match sqlx::query!(
-        r#"DELETE FROM projects WHERE id = $1 AND owner_id = $2 RETURNING id"#,
+    let result = sqlx::query!(
+        //user can only remove their own project
+        r#"DELETE FROM projects 
+        WHERE id = $1 AND user_id = $2 
+        RETURNING id;
+        "#,
         id,
         user_id
     )
     .fetch_one(&pool)
-    .await
-}FINISH
+    .await;
+    match result {
+        Ok(project_row) => {
+        // If you want to return the deleted project ID (for example)
+            Ok(Json(json!({
+            "deleted_id": project_row.id
+        })))
+    }
+    Err(_) => Err(Error::ProjectNotFoundError),
+}
+}
 
 pub fn routes() -> Router {
     Router::new()
