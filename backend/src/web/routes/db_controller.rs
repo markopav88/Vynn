@@ -9,7 +9,6 @@
 / api_wipe_db   GET    /wipe    - Wipe The Database If Secret Code Matches
 /
 */
-
 use axum::{
     extract::{Extension, Query},
     response::Json,
@@ -50,9 +49,9 @@ pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Jso
     }
 }
 
-/// GET handler for wiping the database with a secret key.
+/// GET handler for resetting the database with a secret key.
 /// Accessible via: GET /api/db/wipe?secret=secret_key
-async fn api_db_wipe(
+async fn api_db_reset(
     Extension(pool): Extension<sqlx::PgPool>,
     Query(params): Query<WipeParams>,
 ) -> Result<Json<Value>> {
@@ -94,5 +93,5 @@ async fn api_db_wipe(
 pub fn db_routes() -> Router {
     Router::new()
         .route("/test", get(api_db_test))
-        .route("/wipe", get(api_db_wipe))
+        .route("/wipe", get(api_db_reset))
 }

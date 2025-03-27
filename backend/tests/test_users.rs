@@ -29,7 +29,7 @@ async fn test_users() -> Result<()> {
     let update_user_result = test_update_user(&hc).await;
     let get_user_result = test_get_user(&hc).await;
     let logout_result = test_logout(&hc).await;
-    let wipe_db_result = backend::test_wipe_db(&hc).await;
+    let reset_db_result = backend::test_reset_db(&hc).await;
 
     // Print summary
     println!("\n===== TEST RESULTS =====");
@@ -39,7 +39,7 @@ async fn test_users() -> Result<()> {
     println!("Update User: {}", result_to_string(&update_user_result));
     println!("Get User: {}", result_to_string(&get_user_result));
     println!("Logout: {}", result_to_string(&logout_result));
-    println!("Wipe Database: {}", result_to_string(&wipe_db_result));
+    println!("Reset Database: {}", result_to_string(&reset_db_result));
     println!("=====================\n");
 
     Ok(())

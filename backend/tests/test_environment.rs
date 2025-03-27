@@ -23,13 +23,13 @@ async fn test_environment() -> Result<()> {
     // Run all tests and collect results
     let db_result = test_database(&hc).await;
     let fallback_result = trigger_fallback(&hc).await;
-    let db_wipe = backend::test_wipe_db(&hc).await;
+    let db_reset = backend::test_reset_db(&hc).await;
 
     // Print summary
     println!("\n===== TEST RESULTS =====");
     println!("Database Query: {}", result_to_string(&db_result));
     println!("Test Fallback: {}", result_to_string(&fallback_result));
-    println!("Wipe Database: {}", result_to_string(&db_wipe));
+    println!("Reset Database: {}", result_to_string(&db_reset));
     println!("=====================\n");
 
     Ok(())

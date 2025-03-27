@@ -9,7 +9,6 @@
 /
 */
 
-use crate::models::project::{CreateProjectPayload, Project, UpdateProjectPayload};
 use axum::routing::{get, post, put, delete};
 use axum::{
     extract::{Extension, Json, Path},
@@ -18,7 +17,10 @@ use axum::{
 use sqlx::PgPool;
 use tower_cookies::Cookies;
 
+use crate::models::project::{CreateProjectPayload, Project, UpdateProjectPayload};
+use crate::web::middleware::middleware::check_project_ownership;
 use crate::{Error, Result};
+
 use backend::get_user_id_from_cookie;
 
 /// GET handler for retrieving all projects for a user.
@@ -120,6 +122,12 @@ async fn api_update_project(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
+    // Ensure logged in user is the owner of the project
+    if check_project_ownership(&pool, user_id, id).await? == false {
+        return Err(Error::PermissionError);
+    }
+
+    // Update the project
     let result = sqlx::query_as!(
         Project,
         r#"
@@ -153,7 +161,10 @@ async fn api_delete_project(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // ! Confirm user ID is owner of the project
+    // Ensure logged in user is the owner of the project
+    if check_project_ownership(&pool, user_id, id).await? == false {
+        return Err(Error::PermissionError);
+    }
 
     // delete the project id
     let result = sqlx::query_as!(

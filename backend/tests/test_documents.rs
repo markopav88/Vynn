@@ -37,7 +37,7 @@ async fn test_documents() -> Result<()> {
     let get_permissions = test_get_permissions(&hc).await;
     let delete_result = test_delete_document(&hc).await;
     let get_bad_result = test_get_document(&hc).await;
-    let wipe_db = backend::test_wipe_db(&hc).await;
+    let reset_db = backend::test_reset_db(&hc).await;
 
     // Print summary
     println!("\n===== TEST RESULTS =====");
@@ -56,7 +56,7 @@ async fn test_documents() -> Result<()> {
     );
     println!("Delete Document {}", result_to_string(&delete_result));
     println!("Get Bad Document: {}", result_to_string(&get_result));
-    println!("Wipe Database: {}", result_to_string(&wipe_db));
+    println!("Reset Database: {}", result_to_string(&reset_db));
     println!("=====================\n");
 
     Ok(())
