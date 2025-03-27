@@ -252,7 +252,7 @@ async fn delete_document(
 
 /// POST handler for granting permission to a user for a document.
 /// Accessible via: POST /api/document/:id/permissions
-/// TODO Test: test_documents.rs/test_add_permissions()
+/// Test: test_documents.rs/test_add_permissions()
 pub async fn api_add_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -294,7 +294,7 @@ pub async fn api_add_permissions(
 
 /// GET handler for retrieving all users with access to a document.
 /// Accessible via: GET /api/document/:id/permissions
-/// TODO Test: test_documents.rs/test_get_permissions()
+/// Test: test_documents.rs/test_get_permissions()
 pub async fn api_get_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -329,7 +329,7 @@ pub async fn api_get_permissions(
 
 /// PUT handler for updating a user's permission for a document.
 /// Accessible via: PUT /api/document/:id/permissions
-/// TODO Test: test_documents.rs/test_update_permission()
+/// Test: test_documents.rs/test_update_permission()
 pub async fn api_update_permission(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -375,7 +375,7 @@ pub async fn api_update_permission(
 
 /// DELETE handler for removing a user's permission for a document.
 /// Accessible via: DELETE /api/document/:id/permissions/:user_id
-/// TODO Test: test_documents.rs/test_remove_permissions()
+/// Test: test_documents.rs/test_remove_permissions()
 pub async fn api_remove_permissions(
     cookies: Cookies,
     Path((document_id, target_id)): Path<(i32, i32)>,
