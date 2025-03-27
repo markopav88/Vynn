@@ -9,6 +9,14 @@ pub struct DocumentPermission {
     pub created_at: NaiveDateTime,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserPermissions {
+    pub user_id: i32,
+    pub name: String,
+    pub email: String,
+    pub role: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreatePermissionPayload {
     pub user_id: i32,

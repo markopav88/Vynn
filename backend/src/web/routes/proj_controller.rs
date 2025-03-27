@@ -21,6 +21,8 @@ use tower_cookies::Cookies;
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
+/// GET handler for retrieving all projects for a user.
+/// Accessible via: GET /api/project
 async fn api_get_all_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Project>>> {
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
@@ -41,6 +43,8 @@ async fn api_get_all_projects(cookies: Cookies, Extension(pool): Extension<PgPoo
     }
 }
 
+/// GET handler for retrieving a project by ID.
+/// Accessible via: GET /api/project/:id
 async fn api_get_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -68,6 +72,8 @@ async fn api_get_project(
     }
 }
 
+/// POST handler for creating a new project.
+/// Accessible via: POST /api/project
 async fn api_create_project(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -98,7 +104,8 @@ async fn api_create_project(
     }
 }
 
-//
+/// PUT handler for updating a project.
+/// Accessible via: PUT /api/project/:id
 async fn api_update_project(
     cookies: Cookies,
     //Grabing the id of the project from the path
@@ -134,6 +141,8 @@ async fn api_update_project(
     }
 }
 
+/// DELETE handler for deleting a project.
+/// Accessible via: DELETE /api/project/:id
 async fn api_delete_project(
     cookies: Cookies,
     Path(id): Path<i32>,

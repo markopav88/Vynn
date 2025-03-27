@@ -22,11 +22,8 @@ use std::{fs, path::PathBuf};
 use crate::models::db::WipeParams;
 use crate::{Error, Result};
 
-/*
-/ Define the test_db function
-/ This function is called when the /api/db/test route is hit
-/ It returns a JSON object with a message
-*/
+/// GET handler for testing the database connection.
+/// Accessible via: GET /api/db/test
 pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
     println!("->> {:<12} - test_db", "HANDLER");
 
@@ -53,12 +50,8 @@ pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Jso
     }
 }
 
-/*
-/ Define the wipe_db function
-/ This function is called when the /api/db/wipe route is hit and a special key is passed
-/ It will execute the migration script which will reset the database
-/ It returns a JSON object with a message
-*/
+/// GET handler for wiping the database with a secret key.
+/// Accessible via: GET /api/db/wipe?secret=secret_key
 async fn api_db_wipe(
     Extension(pool): Extension<sqlx::PgPool>,
     Query(params): Query<WipeParams>,

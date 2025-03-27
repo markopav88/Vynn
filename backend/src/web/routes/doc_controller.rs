@@ -12,7 +12,7 @@
 / api_add_permissions       POST    /:id/permissions    - Add Permissions to User on Current Document
 / api_get_permissions       GET     /:id/permissions    - Get Users With Permissions to Current Document
 / api_update_permission     PUT     /:id/permissions    - Update Permissions on User to Current Document
-/ api_remove_permissions    DELETE  /:id/permissions/:user_id - Delete Permissions on User to Current Document
+/ api_remove_permissions    DELETE  /:id/permissions    - Delete Permissions on User to Current Document
 /
 */
 
@@ -26,7 +26,7 @@ use sqlx::PgPool;
 use tower_cookies::Cookies;
 
 use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
-use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload, DocumentPermission};
+use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload, DocumentPermission, UserPermissions};
 use crate::{Error, Result};
 
 use backend::get_user_id_from_cookie;
@@ -144,6 +144,8 @@ pub async fn api_create_document(
     }
 }
 
+/// PUT handler for updating a document.
+/// Accessible via: PUT /api/document/:id
 pub async fn api_update_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -188,6 +190,8 @@ pub async fn api_update_document(
     })))
 }
 
+/// DELETE handler for deleting a document.
+/// Accessible via: DELETE /api/document/:id
 async fn delete_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -241,41 +245,8 @@ async fn delete_document(
     })))
 }
 
-async fn check_document_permission(
-    pool: &PgPool,
-    user_id: i32,
-    document_id: i32,
-    required_role: &str,
-) -> Result<bool> {
-    let result = sqlx::query!(
-        r#"SELECT role FROM document_permissions 
-           WHERE document_id = $1 AND user_id = $2"#,
-        document_id,
-        user_id
-    )
-    .fetch_optional(pool)
-    .await;
-
-    match result {
-        Ok(Some(record)) => {
-            let has_permission = match required_role {
-                "viewer" => true, // Any role can view
-                "editor" => record.role == "editor" || record.role == "owner",
-                "owner" => record.role == "owner",
-                _ => false,
-            };
-
-            Ok(has_permission)
-        }
-        Ok(None) => Ok(false),
-        Err(e) => {
-            println!("Error checking permission: {:?}", e);
-            Err(Error::PermissionError)
-        }
-    }
-}
-
-// Grant permission to a user for a document
+/// POST handler for granting permission to a user for a document.
+/// Accessible via: POST /api/document/:id/permissions
 pub async fn api_add_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -315,12 +286,13 @@ pub async fn api_add_permissions(
     }
 }
 
-/// Get all users with access to a document
+/// GET handler for retrieving all users with access to a document.
+/// Accessible via: GET /api/document/:id/permissions
 pub async fn api_get_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
-) -> Result<Json<Value>> {
+) -> Result<Json<Vec<UserPermissions>>> {
     println!("->> {:<12} - get_document_users", "HANDLER");
 
     // get user_id from cookies
@@ -331,7 +303,8 @@ pub async fn api_get_permissions(
     if !permissions {
         return Err(Error::PermissionError);
     }
-    let result = sqlx::query!(
+    let result = sqlx::query_as!(
+        UserPermissions,
         r#"SELECT dp.user_id, u.name, u.email, dp.role 
            FROM document_permissions dp
            JOIN users u ON dp.user_id = u.id
@@ -342,29 +315,13 @@ pub async fn api_get_permissions(
     .await;
 
     match result {
-        Ok(users) => {
-            let users_json: Vec<Value> = users
-                .into_iter()
-                .map(|u| {
-                    json!({
-                        "user_id": u.user_id,
-                        "name": u.name,
-                        "email": u.email,
-                        "role": u.role
-                    })
-                })
-                .collect();
-
-            Ok(Json(json!({ "users": users_json })))
-        }
-        Err(e) => {
-            println!("Error fetching document users: {:?}", e);
-            Err(Error::DocumentNotFoundError)
-        }
+        Ok(users) => Ok(Json(users)),
+        Err(_) => Err(Error::DocumentNotFoundError)
     }
 }
 
-/// Update a user's permission for a document
+/// PUT handler for updating a user's permission for a document.
+/// Accessible via: PUT /api/document/:id/permissions
 pub async fn api_update_permission(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -408,11 +365,12 @@ pub async fn api_update_permission(
     }
 }
 
-// ! FIX REMOVE :user_id Remove a user's permission for a document
+/// DELETE handler for removing a user's permission for a document.
+/// Accessible via: DELETE /api/document/:id/permissions
 pub async fn api_remove_permissions(
     cookies: Cookies,
-    Path((document_id, target_user_id)): Path<(i32, i32)>,
-    Extension(pool): Extension<PgPool>,
+    Path(document_id): Path<i32>,
+    Extension(pool): Extension<PgPool>, Json(payload): Json<UpdatePermissionPayload>
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - remove_document_permission", "HANDLER");
 
@@ -439,7 +397,7 @@ pub async fn api_remove_permissions(
         "SELECT role FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
         document_id,
-        target_user_id
+        payload.user_id
     )
     .fetch_optional(&pool)
     .await;
@@ -456,7 +414,7 @@ pub async fn api_remove_permissions(
         "DELETE FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
         document_id,
-        target_user_id
+        payload.user_id
     )
     .execute(&pool)
     .await;
@@ -468,12 +426,45 @@ pub async fn api_remove_permissions(
                 "message": "Permission removed successfully"
             }
         }))),
+        Err(_) => Err(Error::PermissionError)
+    }
+}
+
+/// Helper function to check if a user has permission for a document.
+async fn check_document_permission(
+    pool: &PgPool,
+    user_id: i32,
+    document_id: i32,
+    required_role: &str,
+) -> Result<bool> {
+    let result = sqlx::query!(
+        r#"SELECT role FROM document_permissions 
+           WHERE document_id = $1 AND user_id = $2"#,
+        document_id,
+        user_id
+    )
+    .fetch_optional(pool)
+    .await;
+
+    match result {
+        Ok(Some(record)) => {
+            let has_permission = match required_role {
+                "viewer" => true, // Any role can view
+                "editor" => record.role == "editor" || record.role == "owner",
+                "owner" => record.role == "owner",
+                _ => false,
+            };
+
+            Ok(has_permission)
+        }
+        Ok(None) => Ok(false),
         Err(e) => {
-            println!("Error removing permission: {:?}", e);
+            println!("Error checking permission: {:?}", e);
             Err(Error::PermissionError)
         }
     }
 }
+
 
 pub fn doc_routes() -> Router {
     Router::new()
@@ -484,5 +475,5 @@ pub fn doc_routes() -> Router {
         .route("/:id/permissions", post(api_add_permissions))
         .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", put(api_update_permission))
-        .route("/:id/permissions/:user_id", delete(api_remove_permissions))
+        .route("/:id/permissions", delete(api_remove_permissions))
 }

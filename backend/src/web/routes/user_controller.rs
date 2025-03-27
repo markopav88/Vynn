@@ -28,7 +28,7 @@ use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
 /// GET handler for retrieving a user by ID in cookies.
-/// Accessible via: GET /api/users/
+/// Accessible via: GET /api/users/:id
 pub async fn api_get_user(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -101,6 +101,8 @@ pub async fn api_create_user(
     }
 }
 
+/// PUT handler for updating a user.
+/// Accessible via: PUT /api/users/update
 pub async fn api_update_user(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -142,6 +144,8 @@ pub async fn api_update_user(
     })))
 }
 
+/// POST handler for user login.
+/// Accessible via: POST /api/login
 pub async fn api_login(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -197,7 +201,8 @@ pub async fn api_login(
     }
 }
 
-// Logout function to wipe user session and cookies
+/// GET handler for user logout.
+/// Accessible via: GET /api/users/logout
 pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     // Get environment variables with fallbacks for development
     let domain = option_env!("DOMAIN").unwrap_or("localhost");
