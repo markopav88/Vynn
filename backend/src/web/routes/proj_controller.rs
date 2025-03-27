@@ -41,6 +41,7 @@ use crate::models::document::Document;
 /// GET handler for retrieving all projects for a user.
 /// Accessible via: GET /api/project
 /// Test: test_projects.rs/test_get_all_projects()
+/// Frontend: project.ts/get_all_projects()
 async fn api_get_all_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Project>>> {
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
@@ -66,6 +67,7 @@ async fn api_get_all_projects(cookies: Cookies, Extension(pool): Extension<PgPoo
 /// GET handler for retrieving a project by ID.
 /// Accessible via: GET /api/project/:id
 /// Test: test_projects.rs/test_get_project()
+/// Frontend: project.ts/get_project()
 async fn api_get_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -102,6 +104,7 @@ async fn api_get_project(
 /// POST handler for creating a new project.
 /// Accessible via: POST /api/project
 /// Test: test_projects.rs/test_create_project()
+/// Frontend: project.ts/create_project()
 async fn api_create_project(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -151,6 +154,7 @@ async fn api_create_project(
 /// PUT handler for updating a project.
 /// Accessible via: PUT /api/project/:id
 /// Test: test_projects.rs/test_update_project()
+/// Frontend: project.ts/update_project()
 async fn api_update_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -193,6 +197,7 @@ async fn api_update_project(
 /// DELETE handler for deleting a project.
 /// Accessible via: DELETE /api/project/:id
 /// Test: test_projects.rs/test_delete_project()
+/// Frontend: project.ts/delete_project()
 async fn api_delete_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -240,6 +245,7 @@ async fn api_delete_project(
 /// POST handler for granting permission to a user for a project.
 /// Accessible via: POST /api/project/:id/permissions
 /// Test: test_projects.rs/test_add_permissions()
+/// Frontend: project.ts/add_project_permissions()
 async fn api_add_permissions(
     cookies: Cookies,
     Path(project_id): Path<i32>,
@@ -282,6 +288,7 @@ async fn api_add_permissions(
 /// GET handler for retrieving all users with access to a project.
 /// Accessible via: GET /api/project/:id/permissions
 /// Test: test_projects.rs/test_get_permissions()
+/// Frontend: project.ts/get_project_permissions()
 async fn api_get_permissions(
     cookies: Cookies,
     Path(project_id): Path<i32>,
@@ -319,6 +326,7 @@ async fn api_get_permissions(
 /// PUT handler for updating a user's permission for a project.
 /// Accessible via: PUT /api/project/:id/permissions
 /// Test: test_projects.rs/test_update_permission()
+/// Frontend: project.ts/update_project_permission()
 async fn api_update_permission(
     cookies: Cookies,
     Path(project_id): Path<i32>,
@@ -365,6 +373,7 @@ async fn api_update_permission(
 /// DELETE handler for removing a user's permission for a project.
 /// Accessible via: DELETE /api/project/:id/permissions/:user_id
 /// Test: test_projects.rs/test_remove_permissions()
+/// Frontend: project.ts/remove_project_permissions()
 async fn api_remove_permissions(
     cookies: Cookies,
     Path((project_id, target_id)): Path<(i32, i32)>,
@@ -431,6 +440,7 @@ async fn api_remove_permissions(
 /// DELETE handler for deleting a project and all its documents.
 /// Accessible via: DELETE /api/project/:id/force
 /// Test: test_projects.rs/test_force_delete_project()
+/// Frontend: project.ts/force_delete_project()
 async fn api_force_delete_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -509,6 +519,7 @@ async fn api_force_delete_project(
 /// GET handler for retrieving all documents in a project.
 /// Accessible via: GET /api/project/:id/documents
 /// Test: test_projects.rs/test_get_project_documents()
+/// Frontend: project.ts/get_project_documents()
 async fn api_get_documents(
     cookies: Cookies,
     Path(project_id): Path<i32>,
@@ -545,6 +556,7 @@ async fn api_get_documents(
 /// POST handler for adding a document to a project.
 /// Accessible via: POST /api/project/:id/documents/:doc_id
 /// Test: test_projects.rs/test_add_document_to_project()
+/// Frontend: project.ts/add_document_to_project()
 async fn api_add_document(
     cookies: Cookies,
     Path((project_id, document_id)): Path<(i32, i32)>,
@@ -621,6 +633,7 @@ async fn api_add_document(
 /// DELETE handler for removing a document from a project.
 /// Accessible via: DELETE /api/project/:id/documents/:doc_id
 /// Test: test_projects.rs/test_remove_document_from_project()
+/// Frontend: project.ts/remove_document_from_project()
 async fn api_remove_document(
     cookies: Cookies,
     Path((project_id, document_id)): Path<(i32, i32)>,

@@ -73,3 +73,21 @@ export async function logout() {
         return null;
     }
 }
+
+/**
+ * Function to get the current user's information
+ * TODO: Implement function to fetch current user data from the backend
+ */
+export async function get_current_user(): Promise<any | null> {
+    // TODO: Implement API call to GET /api/users/:id
+    return null;
+}
+
+/**
+ * Function to update the current user's information
+ * TODO: Implement function to update user data in the backend
+ */
+export async function update_user(name: string, email: string, password: string): Promise<boolean> {
+    // TODO: Implement API call to PUT /api/users/update
+    return false;
+}

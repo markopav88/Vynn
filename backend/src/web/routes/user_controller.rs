@@ -30,6 +30,7 @@ use backend::get_user_id_from_cookie;
 /// GET handler for retrieving a user by ID in cookies.
 /// Accessible via: GET /api/users/:id
 /// Test: test_users.rs/test_get_user()
+/// Frontend: login.ts/get_current_user()
 pub async fn api_get_user(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -60,6 +61,7 @@ pub async fn api_get_user(
 /// POST handler for creating a new user.
 /// Accessible via: POST /api/users
 /// Test: test_users.rs/test_create_user()
+/// Frontend: signup.ts/attempt_signup()
 pub async fn api_create_user(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreateUserPayload>,
@@ -106,6 +108,7 @@ pub async fn api_create_user(
 /// PUT handler for updating a user.
 /// Accessible via: PUT /api/users/update
 /// Test: test_users.rs/test_update_user()
+/// Frontend: login.ts/update_user()
 pub async fn api_update_user(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -150,6 +153,7 @@ pub async fn api_update_user(
 /// POST handler for user login.
 /// Accessible via: POST /api/login
 /// Test: test_users.rs/test_good_login(), test_users.rs/test_bad_login()
+/// Frontend: login.ts/attempt_login()
 pub async fn api_login(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -208,6 +212,7 @@ pub async fn api_login(
 /// GET handler for user logout.
 /// Accessible via: GET /api/users/logout
 /// Test: test_users.rs/test_logout()
+/// Frontend: login.ts/logout()
 pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     // Get environment variables with fallbacks for development
     let domain = option_env!("DOMAIN").unwrap_or("localhost");

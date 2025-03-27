@@ -238,3 +238,21 @@ export async function delete_document_permissions(userData: DocumentUser): Promi
 	// Check results of API call
 	return true;
 }
+
+/**
+ * Function to create a new document
+ * TODO: Implement function to create a new document in the backend
+ */
+export async function create_document(name: string, content: string): Promise<Document | null> {
+	// TODO: Implement API call to POST /api/document
+	return null;
+}
+
+/**
+ * Function to delete a document
+ * TODO: Implement function to delete a document from the backend
+ */
+export async function delete_document(documentId: number): Promise<boolean> {
+	// TODO: Implement API call to DELETE /api/document/:id
+	return false;
+}
