@@ -12,7 +12,7 @@ pub fn result_to_string(result: &anyhow::Result<()>) -> &str {
 }
 
 pub async fn test_reset_db(hc: &Client) -> Result<()> {
-    print!("TEST - reset Database");
+    print!("TEST - Reset Database");
     let response = hc.do_get("/api/db/reset?secret=secret_key").await?;
     response.print().await?;
 

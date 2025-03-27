@@ -77,3 +77,9 @@ ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'editor';
 
 -- Add this after your document inserts
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+
+-- Add this after the users table is populated and before any other tables that depend on projects
+
+-- Create a default project for user 1
+INSERT INTO projects (name, user_id) 
+VALUES ('Default Project', 1);

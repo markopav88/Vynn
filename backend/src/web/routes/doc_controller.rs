@@ -374,12 +374,12 @@ pub async fn api_update_permission(
 }
 
 /// DELETE handler for removing a user's permission for a document.
-/// Accessible via: DELETE /api/document/:id/permissions
+/// Accessible via: DELETE /api/document/:id/permissions/:user_id
 /// TODO Test: test_documents.rs/test_remove_permissions()
 pub async fn api_remove_permissions(
     cookies: Cookies,
-    Path(document_id): Path<i32>,
-    Extension(pool): Extension<PgPool>, Json(payload): Json<UpdatePermissionPayload>
+    Path((document_id, target_id)): Path<(i32, i32)>,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - remove_document_permission", "HANDLER");
 
@@ -406,7 +406,7 @@ pub async fn api_remove_permissions(
         "SELECT role FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
         document_id,
-        payload.user_id
+        user_id
     )
     .fetch_optional(&pool)
     .await;
@@ -423,7 +423,7 @@ pub async fn api_remove_permissions(
         "DELETE FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
         document_id,
-        payload.user_id
+        target_id
     )
     .execute(&pool)
     .await;
@@ -448,5 +448,5 @@ pub fn doc_routes() -> Router {
         .route("/:id/permissions", post(api_add_permissions))
         .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", put(api_update_permission))
-        .route("/:id/permissions", delete(api_remove_permissions))
+        .route("/:id/permissions/:user_id", delete(api_remove_permissions))
 }

@@ -32,15 +32,15 @@ async fn test_users() -> Result<()> {
     let reset_db_result = backend::test_reset_db(&hc).await;
 
     // Print summary
-    println!("\n===== TEST RESULTS =====");
-    println!("User Creation: {}", result_to_string(&create_user_result));
-    println!("Good Login: {}", result_to_string(&good_login_result));
-    println!("Bad Login: {}", result_to_string(&bad_login_result));
-    println!("Update User: {}", result_to_string(&update_user_result));
-    println!("Get User: {}", result_to_string(&get_user_result));
-    println!("Logout: {}", result_to_string(&logout_result));
-    println!("Reset Database: {}", result_to_string(&reset_db_result));
-    println!("=====================\n");
+    println!("\n==== TEST RESULTS ====");
+    println!("Create User:\t{}", result_to_string(&create_user_result));
+    println!("Good Login:\t{}", result_to_string(&good_login_result));
+    println!("Bad Login:\t{}", result_to_string(&bad_login_result));
+    println!("Update User:\t{}", result_to_string(&update_user_result));
+    println!("Get User:\t{}", result_to_string(&get_user_result));
+    println!("Logout:\t\t{}", result_to_string(&logout_result));
+    println!("Reset Database:\t{}", result_to_string(&reset_db_result));
+    println!("======================\n");
 
     Ok(())
 }
@@ -65,16 +65,6 @@ async fn test_create_user(hc: &Client) -> Result<()> {
             "User creation failed with status: {}",
             response.status()
         ));
-    }
-
-    let body = response.json_body().expect("Failed to get JSON body");
-    let user_id = body["id"].as_i64().unwrap_or(1);
-
-    let get_response = hc.do_get(&format!("/api/users/{}", user_id)).await?;
-    get_response.print().await?;
-
-    if !get_response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to get created user"));
     }
 
     Ok(())

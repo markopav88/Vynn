@@ -95,5 +95,5 @@ async fn api_db_reset(
 pub fn db_routes() -> Router {
     Router::new()
         .route("/test", get(api_db_test))
-        .route("/wipe", get(api_db_reset))
+        .route("/reset", get(api_db_reset))
 }

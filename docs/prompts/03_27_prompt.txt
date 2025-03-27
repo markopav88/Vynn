@@ -1,0 +1,7 @@
+''' 
+    Please use the established convention to generate new test cases for those marked as TODO 
+    Please use the other previous test cases as the foundation of other tests.
+    For example we dont need to login again in add permissions as test_login is already called.
+    In addition we dont need to create a new document before adding permissions as a new document 
+    has already been made in a previous test
+'''

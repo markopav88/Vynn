@@ -26,11 +26,11 @@ async fn test_environment() -> Result<()> {
     let db_reset = backend::test_reset_db(&hc).await;
 
     // Print summary
-    println!("\n===== TEST RESULTS =====");
-    println!("Database Query: {}", result_to_string(&db_result));
-    println!("Test Fallback: {}", result_to_string(&fallback_result));
-    println!("Reset Database: {}", result_to_string(&db_reset));
-    println!("=====================\n");
+    println!("\n==== TEST RESULTS ====");
+    println!("Database Query:\t{}", result_to_string(&db_result));
+    println!("Test Fallback:\t{}", result_to_string(&fallback_result));
+    println!("Reset Database:\t{}", result_to_string(&db_reset));
+    println!("======================\n");
 
     Ok(())
 }
