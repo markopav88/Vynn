@@ -220,29 +220,6 @@ async fn test_add_permissions(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn test_update_permissions(hc: &Client) -> Result<()> {
-    println!("TEST - Update Document Permissions");
-
-    // Update permission of user_id 2 which should always exist in the database
-    let update_response = hc
-        .do_put(
-            "/api/document/1/permissions",
-            json!({
-                "user_id": 2,
-                "role": "viewer"
-            }),
-        )
-        .await?;
-
-    update_response.print().await?;
-
-    if !update_response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to update permission"));
-    }
-
-    Ok(())
-}
-
 async fn test_get_permissions(hc: &Client) -> Result<()> {
     println!("TEST - Get Document Permissions");
     
@@ -263,11 +240,11 @@ async fn test_get_permissions(hc: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn test_update_permission(hc: &Client) -> Result<()> {
-    println!("TEST - Update Document Permission");
-    
-    // Update permissions for user 2 on document 1
-    let update_perm_response = hc
+async fn test_update_permissions(hc: &Client) -> Result<()> {
+    println!("TEST - Update Document Permissions");
+
+    // Update permission of user_id 2 which should always exist in the database
+    let update_response = hc
         .do_put(
             "/api/document/1/permissions",
             json!({
@@ -276,16 +253,13 @@ async fn test_update_permission(hc: &Client) -> Result<()> {
             }),
         )
         .await?;
-    
-    update_perm_response.print().await?;
-    
-    if !update_perm_response.status().is_success() {
-        return Err(anyhow::anyhow!(
-            "Update permission failed with status: {}",
-            update_perm_response.status()
-        ));
+
+    update_response.print().await?;
+
+    if !update_response.status().is_success() {
+        return Err(anyhow::anyhow!("Failed to update permission"));
     }
-    
+
     Ok(())
 }
 

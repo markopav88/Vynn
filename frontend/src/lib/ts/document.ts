@@ -174,7 +174,7 @@ export async function saveDocument(documentData: Document): Promise<boolean | nu
 
 // Function to get all users with permissions to a given document
 // To return a list of DocumentUser objects with access to the document or null 
-export async function get_document_users(documentData: Document): Promise<DocumentUser[] | null> {
+export async function get_document_permissions(documentData: Document): Promise<DocumentUser[] | null> {
 	try {
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${documentData.id}/permissions`;
@@ -202,9 +202,8 @@ export async function get_document_users(documentData: Document): Promise<Docume
 	}
 }
 
-// TODO Function to attempt to update a users permissions will return a boolean
-// that indicates the success or failure of the operation
-export async function update_document_permissions(documentData: Document): Promise<boolean> {
+// TODO Function to attempt to add a users permissions will return a boolean
+export async function add_document_permissions(userData: DocumentUser): Promise<boolean> {
 	// Use correct backend API URL
 
 	// Create payload to send to API
@@ -214,4 +213,28 @@ export async function update_document_permissions(documentData: Document): Promi
 	// Check results of API call
 	return true;
 	
+}
+
+// TODO Function to attempt to update a users permissions will return a boolean
+export async function update_document_permissions(userData: DocumentUser): Promise<boolean> {
+	// Use correct backend API URL
+
+	// Create payload to send to API
+
+	// Call API
+
+	// Check results of API call
+	return true;
+	
+}
+
+// TODO Function to attempt to delete a users permissions will return a boolean
+export async function delete_document_permissions(userData: DocumentUser): Promise<boolean> {
+	// Use correct backend API URL
+
+	// Create payload to send to API
+
+	// Call API
+	// Check results of API call
+	return true;
 }

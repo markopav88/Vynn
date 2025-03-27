@@ -5,3 +5,11 @@
     In addition we dont need to create a new document before adding permissions as a new document 
     has already been made in a previous test
 '''
+
+
+'''
+    Please help me implement project permissions. Use document permssions as a model. Please stick 
+    to my existing conventions, make sure to add to my migration script.  A Project is similiar to 
+    a document in the sense that It has one owner but can haveother editors and viewers. Please update 
+    exiting project apis to include inserts into the joint table of permissions when we create a project
+'''
