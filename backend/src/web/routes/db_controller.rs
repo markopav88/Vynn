@@ -23,6 +23,7 @@ use crate::{Error, Result};
 
 /// GET handler for testing the database connection.
 /// Accessible via: GET /api/db/test
+/// Test: test_environment.rs/test_database()
 pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
     println!("->> {:<12} - test_db", "HANDLER");
 
@@ -51,6 +52,7 @@ pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Jso
 
 /// GET handler for resetting the database with a secret key.
 /// Accessible via: GET /api/db/wipe?secret=secret_key
+/// Test: test_environment.rs/test_reset_db()
 async fn api_db_reset(
     Extension(pool): Extension<sqlx::PgPool>,
     Query(params): Query<WipeParams>,
