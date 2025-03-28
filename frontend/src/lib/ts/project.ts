@@ -49,132 +49,190 @@ export class ProjectUser {
 	}
 }
 
-/**
- * Function to get all projects for the current user
- * TODO: Implement function to fetch all projects from the backend
- */
-export async function get_all_projects(): Promise<Project[] | null> {
-	// TODO: Implement API call to GET /api/project
-	return null;
-}
+// TODO Function to get a project
+export async function get_project(project_id: number): Promise<Project | null> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
 
-/**
- * Function to get a specific project by ID
- * TODO: Implement function to fetch a project by ID from the backend
- */
-export async function get_project(projectId: number): Promise<Project | null> {
-	// TODO: Implement API call to GET /api/project/:id
-	return null;
-}
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			credentials: 'include'
+		});
 
-/**
- * Function to create a new project
- * TODO: Implement function to create a new project in the backend
- */
-export async function create_project(name: string): Promise<Project | null> {
-	// TODO: Implement API call to POST /api/project
-	return null;
-}
+		if (!response.ok) {
+			console.error('Get project failed with status:', response.status);
+			return null;
+		}
 
-/**
- * Function to update an existing project
- * TODO: Implement function to update a project in the backend
- */
-export async function update_project(project: Project): Promise<Project | null> {
-	// TODO: Implement API call to PUT /api/project/:id
-	return null;
-}
+		const project = await response.json();
 
-/**
- * Function to delete a project
- * TODO: Implement function to delete a project from the backend
- */
-export async function delete_project(projectId: number): Promise<boolean> {
-	// TODO: Implement API call to DELETE /api/project/:id
-	return false;
-}
-
-/**
- * Function to force delete a project and all its documents
- * TODO: Implement function to force delete a project and all its documents
- */
-export async function force_delete_project(projectId: number): Promise<boolean> {
-	// TODO: Implement API call to DELETE /api/project/:id/force
-	return false;
+		return project;
+	} catch (error) {
+		console.error('Get project error:', error);
+		return null;
+	}
 }
 
 /**
  * Function to add permissions for a user on a project
- * TODO: Implement function to add permissions for a user on a project
  */
-export async function add_project_permissions(project_user: ProjectUser): Promise<boolean> {
-	// TODO: Implement API call to POST /api/project/:id/permissions
-	return false;
+export async function add_project_permissions(projectId: number, userId: number, role: string): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
+		
+		const payload = {
+			user_id: userId,
+			role: role
+		};
+		
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error adding project permissions:', error);
+		return false;
+	}
 }
 
 /**
  * Function to get all users with permissions on a project
- * TODO: Implement function to get all users with permissions on a project
  */
 export async function get_project_permissions(projectId: number): Promise<ProjectUser[] | null> {
-	// TODO: Implement API call to GET /api/project/:id/permissions
-	return null;
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch project permissions:', response.status);
+			return null;
+		}
+		
+		const data = await response.json();
+		return data.users || null;
+	} catch (error) {
+		console.error('Error fetching project permissions:', error);
+		return null;
+	}
 }
 
 /**
  * Function to update a user's permission on a project
- * TODO: Implement function to update a user's permission on a project
  */
-export async function update_project_permission(
-	projectId: number,
-	userId: number,
-	role: string
-): Promise<boolean> {
-	// TODO: Implement API call to PUT /api/project/:id/permissions
-	return false;
+export async function update_project_permission(projectId: number, userId: number, role: string): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
+		
+		const payload = {
+			user_id: userId,
+			role: role
+		};
+		
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error updating project permission:', error);
+		return false;
+	}
 }
 
 /**
  * Function to remove a user's permission from a project
- * TODO: Implement function to remove a user's permission from a project
  */
-export async function remove_project_permissions(
-	projectId: number,
-	userId: number
-): Promise<boolean> {
-	// TODO: Implement API call to DELETE /api/project/:id/permissions/:user_id
-	return false;
+export async function remove_project_permissions(projectId: number, userId: number): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions/${userId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error removing project permissions:', error);
+		return false;
+	}
 }
 
 /**
  * Function to get all documents in a project
- * TODO: Implement function to get all documents in a project
  */
-export async function get_project_documents(projectId: number): Promise<any[] | null> {
-	// TODO: Implement API call to GET /api/project/:id/documents
-	return null;
+export async function get_project_documents(projectId: number): Promise<Document[] | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch project documents:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching project documents:', error);
+		return null;
+	}
 }
 
 /**
  * Function to add a document to a project
- * TODO: Implement function to add a document to a project
  */
-export async function add_document_to_project(
-	projectId: number,
-	documentId: number
-): Promise<boolean> {
-	// TODO: Implement API call to POST /api/project/:id/documents/:doc_id
-	return false;
+export async function add_document_to_project(projectId: number, documentId: number): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents/${documentId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({}),
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error adding document to project:', error);
+		return false;
+	}
 }
 
 /**
  * Function to remove a document from a project
- * TODO: Implement function to remove a document from a project
  */
-export async function remove_document_from_project(
-	projectId: number,
-	documentId: number
-): Promise<boolean> {
-	// TODO: Implement API call to DELETE /api/project/:id/documents/:doc_id
-	return false;
+export async function remove_document_from_project(projectId: number, documentId: number): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents/${documentId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error removing document from project:', error);
+		return false;
+	}
 }

@@ -6,7 +6,7 @@
     In a Svelte file we can have HTML, CSS, and Typescript code.
 -->
 <script lang="ts">
-    import { logout } from "$lib/ts/login";
+    import { logout } from "$lib/ts/user";
     
     async function handleLogout() {
         try {

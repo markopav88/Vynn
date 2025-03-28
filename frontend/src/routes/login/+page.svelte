@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { attempt_login, Login } from "$lib/ts/login"
+    import { attempt_login, Login } from "$lib/ts/user"
 	import { error } from '@sveltejs/kit';
     
     let email = '';

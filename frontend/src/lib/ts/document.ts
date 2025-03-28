@@ -197,7 +197,7 @@ export async function get_document_permissions(
 		// Parse the response JSON
 		const data = await response.json();
 
-		console.log(data);
+		console.log(data); // debug
 
 		// Return the users array from the response
 		return data.users || null;
@@ -207,55 +207,155 @@ export async function get_document_permissions(
 	}
 }
 
-// TODO Function to attempt to add a users permissions will return a boolean
-export async function add_document_permissions(document_user: DocumentUser): Promise<boolean> {
-	// Use correct backend API URL
-
-	// Create payload to send to API
-
-	// Call API
-
-	// Check results of API call
-	return true;
-}
-
-// TODO Function to attempt to update a users permissions will return a boolean
-export async function update_document_permissions(document_user: DocumentUser): Promise<boolean> {
-	// Use correct backend API URL
-
-	// Create payload to send to API
-
-	// Call API
-
-	// Check results of API call
-	return true;
-}
-
-// TODO Function to attempt to delete a users permissions will return a boolean
-export async function delete_document_permissions(document_user: DocumentUser): Promise<boolean> {
-	// Use correct backend API URL
-
-	// Create payload to send to API
-
-	// Call API
-	// Check results of API call
-	return true;
+/**
+ * Function to get all documents the user has access to
+ */
+export async function get_all_documents(): Promise<Document[] | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch documents:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching documents:', error);
+		return null;
+	}
 }
 
 /**
  * Function to create a new document
- * TODO: Implement function to create a new document in the backend
  */
 export async function create_document(name: string, content: string): Promise<Document | null> {
-	// TODO: Implement API call to POST /api/document
-	return null;
+	try {
+		const apiUrl = `http://localhost:3001/api/document`;
+		const now = new Date().toISOString().replace('Z', '');
+		
+		const payload = {
+			name: name,
+			content: content,
+			created_at: now,
+			updated_at: now
+		};
+		
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to create document:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error creating document:', error);
+		return null;
+	}
 }
 
 /**
  * Function to delete a document
- * TODO: Implement function to delete a document from the backend
  */
 export async function delete_document(documentId: number): Promise<boolean> {
-	// TODO: Implement API call to DELETE /api/document/:id
-	return false;
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error deleting document:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to add permissions for a user on a document
+ */
+export async function add_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
+		
+		const payload = {
+			user_id: userId,
+			role: role
+		};
+		
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error adding document permissions:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to update a user's permissions for a document
+ */
+export async function update_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
+		
+		const payload = {
+			user_id: userId,
+			role: role
+		};
+		
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error updating document permissions:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to delete a user's permissions for a document
+ */
+export async function delete_document_permissions(documentId: number, userId: number): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions/${userId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error deleting document permissions:', error);
+		return false;
+	}
 }
