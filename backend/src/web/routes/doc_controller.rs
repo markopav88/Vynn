@@ -12,7 +12,7 @@
 / api_add_permissions       POST    /:id/permissions    - Add Permissions to User on Current Document
 / api_get_permissions       GET     /:id/permissions    - Get Users With Permissions to Current Document
 / api_update_permission     PUT     /:id/permissions    - Update Permissions on User to Current Document
-/ api_remove_permissions    DELETE  /:id/permissions/:user_id - Delete Permissions on User to Current Document
+/ api_remove_permissions    DELETE  /:id/permissions    - Delete Permissions on User to Current Document
 /
 */
 
@@ -26,13 +26,16 @@ use sqlx::PgPool;
 use tower_cookies::Cookies;
 
 use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
-use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload};
+use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload, DocumentPermission, UserPermissions};
+use crate::web::middleware::middleware::check_document_permission;
 use crate::{Error, Result};
 
 use backend::get_user_id_from_cookie;
 
 /// GET handler for retrieving a document by ID.
 /// Accessible via: GET /api/document/:id
+/// Test: test_documents.rs/test_get_document()
+/// Frontend: document.ts/get_document()
 pub async fn api_get_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -73,6 +76,8 @@ pub async fn api_get_document(
 
 /// POST handler for creating a new document.
 /// Accessible via: POST /api/document
+/// Test: test_documents.rs/test_create_document()
+/// Frontend: document.ts/create_document()
 pub async fn api_create_document(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -144,6 +149,10 @@ pub async fn api_create_document(
     }
 }
 
+/// PUT handler for updating a document.
+/// Accessible via: PUT /api/document/:id
+/// Test: test_documents.rs/test_update_document()
+/// Frontend: document.ts/update_document()
 pub async fn api_update_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -175,19 +184,23 @@ pub async fn api_update_document(
     .execute(&pool)
     .await;
 
-    match result {
-        Ok(_) => Ok(Json(json!({
-            "result": {
-                "success": true
-            }
-        }))),
-        Err(e) => {
-            println!("Error updating document: {:?}", e);
-            Err(Error::DocumentUpdateError)
-        }
+    // if the update doesnt affect any rows it failed
+    if result.as_ref().unwrap().rows_affected() == 0 {
+        return Err(Error::DocumentUpdateError);
     }
+
+    // otherwise it passes
+    Ok(Json(json!({
+        "result": {
+            "success": true
+        }
+    })))
 }
 
+/// DELETE handler for deleting a document.
+/// Accessible via: DELETE /api/document/:id
+/// Test: test_documents.rs/test_delete_document()
+/// Frontend: document.ts/delete_document()
 async fn delete_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -214,83 +227,43 @@ async fn delete_document(
 
     // return error if the query did nothing
     if result.as_ref().unwrap().rows_affected() == 0 {
-        return Err(Error::DocumentNotFoundError);
+        return Err(Error::DocumentDeletionError);
     }
 
-    // check result
-    match result {
-        Ok(_) => {
-            // if we sucessfully delete the delete the document from the database
-            let result = sqlx::query!(
-                "DELETE FROM Documents
-                 WHERE id =  $1",
-                document_id
-            )
-            .execute(&pool)
-            .await;
-
-            // return error if the query did nothing
-            if result.as_ref().unwrap().rows_affected() == 0 {
-                return Err(Error::DocumentNotFoundError);
-            }
-
-            match result {
-                Ok(_) => {
-                    return Ok(Json(json!({
-                        "result": {
-                            "success": true
-                        }
-
-                    })))
-                }
-                Err(_) => return Err(Error::DocumentDeletionError),
-            }
-        }
-        Err(_) => return Err(Error::DocumentDeletionError),
-    }
-}
-
-async fn check_document_permission(
-    pool: &PgPool,
-    user_id: i32,
-    document_id: i32,
-    required_role: &str,
-) -> Result<bool> {
+    // otherwise now we can sucessfully delete the delete the document from the database
+            
     let result = sqlx::query!(
-        r#"SELECT role FROM document_permissions 
-           WHERE document_id = $1 AND user_id = $2"#,
-        document_id,
-        user_id
+        "DELETE FROM Documents
+            WHERE id =  $1",
+        document_id
     )
-    .fetch_optional(pool)
+    .execute(&pool)
     .await;
 
-    match result {
-        Ok(Some(record)) => {
-            let has_permission = match required_role {
-                "viewer" => true, // Any role can view
-                "editor" => record.role == "editor" || record.role == "owner",
-                "owner" => record.role == "owner",
-                _ => false,
-            };
-
-            Ok(has_permission)
-        }
-        Ok(None) => Ok(false),
-        Err(e) => {
-            println!("Error checking permission: {:?}", e);
-            Err(Error::PermissionError)
-        }
+    // return error if the query did nothing
+    if result.as_ref().unwrap().rows_affected() == 0 {
+        return Err(Error::DocumentDeletionError);
     }
+
+    // otherwise its success
+    return Ok(Json(json!({
+        "result": {
+            "success": true
+        }
+
+    })))
 }
 
-/// Grant permission to a user for a document
+/// POST handler for granting permission to a user for a document.
+/// Accessible via: POST /api/document/:id/permissions
+/// Test: test_documents.rs/test_add_permissions()
+/// Frontend: document.ts/add_document_permissions()
 pub async fn api_add_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreatePermissionPayload>,
-) -> Result<Json<Value>> {
+) -> Result<Json<DocumentPermission>> {
     println!("->> {:<12} - grant_document_permission", "HANDLER");
 
     // First check if the current user has owner permission
@@ -304,37 +277,35 @@ pub async fn api_add_permissions(
     }
 
     // Insert the permission
-    let result = sqlx::query!(
+    let result = sqlx::query_as!(
+        DocumentPermission,
         "INSERT INTO document_permissions (document_id, user_id, role)
         VALUES ($1, $2, $3)
         ON CONFLICT (document_id, user_id) 
-        DO UPDATE SET role = $3",
+        DO UPDATE SET role = $3
+        RETURNING document_id, user_id, role, created_at",
         document_id,
         payload.user_id,
         payload.role
     )
-    .execute(&pool)
+    .fetch_one(&pool)
     .await;
 
     match result {
-        Ok(_) => Ok(Json(json!({
-            "result": {
-                "success": true
-            }
-        }))),
-        Err(e) => {
-            println!("Error granting permission: {:?}", e);
-            Err(Error::PermissionError)
-        }
+        Ok(permission) => Ok(Json(permission)),
+        Err(_) => Err(Error::PermissionError)
     }
 }
 
-/// Get all users with access to a document
+/// GET handler for retrieving all users with access to a document.
+/// Accessible via: GET /api/document/:id/permissions
+/// Test: test_documents.rs/test_get_permissions()
+/// Frontend: document.ts/get_document_permissions()
 pub async fn api_get_permissions(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
-) -> Result<Json<Value>> {
+) -> Result<Json<Vec<UserPermissions>>> {
     println!("->> {:<12} - get_document_users", "HANDLER");
 
     // get user_id from cookies
@@ -345,7 +316,8 @@ pub async fn api_get_permissions(
     if !permissions {
         return Err(Error::PermissionError);
     }
-    let result = sqlx::query!(
+    let result = sqlx::query_as!(
+        UserPermissions,
         r#"SELECT dp.user_id, u.name, u.email, dp.role 
            FROM document_permissions dp
            JOIN users u ON dp.user_id = u.id
@@ -356,29 +328,15 @@ pub async fn api_get_permissions(
     .await;
 
     match result {
-        Ok(users) => {
-            let users_json: Vec<Value> = users
-                .into_iter()
-                .map(|u| {
-                    json!({
-                        "user_id": u.user_id,
-                        "name": u.name,
-                        "email": u.email,
-                        "role": u.role
-                    })
-                })
-                .collect();
-
-            Ok(Json(json!({ "users": users_json })))
-        }
-        Err(e) => {
-            println!("Error fetching document users: {:?}", e);
-            Err(Error::DocumentNotFoundError)
-        }
+        Ok(users) => Ok(Json(users)),
+        Err(_) => Err(Error::DocumentNotFoundError)
     }
 }
 
-/// Update a user's permission for a document
+/// PUT handler for updating a user's permission for a document.
+/// Accessible via: PUT /api/document/:id/permissions
+/// Test: test_documents.rs/test_update_permission()
+/// Frontend: document.ts/update_document_permissions()
 pub async fn api_update_permission(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -422,10 +380,13 @@ pub async fn api_update_permission(
     }
 }
 
-// ! FIX REMOVE :user_id Remove a user's permission for a document
+/// DELETE handler for removing a user's permission for a document.
+/// Accessible via: DELETE /api/document/:id/permissions/:user_id
+/// Test: test_documents.rs/test_remove_permissions()
+/// Frontend: document.ts/delete_document_permissions()
 pub async fn api_remove_permissions(
     cookies: Cookies,
-    Path((document_id, target_user_id)): Path<(i32, i32)>,
+    Path((document_id, target_id)): Path<(i32, i32)>,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - remove_document_permission", "HANDLER");
@@ -453,7 +414,7 @@ pub async fn api_remove_permissions(
         "SELECT role FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
         document_id,
-        target_user_id
+        user_id
     )
     .fetch_optional(&pool)
     .await;
@@ -470,7 +431,7 @@ pub async fn api_remove_permissions(
         "DELETE FROM document_permissions 
          WHERE document_id = $1 AND user_id = $2",
         document_id,
-        target_user_id
+        target_id
     )
     .execute(&pool)
     .await;
@@ -482,10 +443,7 @@ pub async fn api_remove_permissions(
                 "message": "Permission removed successfully"
             }
         }))),
-        Err(e) => {
-            println!("Error removing permission: {:?}", e);
-            Err(Error::PermissionError)
-        }
+        Err(_) => Err(Error::PermissionError)
     }
 }
 

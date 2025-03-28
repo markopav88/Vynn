@@ -2,15 +2,15 @@ use serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
 
 #[derive(Debug, sqlx::FromRow, Serialize, Deserialize)]
-pub struct DocumentPermission {
-    pub document_id: i32,
+pub struct ProjectPermission {
+    pub project_id: i32,
     pub user_id: i32,
     pub role: String,
     pub created_at: NaiveDateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserPermissions {
+#[derive(Debug, sqlx::FromRow, Serialize, Deserialize)]
+pub struct UserProjectPermissions {
     pub user_id: i32,
     pub name: String,
     pub email: String,
@@ -18,13 +18,13 @@ pub struct UserPermissions {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreatePermissionPayload {
+pub struct CreateProjectPermissionPayload {
     pub user_id: i32,
     pub role: String
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpdatePermissionPayload {
+pub struct UpdateProjectPermissionPayload {
     pub user_id: i32,
     pub role: String
 } 

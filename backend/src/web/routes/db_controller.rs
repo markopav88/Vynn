@@ -9,7 +9,6 @@
 / api_wipe_db   GET    /wipe    - Wipe The Database If Secret Code Matches
 /
 */
-
 use axum::{
     extract::{Extension, Query},
     response::Json,
@@ -22,11 +21,10 @@ use std::{fs, path::PathBuf};
 use crate::models::db::WipeParams;
 use crate::{Error, Result};
 
-/*
-/ Define the test_db function
-/ This function is called when the /api/db/test route is hit
-/ It returns a JSON object with a message
-*/
+/// GET handler for testing the database connection.
+/// Accessible via: GET /api/db/test
+/// Test: test_environment.rs/test_database()
+/// Frontend: Not directly called from frontend
 pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
     println!("->> {:<12} - test_db", "HANDLER");
 
@@ -53,13 +51,11 @@ pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Jso
     }
 }
 
-/*
-/ Define the wipe_db function
-/ This function is called when the /api/db/wipe route is hit and a special key is passed
-/ It will execute the migration script which will reset the database
-/ It returns a JSON object with a message
-*/
-async fn api_db_wipe(
+/// GET handler for resetting the database with a secret key.
+/// Accessible via: GET /api/db/wipe?secret=secret_key
+/// Test: test_environment.rs/test_reset_db()
+/// Frontend: Not directly called from frontend
+async fn api_db_reset(
     Extension(pool): Extension<sqlx::PgPool>,
     Query(params): Query<WipeParams>,
 ) -> Result<Json<Value>> {
@@ -101,5 +97,5 @@ async fn api_db_wipe(
 pub fn db_routes() -> Router {
     Router::new()
         .route("/test", get(api_db_test))
-        .route("/wipe", get(api_db_wipe))
+        .route("/reset", get(api_db_reset))
 }
