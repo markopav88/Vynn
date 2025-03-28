@@ -26,7 +26,9 @@ use sqlx::PgPool;
 use tower_cookies::Cookies;
 
 use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPayload};
-use crate::models::permission::{CreatePermissionPayload, UpdatePermissionPayload, DocumentPermission, UserPermissions};
+use crate::models::permission::{
+    CreatePermissionPayload, DocumentPermission, UpdatePermissionPayload, UserPermissions,
+};
 use crate::web::middleware::middleware::check_document_permission;
 use crate::{Error, Result};
 
@@ -72,6 +74,35 @@ pub async fn api_get_document(
     } else {
         Err(Error::PermissionError)
     }
+}
+
+/// GET handler for retrieving all documents the user has access to.
+/// Accessible via: GET /api/document/
+/// Test: test_documents.rs/test_get_all_documents()
+/// Frontend: document.ts/get_all_documents()
+pub async fn api_get_all_documents(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Document>>> {
+    println!("->> {:<12} - get_all_documents", "HANDLER");
+
+    // get user_id from cookies
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all documents where the user has any permission
+    let result = sqlx::query_as!(
+        Document,
+        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DocumentNotFoundError)?;
+
+    Ok(Json(result))
 }
 
 /// POST handler for creating a new document.
@@ -231,7 +262,7 @@ async fn delete_document(
     }
 
     // otherwise now we can sucessfully delete the delete the document from the database
-            
+
     let result = sqlx::query!(
         "DELETE FROM Documents
             WHERE id =  $1",
@@ -251,7 +282,7 @@ async fn delete_document(
             "success": true
         }
 
-    })))
+    })));
 }
 
 /// POST handler for granting permission to a user for a document.
@@ -293,7 +324,7 @@ pub async fn api_add_permissions(
 
     match result {
         Ok(permission) => Ok(Json(permission)),
-        Err(_) => Err(Error::PermissionError)
+        Err(_) => Err(Error::PermissionError),
     }
 }
 
@@ -329,7 +360,7 @@ pub async fn api_get_permissions(
 
     match result {
         Ok(users) => Ok(Json(users)),
-        Err(_) => Err(Error::DocumentNotFoundError)
+        Err(_) => Err(Error::DocumentNotFoundError),
     }
 }
 
@@ -443,12 +474,13 @@ pub async fn api_remove_permissions(
                 "message": "Permission removed successfully"
             }
         }))),
-        Err(_) => Err(Error::PermissionError)
+        Err(_) => Err(Error::PermissionError),
     }
 }
 
 pub fn doc_routes() -> Router {
     Router::new()
+        .route("/", get(api_get_all_documents))
         .route("/", post(api_create_document))
         .route("/:id", get(api_get_document))
         .route("/:id", put(api_update_document))

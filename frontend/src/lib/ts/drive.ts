@@ -5,53 +5,234 @@
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
-/
-/
+/ create_document: Function to create a new document
+/ get_all_documents: Function to get all documents the user has access to
+/ delete_document: Function to delete a document by ID
+/ create_project: Function to create a new project
+/ get_all_projects: Function to get all projects for the current user
+/ update_project: Function to update a project by ID
+/ delete_project: Function to delete a project by ID
+/ force_delete_project: Function to force delete a project and all its documents
 /
 */
+import { Document } from "./document";
+import { Project } from "./project";
 
-// TODO Function to create a document
-export async function create_document(): Promise<Boolean> {
-    return true;
+/**
+ * Function to create a document
+ * Calls: POST /api/document
+ */
+export async function create_document(document_payload: Document): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/document/`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(document_payload),
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Create document failed with status:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
+			return false;
+		}
+	} catch (error) {
+		console.error('Create document error:', error);
+		return false;
+	}
 }
 
-// TODO Function to get all documents
-export async function get_all_documents(): Promise<Boolean> {
-    return true;
+/**
+ * Function to get all documents the user has access to
+ * Calls: GET /api/document
+ */
+export async function get_all_documents(): Promise<Document[] | null> {
+	const apiUrl = `http://localhost:3001/api/document/`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Get all documents failed with status:', response.status);
+			return null;
+		}
+
+		const documents = await response.json();
+		return documents;
+	} catch (error) {
+		console.error('Get all documents error:', error);
+		return null;
+	}
 }
 
-// TODO Function to delete document
-export async function delete_document(): Promise<Boolean> {
-    return true;
+/**
+ * Function to delete a document
+ * Calls: DELETE /api/document/:id
+ */
+export async function delete_document(document_id: number): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/document/${document_id}`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Delete document failed with status:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
+			return false;
+		}
+	} catch (error) {
+		console.error('Delete document error:', error);
+		return false;
+	}
 }
 
-// TODO Function to create a project
-export async function create_project(): Promise<Boolean> {
-    return true;
+/**
+ * Function to create a project
+ * Calls: POST /api/project
+ */
+export async function create_project(name: string): Promise<Project | null> {
+	const apiUrl = `http://localhost:3001/api/project/`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ _name: name }),
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Create project failed with status:', response.status);
+			return null;
+		}
+
+		const project = await response.json();
+		return project;
+	} catch (error) {
+		console.error('Create project error:', error);
+		return null;
+	}
 }
 
-// TODO Function to get a project
-export async function get_project(): Promise<Boolean> {
-    return true;
+/**
+ * Function to get all projects for the current user
+ * Calls: GET /api/project
+ */
+export async function get_all_projects(): Promise<Project[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Get all projects failed with status:', response.status);
+			return null;
+		}
+
+		const projects = await response.json();
+		return projects;
+	} catch (error) {
+		console.error('Get all projects error:', error);
+		return null;
+	}
 }
 
-// TODO Function to get a project
-export async function get_all_projects(): Promise<Boolean> {
-    return true;
+/**
+ * Function to update a project
+ * Calls: PUT /api/project/:id
+ */
+export async function update_project(project_id: number, name: string): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ _name: name }),
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Update project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Update project error:', error);
+		return false;
+	}
 }
 
+/**
+ * Function to delete a project
+ * Calls: DELETE /api/project/:id
+ */
+export async function delete_project(project_id: number): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
 
-// TODO Function to update a project
-export async function update_project(): Promise<Boolean> {
-    return true;
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Delete project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Delete project error:', error);
+		return false;
+	}
 }
 
-// TODO Function to delete a project
-export async function delete_project(): Promise<Boolean> {
-    return true;
-}
+/**
+ * Function to force delete a project and all its documents
+ * Calls: DELETE /api/project/:id/force
+ */
+export async function force_delete_project(project_id: number): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
+	
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
 
-// TODO Function to delete a project and all its documents
-export async function force_delete_project(): Promise<Boolean> {
-    return true;
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Force delete project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Force delete project error:', error);
+		return false;
+	}
 }
