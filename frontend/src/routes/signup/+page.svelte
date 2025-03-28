@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { attempt_signup, Signup} from "$lib/ts/signup"
+    import { attempt_signup, Signup} from "$lib/ts/user"
     
     let name = '';
     let email = '';

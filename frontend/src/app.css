@@ -1,6 +1,30 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import 'bootstrap/dist/css/bootstrap.min.css';
 
-/* Import custom styles */
-@import './lib/styles/TextEditor.css';
+/* Custom variables */
+:root {
+  --color-primary: #10B981;
+  --color-text: #ffffff;
+  --color-background: #000000;
+  --color-border: rgba(255, 255, 255, 0.1);
+}
+
+/* Global styles */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Custom utility classes */
+.btn-green {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.text-green {
+  color: var(--color-primary);
+}
+
+.border-subtle {
+  border-color: var(--color-border);
+}

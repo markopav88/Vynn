@@ -52,7 +52,7 @@
 </script>
 
 <div class="min-h-screen flex items-center justify-center bg-[#0A1721] text-white py-12 px-4 sm:px-6">
-    <div class="max-w-md p-8 space-y-8 bg-[#1E293B] rounded-lg shadow-lg mt-[-5vh] mt-80">
+    <div class="max-w-md p-8 space-y-8 bg-[#1E293B] rounded-lg shadow-lg mt-80">
         <div class="text-center">
             <h1 class="text-3xl font-bold">Welcome Back</h1>
             <p class="mt-2 text-gray-400">Sign in to your account</p>

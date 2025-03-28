@@ -8,10 +8,16 @@
 	// Import the global CSS file
 	// Can import other global components here such as a Navbar, Footer, etc, 
 	// things we want to be on every page
-	import '../app.css';
+	import "../app.css";
+	import { onMount } from 'svelte';
 
 	// Define the props for the layout component
 	let { children } = $props();
+
+	onMount(() => {
+		// Import Bootstrap JS
+		import('bootstrap');
+	});
 </script>
 
 <!-- Renders the current page -->
