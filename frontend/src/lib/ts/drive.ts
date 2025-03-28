@@ -39,6 +39,7 @@ export async function create_document(document_payload: Document): Promise<Boole
 }
 
 // TODO Function to get all documents
+//Return a list of all the documents
 export async function get_all_documents(): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/users`;
 	2;
