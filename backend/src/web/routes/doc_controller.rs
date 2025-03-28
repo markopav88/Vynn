@@ -76,10 +76,33 @@ pub async fn api_get_document(
     }
 }
 
+/// GET handler for retrieving all documents the user has access to.
+/// Accessible via: GET /api/document/
+/// Test: test_documents.rs/test_get_all_documents()
+/// Frontend: document.ts/get_all_documents()
 pub async fn api_get_all_documents(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
-) -> Result<Vec<Document>> {
+) -> Result<Json<Vec<Document>>> {
+    println!("->> {:<12} - get_all_documents", "HANDLER");
+
+    // get user_id from cookies
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all documents where the user has any permission
+    let result = sqlx::query_as!(
+        Document,
+        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DocumentNotFoundError)?;
+
+    Ok(Json(result))
 }
 
 /// POST handler for creating a new document.
