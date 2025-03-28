@@ -33,8 +33,8 @@ async fn test_documents() -> Result<()> {
     let get_result = test_get_document(&hc).await;
     let update_result = test_update_document(&hc).await;
     let add_permissions = test_add_permissions(&hc).await;
-    let update_permissions = test_update_permissions(&hc).await;
-    let get_permissions = test_get_permissions(&hc).await;
+    let upd_perm = test_update_permissions(&hc).await;
+    let get_perm = test_get_permissions(&hc).await;
     let delete_result = test_delete_document(&hc).await;
     let get_bad_result = test_get_document(&hc).await;
     let reset_db = backend::test_reset_db(&hc).await;
@@ -46,8 +46,8 @@ async fn test_documents() -> Result<()> {
     println!("Get Document:\t\t{}", result_to_string(&get_result));
     println!("Update Document:\t{}", result_to_string(&update_result));
     println!("Add Permissions:\t{}", result_to_string(&add_permissions));
-    println!("Update Permissions:\t{}", result_to_string(&update_permissions));
-    println!("Get Users Permissions:\t{}", result_to_string(&get_permissions));
+    println!("Update Permissions:\t{}", result_to_string(&upd_perm));
+    println!("Get Users Permissions:\t{}", result_to_string(&get_perm));
     println!("Delete Document\t\t{}", result_to_string(&delete_result));
     println!("Get Bad Document:\t{}", result_to_string(&get_result));
     println!("Reset Database:\t\t{}", result_to_string(&reset_db));
@@ -150,7 +150,7 @@ async fn test_update_document(hc: &Client) -> Result<()> {
     // generate new updated_at time
     let now = Utc::now().naive_utc();
 
-    // Now update the document we just created 
+    // Now update the document we just created
     let update_response = hc
         .do_put(
             &format!("/api/document/2"),
@@ -196,7 +196,7 @@ async fn test_delete_document(hc: &Client) -> Result<()> {
 
 async fn test_add_permissions(hc: &Client) -> Result<()> {
     println!("TEST - Add Document Permissions");
-    
+
     // Add permissions for user 2 on document 1 (created in previous tests)
     let add_perm_response = hc
         .do_post(
@@ -207,36 +207,34 @@ async fn test_add_permissions(hc: &Client) -> Result<()> {
             }),
         )
         .await?;
-    
+
     add_perm_response.print().await?;
-    
+
     if !add_perm_response.status().is_success() {
         return Err(anyhow::anyhow!(
             "Add permissions failed with status: {}",
             add_perm_response.status()
         ));
     }
-    
+
     Ok(())
 }
 
 async fn test_get_permissions(hc: &Client) -> Result<()> {
     println!("TEST - Get Document Permissions");
-    
+
     // Get permissions for document 1
-    let get_perm_response = hc
-        .do_get("/api/document/1/permissions")
-        .await?;
-    
+    let get_perm_response = hc.do_get("/api/document/1/permissions").await?;
+
     get_perm_response.print().await?;
-    
+
     if !get_perm_response.status().is_success() {
         return Err(anyhow::anyhow!(
             "Get permissions failed with status: {}",
             get_perm_response.status()
         ));
     }
-    
+
     Ok(())
 }
 
@@ -265,20 +263,18 @@ async fn test_update_permissions(hc: &Client) -> Result<()> {
 
 async fn test_remove_permissions(hc: &Client) -> Result<()> {
     println!("TEST - Remove Document Permission");
-    
+
     // Remove permissions for user 2 on document 1
-    let remove_perm_response = hc
-        .do_delete("/api/document/1/permissions/2")
-        .await?;
-    
+    let remove_perm_response = hc.do_delete("/api/document/1/permissions/2").await?;
+
     remove_perm_response.print().await?;
-    
+
     if !remove_perm_response.status().is_success() {
         return Err(anyhow::anyhow!(
             "Remove permission failed with status: {}",
             remove_perm_response.status()
         ));
     }
-    
+
     Ok(())
 }
