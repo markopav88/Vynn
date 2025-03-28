@@ -23,10 +23,8 @@ export class Login {
 
 // Function for attempting login on POST API
 export async function attempt_login(login_payload: Login): Promise<boolean> {
-	// Use the correct backend API URL
 	const apiUrl = `http://localhost:3001/api/login`;
 
-	// attempt to call POST API
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'POST',
@@ -37,7 +35,6 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 			credentials: 'include'
 		});
 
-		// Check if the response is successful
 		if (response.ok) {
 			return true;
 		} else {
@@ -54,18 +51,18 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 
 export async function logout() {
 	const apiUrl = `http://localhost:3001/api/users/logout`;
-	// Call GET API
+
 	const response = await fetch(apiUrl, {
 		credentials: 'include'
 	});
 
-	// check response status
 	if (!response.ok) {
 		throw new Error(`Failed to logout: ${response.statusText}`);
 	}
 
 	// Check if the response is JSON
 	const contentType = response.headers.get('Content-Type');
+
 	if (!contentType || !contentType.includes('application/json')) {
 		// If the response is not JSON, log it and return null
 		const text = await response.text(); // Read the response as text to inspect it
