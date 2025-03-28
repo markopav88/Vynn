@@ -21,7 +21,7 @@
 /
 */
 
-use axum::routing::{get, post, put, delete};
+use axum::routing::{delete, get, post, put};
 use axum::{
     extract::{Extension, Json, Path},
     Router,
@@ -31,18 +31,24 @@ use sqlx::PgPool;
 use tower_cookies::Cookies;
 
 use crate::models::project::{CreateProjectPayload, Project, UpdateProjectPayload};
-use crate::models::project_permission::{CreateProjectPermissionPayload, ProjectPermission, UpdateProjectPermissionPayload, UserProjectPermissions};
+use crate::models::project_permission::{
+    CreateProjectPermissionPayload, ProjectPermission, UpdateProjectPermissionPayload,
+    UserProjectPermissions,
+};
 use crate::web::middleware::middleware::check_project_permission;
 use crate::{Error, Result};
 
-use backend::get_user_id_from_cookie;
 use crate::models::document::Document;
+use backend::get_user_id_from_cookie;
 
 /// GET handler for retrieving all projects for a user.
 /// Accessible via: GET /api/project
 /// Test: test_projects.rs/test_get_all_projects()
 /// Frontend: project.ts/get_all_projects()
-async fn api_get_all_projects(cookies: Cookies, Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Project>>> {
+async fn api_get_all_projects(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Project>>> {
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
@@ -114,7 +120,7 @@ async fn api_create_project(
 
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
-    
+
     // Use query_as! to directly map to Project struct
     let result = sqlx::query_as!(
         Project,
@@ -146,7 +152,7 @@ async fn api_create_project(
             }
 
             Ok(Json(project))
-        },
+        }
         Err(_) => Err(Error::ProjectNotFoundError),
     }
 }
@@ -281,7 +287,7 @@ async fn api_add_permissions(
 
     match result {
         Ok(permission) => Ok(Json(permission)),
-        Err(_) => Err(Error::PermissionError)
+        Err(_) => Err(Error::PermissionError),
     }
 }
 
@@ -319,7 +325,7 @@ async fn api_get_permissions(
 
     match result {
         Ok(users) => Ok(Json(users)),
-        Err(_) => Err(Error::ProjectNotFoundError)
+        Err(_) => Err(Error::ProjectNotFoundError),
     }
 }
 
@@ -433,7 +439,7 @@ async fn api_remove_permissions(
                 "message": "Permission removed successfully"
             }
         }))),
-        Err(_) => Err(Error::PermissionError)
+        Err(_) => Err(Error::PermissionError),
     }
 }
 
@@ -470,7 +476,7 @@ async fn api_force_delete_project(
     // 2. For each document, delete permissions and then the document
     for doc_record in document_ids {
         let doc_id = doc_record.document_id;
-        
+
         // Delete document permissions
         sqlx::query!(
             "DELETE FROM document_permissions WHERE document_id = $1",
@@ -479,34 +485,25 @@ async fn api_force_delete_project(
         .execute(&pool)
         .await
         .map_err(|_| Error::DocumentDeletionError)?;
-        
+
         // Delete document
-        sqlx::query!(
-            "DELETE FROM documents WHERE id = $1",
-            doc_id
-        )
-        .execute(&pool)
-        .await
-        .map_err(|_| Error::DocumentDeletionError)?;
+        sqlx::query!("DELETE FROM documents WHERE id = $1", doc_id)
+            .execute(&pool)
+            .await
+            .map_err(|_| Error::DocumentDeletionError)?;
     }
 
     // 3. Delete project permissions
-    sqlx::query!(
-        "DELETE FROM project_permissions WHERE project_id = $1",
-        id
-    )
-    .execute(&pool)
-    .await
-    .map_err(|_| Error::PermissionError)?;
+    sqlx::query!("DELETE FROM project_permissions WHERE project_id = $1", id)
+        .execute(&pool)
+        .await
+        .map_err(|_| Error::PermissionError)?;
 
     // 4. Delete the project
-    sqlx::query!(
-        "DELETE FROM projects WHERE id = $1",
-        id
-    )
-    .execute(&pool)
-    .await
-    .map_err(|_| Error::ProjectNotFoundError)?;
+    sqlx::query!("DELETE FROM projects WHERE id = $1", id)
+        .execute(&pool)
+        .await
+        .map_err(|_| Error::ProjectNotFoundError)?;
 
     Ok(Json(json!({
         "result": {
@@ -568,7 +565,8 @@ async fn api_add_document(
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
     // Check if user has at least editor permission on the project
-    let has_project_permission = check_project_permission(&pool, user_id, project_id, "editor").await?;
+    let has_project_permission =
+        check_project_permission(&pool, user_id, project_id, "editor").await?;
 
     if !has_project_permission {
         return Err(Error::PermissionError);
@@ -626,7 +624,7 @@ async fn api_add_document(
                 "message": "Document added to project successfully"
             }
         }))),
-        Err(_) => Err(Error::DatabaseError)
+        Err(_) => Err(Error::DatabaseError),
     }
 }
 
@@ -668,7 +666,7 @@ async fn api_remove_document(
                 "message": "Document removed from project successfully"
             }
         }))),
-        Err(_) => Err(Error::DatabaseError)
+        Err(_) => Err(Error::DatabaseError),
     }
 }
 

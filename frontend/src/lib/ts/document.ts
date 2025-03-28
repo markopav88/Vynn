@@ -51,10 +51,10 @@ export class DocumentUser {
 }
 
 // Function to parse the saved document state into how it is supposed to look
-export async function get_document(documentId: number): Promise<Document | null> {
+export async function get_document(document_id: number): Promise<Document | null> {
 	try {
 		// Use the correct backend API URL
-		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
+		const apiUrl = `http://localhost:3001/api/document/${document_id}`;
 
 		// Call GET API
 		const response = await fetch(apiUrl, {
@@ -83,7 +83,7 @@ export async function get_document(documentId: number): Promise<Document | null>
 			let document = new Document(
 				data.id,
 				data.name,
-				data.content || "", // Handle null content
+				data.content || '', // Handle null content
 				data.created_at,
 				data.updated_at
 			);
@@ -103,35 +103,35 @@ export async function update_document(document: Document): Promise<boolean> {
 	try {
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
-		
+
 		// Format the timestamp in the format expected by the backend (NaiveDateTime)
 		const now = new Date().toISOString().replace('Z', '');
-		
+
 		// Create payload with explicit content handling
 		const payload = {
 			name: document.name,
-			content: document.content || "", // Ensure content is never null/undefined
+			content: document.content || '', // Ensure content is never null/undefined
 			updated_at: now
 		};
-		
-		console.log("Sending update with payload:", payload);
-		
+
+		console.log('Sending update with payload:', payload);
+
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			headers: {
-				'Content-Type': 'application/json',
+				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			const errorText = await response.text();
-			console.error("Update failed:", response.status, errorText);
+			console.error('Update failed:', response.status, errorText);
 			return false;
 		}
-		
-		console.log("Document updated successfully");
+
+		console.log('Document updated successfully');
 		return true;
 	} catch (error) {
 		console.error('Error updating document:', error);
@@ -140,23 +140,26 @@ export async function update_document(document: Document): Promise<boolean> {
 }
 
 // Function to set up auto-save interval for a document
-export function setup_auto_save(document: Document, onSave?: (success: boolean) => void): () => void {
+export function setup_auto_save(
+	document: Document,
+	onSave?: (success: boolean) => void
+): () => void {
 	// Set up interval to save every 30 seconds
 	const intervalId = setInterval(async () => {
 		console.log('Auto-saving document...');
 		const success = await update_document(document);
-		
+
 		if (onSave) {
 			onSave(success);
 		}
-		
+
 		if (success) {
 			console.log('Document saved successfully');
 		} else {
 			console.error('Failed to save document');
 		}
 	}, 30000); // 30 seconds in milliseconds
-	
+
 	// Return a cleanup function to clear the interval
 	return () => {
 		clearInterval(intervalId);
@@ -164,17 +167,19 @@ export function setup_auto_save(document: Document, onSave?: (success: boolean) 
 	};
 }
 
-// Manual save function for when we want to bind this 
-export async function saveDocument(documentData: Document): Promise<boolean | null> {
-	if (documentData) {
-		return await update_document(documentData);
+// Manual save function for when we want to bind this
+export async function saveDocument(document: Document): Promise<boolean | null> {
+	if (document) {
+		return await update_document(document);
 	}
 	return null;
 }
 
 // Function to get all users with permissions to a given document
-// To return a list of DocumentUser objects with access to the document or null 
-export async function get_document_permissions(documentData: Document): Promise<DocumentUser[] | null> {
+// To return a list of DocumentUser objects with access to the document or null
+export async function get_document_permissions(
+	documentData: Document
+): Promise<DocumentUser[] | null> {
 	try {
 		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${documentData.id}/permissions`;
@@ -193,7 +198,7 @@ export async function get_document_permissions(documentData: Document): Promise<
 		const data = await response.json();
 
 		console.log(data);
-		
+
 		// Return the users array from the response
 		return data.users || null;
 	} catch (error) {
@@ -203,7 +208,7 @@ export async function get_document_permissions(documentData: Document): Promise<
 }
 
 // TODO Function to attempt to add a users permissions will return a boolean
-export async function add_document_permissions(userData: DocumentUser): Promise<boolean> {
+export async function add_document_permissions(document_user: DocumentUser): Promise<boolean> {
 	// Use correct backend API URL
 
 	// Create payload to send to API
@@ -212,11 +217,10 @@ export async function add_document_permissions(userData: DocumentUser): Promise<
 
 	// Check results of API call
 	return true;
-	
 }
 
 // TODO Function to attempt to update a users permissions will return a boolean
-export async function update_document_permissions(userData: DocumentUser): Promise<boolean> {
+export async function update_document_permissions(document_user: DocumentUser): Promise<boolean> {
 	// Use correct backend API URL
 
 	// Create payload to send to API
@@ -225,11 +229,10 @@ export async function update_document_permissions(userData: DocumentUser): Promi
 
 	// Check results of API call
 	return true;
-	
 }
 
 // TODO Function to attempt to delete a users permissions will return a boolean
-export async function delete_document_permissions(userData: DocumentUser): Promise<boolean> {
+export async function delete_document_permissions(document_user: DocumentUser): Promise<boolean> {
 	// Use correct backend API URL
 
 	// Create payload to send to API
