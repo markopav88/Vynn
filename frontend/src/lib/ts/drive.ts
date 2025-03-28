@@ -5,15 +5,23 @@
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
-/
-/
+/ create_document: Function to create a new document
+/ get_all_documents: Function to get all documents the user has access to
+/ delete_document: Function to delete a document by ID
+/ create_project: Function to create a new project
+/ get_all_projects: Function to get all projects for the current user
+/ update_project: Function to update a project by ID
+/ delete_project: Function to delete a project by ID
+/ force_delete_project: Function to force delete a project and all its documents
 /
 */
 import { Document } from "./document";
 import { Project } from "./project";
 
-
-// TODO Function to create a document
+/**
+ * Function to create a document
+ * Calls: POST /api/document
+ */
 export async function create_document(document_payload: Document): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/document/`;
 
@@ -41,7 +49,10 @@ export async function create_document(document_payload: Document): Promise<Boole
 	}
 }
 
-// TODO Function to get all documents
+/**
+ * Function to get all documents the user has access to
+ * Calls: GET /api/document
+ */
 export async function get_all_documents(): Promise<Document[] | null> {
 	const apiUrl = `http://localhost:3001/api/document/`;
 
@@ -64,7 +75,10 @@ export async function get_all_documents(): Promise<Document[] | null> {
 	}
 }
 
-// TODO Function to delete document
+/**
+ * Function to delete a document
+ * Calls: DELETE /api/document/:id
+ */
 export async function delete_document(document_id: number): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/document/${document_id}`;
 
@@ -88,7 +102,10 @@ export async function delete_document(document_id: number): Promise<Boolean> {
 	}
 }
 
-// TODO Function to create a project
+/**
+ * Function to create a project
+ * Calls: POST /api/project
+ */
 export async function create_project(name: string): Promise<Project | null> {
 	const apiUrl = `http://localhost:3001/api/project/`;
 
@@ -115,7 +132,10 @@ export async function create_project(name: string): Promise<Project | null> {
 	}
 }
 
-// TODO Function to get a project
+/**
+ * Function to get all projects for the current user
+ * Calls: GET /api/project
+ */
 export async function get_all_projects(): Promise<Project[] | null> {
 	const apiUrl = `http://localhost:3001/api/project/`;
 
@@ -138,7 +158,10 @@ export async function get_all_projects(): Promise<Project[] | null> {
 	}
 }
 
-// TODO Function to update a project
+/**
+ * Function to update a project
+ * Calls: PUT /api/project/:id
+ */
 export async function update_project(project_id: number, name: string): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
 	
@@ -164,7 +187,10 @@ export async function update_project(project_id: number, name: string): Promise<
 	}
 }
 
-// TODO Function to delete a project
+/**
+ * Function to delete a project
+ * Calls: DELETE /api/project/:id
+ */
 export async function delete_project(project_id: number): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
 	
@@ -186,7 +212,10 @@ export async function delete_project(project_id: number): Promise<Boolean> {
 	}
 }
 
-// TODO Function to delete a project and all its documents
+/**
+ * Function to force delete a project and all its documents
+ * Calls: DELETE /api/project/:id/force
+ */
 export async function force_delete_project(project_id: number): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
 	

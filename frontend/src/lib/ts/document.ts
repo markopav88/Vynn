@@ -50,89 +50,54 @@ export class DocumentUser {
 	}
 }
 
-// Function to parse the saved document state into how it is supposed to look
+/**
+ * Function to get a document by ID
+ * Calls: GET /api/document/:id
+ */
 export async function get_document(document_id: number): Promise<Document | null> {
 	try {
-		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${document_id}`;
-
-		// Call GET API
+		
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-
-		// check response status
+		
 		if (!response.ok) {
-			throw new Error(`Failed to fetch document: ${response.statusText}`);
-		}
-
-		// Check if the response is JSON
-		const contentType = response.headers.get('Content-Type');
-		if (!contentType || !contentType.includes('application/json')) {
-			// If the response is not JSON, log it and return null
-			const text = await response.text(); // Read the response as text to inspect it
-			console.error('Expected JSON, but received:', text);
+			console.error('Failed to fetch document:', response.status);
 			return null;
 		}
-
-		// Parse the response JSON
-		const data = await response.json();
-
-		// Parse Document
-		try {
-			let document = new Document(
-				data.id,
-				data.name,
-				data.content || '', // Handle null content
-				data.created_at,
-				data.updated_at
-			);
-			return document;
-		} catch (error) {
-			console.error('Error parsing document data:', error);
-			return null;
-		}
+		
+		return await response.json();
 	} catch (error) {
-		console.error('Error loading document:', error);
+		console.error('Error fetching document:', error);
 		return null;
 	}
 }
 
-// Function to take the current state of the document and update it in the database
+/**
+ * Function to update a document
+ * Calls: PUT /api/document/:id
+ */
 export async function update_document(document: Document): Promise<boolean> {
 	try {
-		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
-
-		// Format the timestamp in the format expected by the backend (NaiveDateTime)
-		const now = new Date().toISOString().replace('Z', '');
-
-		// Create payload with explicit content handling
+		
 		const payload = {
 			name: document.name,
-			content: document.content || '', // Ensure content is never null/undefined
-			updated_at: now
+			content: document.content,
+			updated_at: new Date().toISOString().replace('Z', '')
 		};
-
-		console.log('Sending update with payload:', payload);
-
+		
 		const response = await fetch(apiUrl, {
-			method: 'POST',
+			method: 'PUT',
 			headers: {
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('Update failed:', response.status, errorText);
-			return false;
-		}
-
-		console.log('Document updated successfully');
-		return true;
+		
+		return response.ok;
 	} catch (error) {
 		console.error('Error updating document:', error);
 		return false;
@@ -175,31 +140,25 @@ export async function saveDocument(document: Document): Promise<boolean | null> 
 	return null;
 }
 
-// Function to get all users with permissions to a given document
-// To return a list of DocumentUser objects with access to the document or null
+/**
+ * Function to get all users with permissions to a given document
+ * Calls: GET /api/document/:id/permissions
+ */
 export async function get_document_permissions(
 	documentData: Document
 ): Promise<DocumentUser[] | null> {
 	try {
-		// Use the correct backend API URL
 		const apiUrl = `http://localhost:3001/api/document/${documentData.id}/permissions`;
 
-		// Call GET API with credentials for auth cookies
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
 
-		// Check response status
 		if (!response.ok) {
 			throw new Error(`Failed to fetch document users: ${response.statusText}`);
 		}
 
-		// Parse the response JSON
 		const data = await response.json();
-
-		console.log(data); // debug
-
-		// Return the users array from the response
 		return data.users || null;
 	} catch (error) {
 		console.error('Error loading document users:', error);
@@ -209,6 +168,7 @@ export async function get_document_permissions(
 
 /**
  * Function to get all documents the user has access to
+ * Calls: GET /api/document/
  */
 export async function get_all_documents(): Promise<Document[] | null> {
 	try {
@@ -232,6 +192,7 @@ export async function get_all_documents(): Promise<Document[] | null> {
 
 /**
  * Function to create a new document
+ * Calls: POST /api/document
  */
 export async function create_document(name: string, content: string): Promise<Document | null> {
 	try {
@@ -268,6 +229,7 @@ export async function create_document(name: string, content: string): Promise<Do
 
 /**
  * Function to delete a document
+ * Calls: DELETE /api/document/:id
  */
 export async function delete_document(documentId: number): Promise<boolean> {
 	try {
@@ -287,6 +249,7 @@ export async function delete_document(documentId: number): Promise<boolean> {
 
 /**
  * Function to add permissions for a user on a document
+ * Calls: POST /api/document/:id/permissions
  */
 export async function add_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
@@ -315,6 +278,7 @@ export async function add_document_permissions(documentId: number, userId: numbe
 
 /**
  * Function to update a user's permissions for a document
+ * Calls: PUT /api/document/:id/permissions
  */
 export async function update_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
@@ -343,6 +307,7 @@ export async function update_document_permissions(documentId: number, userId: nu
 
 /**
  * Function to delete a user's permissions for a document
+ * Calls: DELETE /api/document/:id/permissions/:user_id
  */
 export async function delete_document_permissions(documentId: number, userId: number): Promise<boolean> {
 	try {

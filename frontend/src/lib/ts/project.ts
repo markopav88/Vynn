@@ -49,7 +49,10 @@ export class ProjectUser {
 	}
 }
 
-// TODO Function to get a project
+/**
+ * Function to get a project by ID
+ * Calls: GET /api/project/:id
+ */
 export async function get_project(project_id: number): Promise<Project | null> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
 
@@ -65,7 +68,6 @@ export async function get_project(project_id: number): Promise<Project | null> {
 		}
 
 		const project = await response.json();
-
 		return project;
 	} catch (error) {
 		console.error('Get project error:', error);
@@ -74,7 +76,143 @@ export async function get_project(project_id: number): Promise<Project | null> {
 }
 
 /**
+ * Function to get all projects for the current user
+ * Calls: GET /api/project
+ */
+export async function get_all_projects(): Promise<Project[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Get all projects failed with status:', response.status);
+			return null;
+		}
+
+		const projects = await response.json();
+		return projects;
+	} catch (error) {
+		console.error('Get all projects error:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to create a new project
+ * Calls: POST /api/project
+ */
+export async function create_project(name: string): Promise<Project | null> {
+	const apiUrl = `http://localhost:3001/api/project/`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ _name: name }),
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Create project failed with status:', response.status);
+			return null;
+		}
+
+		const project = await response.json();
+		return project;
+	} catch (error) {
+		console.error('Create project error:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to update a project
+ * Calls: PUT /api/project/:id
+ */
+export async function update_project(project_id: number, name: string): Promise<boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ _name: name }),
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Update project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Update project error:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to delete a project
+ * Calls: DELETE /api/project/:id
+ */
+export async function delete_project(project_id: number): Promise<boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Delete project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Delete project error:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to force delete a project and all its documents
+ * Calls: DELETE /api/project/:id/force
+ */
+export async function force_delete_project(project_id: number): Promise<boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
+	
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Force delete project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Force delete project error:', error);
+		return false;
+	}
+}
+
+/**
  * Function to add permissions for a user on a project
+ * Calls: POST /api/project/:id/permissions
  */
 export async function add_project_permissions(projectId: number, userId: number, role: string): Promise<boolean> {
 	try {
@@ -103,6 +241,7 @@ export async function add_project_permissions(projectId: number, userId: number,
 
 /**
  * Function to get all users with permissions on a project
+ * Calls: GET /api/project/:id/permissions
  */
 export async function get_project_permissions(projectId: number): Promise<ProjectUser[] | null> {
 	try {
@@ -127,6 +266,7 @@ export async function get_project_permissions(projectId: number): Promise<Projec
 
 /**
  * Function to update a user's permission on a project
+ * Calls: PUT /api/project/:id/permissions
  */
 export async function update_project_permission(projectId: number, userId: number, role: string): Promise<boolean> {
 	try {
@@ -155,6 +295,7 @@ export async function update_project_permission(projectId: number, userId: numbe
 
 /**
  * Function to remove a user's permission from a project
+ * Calls: DELETE /api/project/:id/permissions/:user_id
  */
 export async function remove_project_permissions(projectId: number, userId: number): Promise<boolean> {
 	try {
@@ -174,6 +315,7 @@ export async function remove_project_permissions(projectId: number, userId: numb
 
 /**
  * Function to get all documents in a project
+ * Calls: GET /api/project/:id/documents
  */
 export async function get_project_documents(projectId: number): Promise<Document[] | null> {
 	try {
@@ -197,6 +339,7 @@ export async function get_project_documents(projectId: number): Promise<Document
 
 /**
  * Function to add a document to a project
+ * Calls: POST /api/project/:id/documents/:doc_id
  */
 export async function add_document_to_project(projectId: number, documentId: number): Promise<boolean> {
 	try {
@@ -220,6 +363,7 @@ export async function add_document_to_project(projectId: number, documentId: num
 
 /**
  * Function to remove a document from a project
+ * Calls: DELETE /api/project/:id/documents/:doc_id
  */
 export async function remove_document_from_project(projectId: number, documentId: number): Promise<boolean> {
 	try {

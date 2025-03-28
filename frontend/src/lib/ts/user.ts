@@ -1,12 +1,15 @@
 /*
-/ user.ts
+/ User.ts
 /
-/ File containing functions and logic required for frontend handling of logging in
+/ File containing functions and logic required for frontend handling of users
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
 / Class Login: Class responsible for holding login information
 / attempt_login: function responsible for calling POST API for login
+/ logout: function responsible for calling GET API for logout
+/ get_current_user: function responsible for calling GET API for current user
+/ update_user: function responsible for calling PUT API for updating user
 /
 */
 
@@ -49,7 +52,10 @@ class SignupPayload {
     }
 }
 
-// Function for attempting login on POST API
+/**
+ * Function to attempt login
+ * Calls: POST /api/login
+ */
 export async function attempt_login(login_payload: Login): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/login`;
 
@@ -77,35 +83,35 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 	}
 }
 
-export async function logout() {
+/**
+ * Function to logout user
+ * Calls: GET /api/users/logout
+ */
+export async function logout(): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/users/logout`;
 
-	const response = await fetch(apiUrl, {
-		credentials: 'include'
-	});
+	try {
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
 
-	if (!response.ok) {
-		throw new Error(`Failed to logout: ${response.statusText}`);
-	}
+		if (!response.ok) {
+			throw new Error(`Failed to logout: ${response.statusText}`);
+		}
 
-	// Check if the response is JSON
-	const contentType = response.headers.get('Content-Type');
-
-	if (!contentType || !contentType.includes('application/json')) {
-		// If the response is not JSON, log it and return null
-		const text = await response.text(); // Read the response as text to inspect it
-		console.error('Expected JSON, but received:', text);
-		return null;
+		return true;
+	} catch (error) {
+		console.error('Logout error:', error);
+		return false;
 	}
 }
 
 /**
  * Function to get the current user's information
+ * Calls: GET /api/users/:id
  */
 export async function get_current_user(): Promise<any | null> {
 	try {
-		// We need to get the user ID from cookies, but since we don't have direct access
-		// to cookies in the frontend, we'll use the endpoint that gets the current user
 		const apiUrl = `http://localhost:3001/api/users/current`;
 		
 		const response = await fetch(apiUrl, {
@@ -126,6 +132,7 @@ export async function get_current_user(): Promise<any | null> {
 
 /**
  * Function to update the current user's information
+ * Calls: PUT /api/users/update
  */
 export async function update_user(name: string, email: string, password: string): Promise<boolean> {
 	try {
@@ -153,7 +160,10 @@ export async function update_user(name: string, email: string, password: string)
 	}
 }
 
-// Function for attempting signup on POST API
+/**
+ * Function for attempting signup
+ * Calls: POST /api/users
+ */
 export async function attempt_signup(signup_input: Signup): Promise<boolean> {
     // Check if passwords match and make new payload if they do
     let signup_payload;
@@ -181,13 +191,13 @@ export async function attempt_signup(signup_input: Signup): Promise<boolean> {
         if(response.ok) {
             return true;
         } else {
-            console.error('Login failed with status:', response.status);
+            console.error('Signup failed with status:', response.status);
             const errorText = await response.text();
             console.error('Error response:', errorText);
             return false;
         }
     } catch(error) {
-        console.error("Login request error:", error);
+        console.error("Signup request error:", error);
         return false;
     }
-}
+} 
