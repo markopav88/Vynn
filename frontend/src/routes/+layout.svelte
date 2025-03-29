@@ -15,8 +15,7 @@
 	let { children } = $props();
 
 	onMount(() => {
-		// Import Bootstrap JS
-		import('bootstrap');
+		import('bootstrap' as any);
 	});
 </script>
 

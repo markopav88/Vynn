@@ -104,4 +104,24 @@
             font-size: 1.2rem;
         }
     }
+    
+    /* Add these styles to your Navbar component */
+    .nav-link {
+        color: rgba(255, 255, 255, 0.8) !important;
+        transition: color 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .nav-link:hover {
+        color: var(--color-primary) !important;
+    }
+    
+    /* Prevent any hover-based navigation */
+    a {
+        pointer-events: auto;
+    }
+    
+    a:hover {
+        text-decoration: none;
+    }
 </style> 

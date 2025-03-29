@@ -8,7 +8,9 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { logout } from "$lib/ts/user";
+    import logo from '$lib/assets/logo.png';
     import Navbar from '$lib/components/Navbar.svelte';
+    import Footer from '$lib/components/Footer.svelte';
     import heroBackground from '$lib/assets/hero-background.png';
     
     let isLoggedIn = false;
@@ -26,7 +28,7 @@
     <section class="position-relative">
         <!-- Background Image -->
         <div class="position-absolute top-0 start-0 w-100 h-100" style="overflow: hidden;">
-            <img src="{heroBackground}" alt="Hero Background" class="w-100 h-100 object-fit-cover opacity-25" />
+            <img src={heroBackground} alt="Hero Background" class="w-100 h-100 object-fit-cover opacity-25" />
         </div>
         
         <div class="container py-5">
@@ -47,7 +49,10 @@
                     <p class="fs-4 text-white-50 mb-4">
                         Experience the perfect blend of Neovim's efficiency and AI assistance designed specifically for writers. Craft your stories, articles, and content with unprecedented speed and creativity.
                     </p>
-        
+                    
+                    <p class="fs-5 text-white-50 mb-5">
+                        Vynn combines the power of Vim's keyboard-centric editing with state-of-the-art AI to help you write faster, smarter, and more creatively. Whether you're drafting a novel, writing technical documentation, or crafting marketing copy, Vynn provides the tools you need to excel.
+                    </p>
                     
                     <div class="d-flex gap-4 justify-content-center">
                         <a href="/editor" class="btn btn-green btn-lg px-4 py-2">
@@ -81,70 +86,203 @@
             </div>
         </div>
     </section>
-    
-    <!-- Features Section -->
-    <section class="py-5">
+
+    <!-- Testimonials Section -->
+    <section class="py-5 bg-black">
         <div class="container">
-            <h2 class="text-center fw-bold mb-3">Powerful Features for Modern Writers</h2>
-            
-            <p class="text-center text-green mb-5">
-                Combine the precision of Neovim with cutting-edge AI assistance to enhance your writing workflow.
-            </p>
+            <h2 class="text-center fw-bold mb-5">Loved by Writers Worldwide</h2>
             
             <div class="row g-4">
-                <!-- Feature 1 -->
+                <!-- Testimonial 1 -->
                 <div class="col-md-4">
-                    <div class="d-flex">
-                        <div class="flex-shrink-0">
-                            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                <i class="bi bi-robot text-white"></i>
+                    <div class="p-4 rounded-3 h-100" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle overflow-hidden me-3" style="width: 50px; height: 50px;">
+                                <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Sarah Davis" class="img-fluid" />
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold">Sarah Davis</h5>
+                                <p class="text-white-50 small mb-0">Fiction Writer</p>
                             </div>
                         </div>
-                        <div>
-                            <h3 class="fs-5 fw-semibold">AI-Powered Suggestions</h3>
-                            <p class="text-light-emphasis small">
-                                Get real-time writing suggestions, completions, and improvements powered by advanced AI models.
-                            </p>
+                        <p class="text-white-50 mb-0">"Vynn has completely transformed how I write! The blend of Neovim's efficiency and AI assistance is exactly what I needed to boost my productivity."</p>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 2 -->
+                <div class="col-md-4">
+                    <div class="p-4 rounded-3 h-100" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle overflow-hidden me-3" style="width: 50px; height: 50px;">
+                                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Mark Thompson" class="img-fluid" />
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold">Mark Thompson</h5>
+                                <p class="text-white-50 small mb-0">Journalist</p>
+                            </div>
+                        </div>
+                        <p class="text-white-50 mb-0">"It's a life-saver. Writing for a news outlet requires speed and accuracy - Vynn delivers both. I can research, draft, and edit articles faster than I thought possible."</p>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 3 -->
+                <div class="col-md-4">
+                    <div class="p-4 rounded-3 h-100" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle overflow-hidden me-3" style="width: 50px; height: 50px;">
+                                <img src="https://randomuser.me/api/portraits/women/68.jpg" alt="Emily Rodriguez" class="img-fluid" />
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold">Emily Rodriguez</h5>
+                                <p class="text-white-50 small mb-0">Content Creator</p>
+                            </div>
+                        </div>
+                        <p class="text-white-50 mb-0">"The AI assistance in Vynn feels like having a writing partner who understands your style. It helps me overcome writer's block and enhances my creativity."</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="py-5 bg-black">
+        <div class="container">
+            <h2 class="text-center fw-bold mb-3">Simple, Transparent Pricing</h2>
+            <p class="text-center text-white-50 mb-5">Choose the plan that works best for you</p>
+            
+            <div class="row g-4 justify-content-center mt-5 pt-4">
+                <!-- Starter Plan -->
+                <div class="col-md-4">
+                    <div class="card h-100 bg-dark text-white border-0">
+                        <div class="card-body p-4">
+                            <h3 class="card-title fw-bold mb-4">Starter</h3>
+                            <p class="text-white-50 mb-4">Perfect for individual writers</p>
+                            
+                            <div class="mb-4">
+                                <h2 class="fw-bold mb-0">$9</h2>
+                                <p class="text-white-50">/month</p>
+                            </div>
+                            
+                            <ul class="list-unstyled mb-4">
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Basic AI assistance
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    5 projects
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Standard support
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Unlimited Documents
+                                </li>
+                            </ul>
+                            
+                            <a href="/signup" class="btn btn-outline-light w-100">Get Started</a>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Feature 2 -->
+                <!-- Pro Plan -->
                 <div class="col-md-4">
-                    <div class="d-flex">
-                        <div class="flex-shrink-0">
-                            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                <i class="bi bi-keyboard text-white"></i>
-                            </div>
+                    <div class="card h-100 bg-dark text-white border-0 position-relative featured-card">
+                        <div class="position-absolute top-0 start-50 translate-middle">
+                            <span class="badge bg-green px-4 py-2 rounded-pill mt-2 mb-5 popular-badge">Popular</span>
                         </div>
-                        <div>
-                            <h3 class="fs-5 fw-semibold">Vim Keybindings</h3>
-                            <p class="text-light-emphasis small">
-                                Leverage the power of Vim keybindings for lightning-fast text editing and navigation.
-                            </p>
+                        <div class="card-body p-4">
+                            <h3 class="card-title fw-bold mb-4">Pro</h3>
+                            <p class="text-white-50 mb-4">For professional writers</p>
+                            
+                            <div class="mb-4">
+                                <h2 class="fw-bold mb-0">$19</h2>
+                                <p class="text-white-50">/month</p>
+                            </div>
+                            
+                            <ul class="list-unstyled mb-4">
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Advanced AI features
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Unlimited projects
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    All themes
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Priority support
+                                </li>
+                            </ul>
+                            
+                            <a href="/signup" class="btn btn-green w-100">Get Started</a>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Feature 3 -->
+                <!-- Team Plan -->
                 <div class="col-md-4">
-                    <div class="d-flex">
-                        <div class="flex-shrink-0">
-                            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                <i class="bi bi-palette text-white"></i>
+                    <div class="card h-100 bg-dark text-white border-0">
+                        <div class="card-body p-4">
+                            <h3 class="card-title fw-bold mb-4">Team</h3>
+                            <p class="text-white-50 mb-4">For writing teams</p>
+                            
+                            <div class="mb-4">
+                                <h2 class="fw-bold mb-0">$49</h2>
+                                <p class="text-white-50">/month</p>
                             </div>
-                        </div>
-                        <div>
-                            <h3 class="fs-5 fw-semibold">Custom Themes</h3>
-                            <p class="text-light-emphasis small">
-                                Personalize your writing environment with customizable themes and color schemes.
-                            </p>
+                            
+                            <ul class="list-unstyled mb-4">
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Everything in Pro
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Team collaboration
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Admin controls
+                                </li>
+                                <li class="mb-2">
+                                    <i class="bi bi-check-circle-fill text-green me-2"></i>
+                                    Custom integrations
+                                </li>
+                            </ul>
+                            
+                            <a href="/contact" class="btn btn-outline-light w-100">Contact Sales</a>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- Call to Action Section -->
+    <section class="py-5 bg-black">
+        <div class="container">
+            <div class="p-5 rounded-4 text-center" style="background: linear-gradient(rgba(16,185,129,0.1), rgba(0,0,0,0.5));">
+                <h2 class="fw-bold mb-4">Ready to Transform Your Writing?</h2>
+                <p class="text-white-50 mb-4 mx-auto" style="max-width: 600px;">
+                    Join thousands of writers who have already discovered the power of Vynn Editor. Start your 14-day free trial today.
+                </p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="/signup" class="btn btn-green btn-lg px-4">Start Free Trial</a>
+                    <a href="/demo" class="btn btn-outline-light btn-lg px-4">Watch Demo</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use the Footer component -->
+    <Footer />
 </div>
 
 <style>
@@ -154,5 +292,20 @@
         background-color: #000;
         color: #fff;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    
+    .popular-badge {
+        font-size: 1rem;
+        font-weight: bold;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        transform: translateY(-10px);
+    }
+    
+    .featured-card {
+        transform: translateY(-20px);
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+        border: 2px solid rgba(16, 185, 129, 0.3) !important;
+        z-index: 1;
     }
 </style>

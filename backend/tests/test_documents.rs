@@ -31,6 +31,7 @@ async fn test_documents() -> Result<()> {
     let login_result = test_good_login(&hc).await;
     let create_result = test_create_document(&hc).await;
     let get_result = test_get_document(&hc).await;
+    // ! Need test_get_all_doc()
     let update_result = test_update_document(&hc).await;
     let add_permissions = test_add_permissions(&hc).await;
     let upd_perm = test_update_permissions(&hc).await;
