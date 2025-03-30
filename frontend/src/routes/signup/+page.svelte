@@ -183,19 +183,23 @@
                         </div>
                         <div class="mt-1 d-flex justify-content-between">
                             <small class="text-white-50">Strength:</small>
-                            <small class="{passwordStrength < 50 ? 'text-danger' : passwordStrength < 100 ? 'text-warning' : 'text-success'}">
-                                {#if passwordStrength < 25}
-                                    Very Weak
-                                {:else if passwordStrength < 50}
-                                    Weak
-                                {:else if passwordStrength < 75}
-                                    Good
-                                {:else if passwordStrength < 100}
-                                    Strong
-                                {:else}
-                                    Very Strong
-                                {/if}
-                            </small>
+                            {#if password.length > 0}
+                                <small class="{passwordStrength < 50 ? 'text-danger' : passwordStrength < 100 ? 'text-warning' : 'text-success'}">
+                                    {#if passwordStrength < 25}
+                                        Very Weak
+                                    {:else if passwordStrength < 50}
+                                        Weak
+                                    {:else if passwordStrength < 75}
+                                        Good
+                                    {:else if passwordStrength < 100}
+                                        Strong
+                                    {:else}
+                                        Very Strong
+                                    {/if}
+                                </small>
+                            {:else}
+                                <small>&nbsp;</small>
+                            {/if}
                         </div>
                     </div>
                     
