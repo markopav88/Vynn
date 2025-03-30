@@ -57,7 +57,7 @@ class SignupPayload {
  * Calls: POST /api/login
  */
 export async function attempt_login(login_payload: Login): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/login`;
+	const apiUrl = `http://localhost:3001/api/users/login`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -198,6 +198,43 @@ export async function attempt_signup(signup_input: Signup): Promise<boolean> {
         }
     } catch(error) {
         console.error("Signup request error:", error);
+        return false;
+    }
+}
+
+/**
+ * Check if the user is authenticated
+ * @returns Promise<boolean> - True if authenticated, false otherwise
+ */
+export async function check_auth(): Promise<boolean> {
+    try {
+        // Add fallback logic in case the backend is not available
+        const apiUrl = `http://localhost:3001/api/users/check-auth`;
+        console.log("Attempting to connect to backend at:", apiUrl);
+        
+        // Add timeout to prevent long waiting times if server is down
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            credentials: 'include',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log("Auth check response:", data);
+            return data.authenticated;
+        } else {
+            console.error('Auth check failed with status:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('Auth check request error:', error);
+        // Continue with the app even if backend is not available
         return false;
     }
 } 

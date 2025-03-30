@@ -1,17 +1,24 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { logout } from "$lib/ts/user";
+    import { logout } from '$lib/ts/user';
     import logo from '$lib/assets/logo.png';
     
     export let isLoggedIn = false;
     
     async function handleLogout() {
         try {
-            await logout();
-            window.location.reload();
+            console.log("Attempting to logout...");
+            const success = await logout();
+            
+            if (success) {
+                console.log("Logout successful, redirecting to homepage");
+                window.location.href = '/';
+            } else {
+                console.error("Logout failed");
+                alert("Failed to logout. Please try again.");
+            }
         } catch (error) {
-            console.error("Logout error:", error);
-            alert("Failed to logout. Please try again.");
+            console.error("Error during logout:", error);
         }
     }
 </script>
@@ -56,7 +63,7 @@
                     href="/signup" 
                     class="btn btn-green btn-sm rounded-pill"
                 >
-                    Start Writing
+                    Get Started
                 </a>
             {/if}
         </div>

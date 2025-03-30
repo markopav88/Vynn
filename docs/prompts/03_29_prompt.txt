@@ -1,0 +1,5 @@
+'''
+    Now please use the example of the signup page and the example of @login.png 
+    to create the login ui which utilizes @attempt_login() with @Login to login 
+    and parse api result boolean promise result. Please stick to dark green theme and animations
+'''

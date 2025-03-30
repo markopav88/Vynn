@@ -74,7 +74,7 @@ pub async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");
     let response = hc
         .do_post(
-            "/api/login",
+            "/api/users/login",
             json!({
                 "email": "testcreate@example.com",
                 "password": "password123"
@@ -124,7 +124,7 @@ async fn test_bad_login(hc: &Client) -> Result<()> {
     print!("TEST - Bad Login");
     let response = hc
         .do_post(
-            "/api/login",
+            "/api/users/login",
             json!({
                 "email": "Hell2o@gmail.com",
                 "password": "bad password"

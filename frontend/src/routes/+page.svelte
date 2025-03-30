@@ -7,17 +7,53 @@
 -->
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { logout } from "$lib/ts/user";
+    import { logout, check_auth } from "$lib/ts/user";
     import logo from '$lib/assets/logo.png';
     import Navbar from '$lib/components/Navbar.svelte';
     import Footer from '$lib/components/Footer.svelte';
     import heroBackground from '$lib/assets/hero-background.png';
     
     let isLoggedIn = false;
+    let pageLoaded = false;
     
-    onMount(async () => {
-        // Check if user is logged in
-        // if so redirect to drive
+    onMount(() => {
+        // First part: async function for auth check
+        (async () => {
+            try {
+                const authCheckPromise = check_auth();
+                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(false), 3000));
+                const isAuthenticated = await Promise.race([authCheckPromise, timeoutPromise]);
+                
+                if (isAuthenticated) {
+                    console.log("User is authenticated, redirecting to /drive");
+                    window.location.href = '/drive';
+                    return;
+                }
+            } catch (error) {
+                console.error("Error checking authentication:", error);
+            }
+            
+            pageLoaded = true;
+        })();
+        
+        // Animation setup
+        const handleScroll = () => {
+            const elements = document.querySelectorAll('.fade-in:not(.visible)');
+            elements.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.top < window.innerHeight * 0.8) {
+                    el.classList.add('visible');
+                }
+            });
+        };
+        
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
+        
+        // Return cleanup function (non-async)
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
     });
 </script>
 
@@ -34,7 +70,7 @@
         <div class="container py-5">
             <!-- Header that spans full width -->
             <div class="row mb-4">
-                <div class="col-12 text-center">
+                <div class="col-12 text-center fade-in">
                     <h1 class="fw-bold" style="font-size: 6rem; line-height: 1.1;">
                         Write using the Power of<br>
                         <span class="text-green">Neovim + AI</span>
@@ -45,7 +81,7 @@
             <!-- Content in two columns -->
             <div class="row py-3 align-items-center">
                 <!-- Left side: Text content -->
-                <div class="col-md-6 text-center" style="margin-top: -2rem;">
+                <div class="col-md-6 text-center fade-in" style="margin-top: -2rem;">
                     <p class="fs-4 text-white-50 mb-4">
                         Experience the perfect blend of Neovim's efficiency and AI assistance designed specifically for writers. Craft your stories, articles, and content with unprecedented speed and creativity.
                     </p>
@@ -65,7 +101,7 @@
                 </div>
                 
                 <!-- Right side: Demo image -->
-                <div class="col-md-6 mt-15 mt-md-0 d-flex justify-content-end" style="margin-top: -10rem;">
+                <div class="col-md-6 mt-15 mt-md-0 d-flex justify-content-end fade-in" style="margin-top: -10rem;">
                     <div class="position-relative ms-md-5" style="margin-right: -10rem;">
                         <!-- Placeholder image -->
                         <div class="bg-dark rounded-3 shadow-lg p-3 d-flex align-items-center justify-content-center" style="width: 700px; height: 500px; border: 1px solid rgba(255,255,255,0.1);">
@@ -90,11 +126,11 @@
     <!-- Testimonials Section -->
     <section class="py-5 bg-black">
         <div class="container">
-            <h2 class="text-center fw-bold mb-5">Loved by Writers Worldwide</h2>
+            <h2 class="text-center fw-bold mb-5 fade-in">Loved by Writers Worldwide</h2>
             
             <div class="row g-4">
                 <!-- Testimonial 1 -->
-                <div class="col-md-4">
+                <div class="col-md-4 fade-in">
                     <div class="p-4 rounded-3 h-100" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center mb-3">
                             <div class="rounded-circle overflow-hidden me-3" style="width: 50px; height: 50px;">
@@ -110,7 +146,7 @@
                 </div>
                 
                 <!-- Testimonial 2 -->
-                <div class="col-md-4">
+                <div class="col-md-4 fade-in">
                     <div class="p-4 rounded-3 h-100" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center mb-3">
                             <div class="rounded-circle overflow-hidden me-3" style="width: 50px; height: 50px;">
@@ -126,7 +162,7 @@
                 </div>
                 
                 <!-- Testimonial 3 -->
-                <div class="col-md-4">
+                <div class="col-md-4 fade-in">
                     <div class="p-4 rounded-3 h-100" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center mb-3">
                             <div class="rounded-circle overflow-hidden me-3" style="width: 50px; height: 50px;">
@@ -147,12 +183,12 @@
     <!-- Pricing Section -->
     <section class="py-5 bg-black">
         <div class="container">
-            <h2 class="text-center fw-bold mb-3">Simple, Transparent Pricing</h2>
-            <p class="text-center text-white-50 mb-5">Choose the plan that works best for you</p>
+            <h2 class="text-center fw-bold mb-3 fade-in">Simple, Transparent Pricing</h2>
+            <p class="text-center text-white-50 mb-5 fade-in">Choose the plan that works best for you</p>
             
             <div class="row g-4 justify-content-center mt-5 pt-4">
                 <!-- Starter Plan -->
-                <div class="col-md-4">
+                <div class="col-md-4 fade-in">
                     <div class="card h-100 bg-dark text-white border-0">
                         <div class="card-body p-4">
                             <h3 class="card-title fw-bold mb-4">Starter</h3>
@@ -188,7 +224,7 @@
                 </div>
                 
                 <!-- Pro Plan -->
-                <div class="col-md-4">
+                <div class="col-md-4 fade-in">
                     <div class="card h-100 bg-dark text-white border-0 position-relative featured-card">
                         <div class="position-absolute top-0 start-50 translate-middle">
                             <span class="badge bg-green px-4 py-2 rounded-pill mt-2 mb-5 popular-badge">Popular</span>
@@ -227,7 +263,7 @@
                 </div>
                 
                 <!-- Team Plan -->
-                <div class="col-md-4">
+                <div class="col-md-4 fade-in">
                     <div class="card h-100 bg-dark text-white border-0">
                         <div class="card-body p-4">
                             <h3 class="card-title fw-bold mb-4">Team</h3>
@@ -268,7 +304,7 @@
     <!-- Call to Action Section -->
     <section class="py-5 bg-black">
         <div class="container">
-            <div class="p-5 rounded-4 text-center" style="background: linear-gradient(rgba(16,185,129,0.1), rgba(0,0,0,0.5));">
+            <div class="p-5 rounded-4 text-center fade-in" style="background: linear-gradient(rgba(16,185,129,0.1), rgba(0,0,0,0.5));">
                 <h2 class="fw-bold mb-4">Ready to Transform Your Writing?</h2>
                 <p class="text-white-50 mb-4 mx-auto" style="max-width: 600px;">
                     Join thousands of writers who have already discovered the power of Vynn Editor. Start your 14-day free trial today.
@@ -308,4 +344,21 @@
         border: 2px solid rgba(16, 185, 129, 0.3) !important;
         z-index: 1;
     }
+    
+    /* Simple fade-in animation */
+    .fade-in {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    
+    :global(.fade-in.visible) {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    /* Add staggered delays for siblings */
+    .row > .fade-in:nth-child(1) { transition-delay: 0.1s; }
+    .row > .fade-in:nth-child(2) { transition-delay: 0.3s; }
+    .row > .fade-in:nth-child(3) { transition-delay: 0.5s; }
 </style>

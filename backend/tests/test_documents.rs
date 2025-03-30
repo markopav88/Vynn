@@ -62,7 +62,7 @@ pub async fn test_good_login(hc: &Client) -> Result<()> {
     print!("TEST - Good Login");
     let response = hc
         .do_post(
-            "/api/login",
+            "/api/users/login",
             json!({
                 "email": "CFdefence@gmail.com",
                 "password": "MyPassword"

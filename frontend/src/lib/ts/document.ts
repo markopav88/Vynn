@@ -168,22 +168,34 @@ export async function get_document_permissions(
 
 /**
  * Function to get all documents the user has access to
- * Calls: GET /api/document/
+ * Calls: GET /api/document
  */
 export async function get_all_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/`;
+		const apiUrl = `http://localhost:3001/api/document`;
+		
+		console.log("Fetching documents from:", apiUrl);
 		
 		const response = await fetch(apiUrl, {
-			credentials: 'include'
+			method: 'GET',
+			credentials: 'include',
+			headers: {
+				'Accept': 'application/json'
+			}
 		});
+		
+		console.log("Document response status:", response.status);
 		
 		if (!response.ok) {
 			console.error('Failed to fetch documents:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
 			return null;
 		}
 		
-		return await response.json();
+		const documents = await response.json();
+		console.log("Documents received:", documents);
+		return documents;
 	} catch (error) {
 		console.error('Error fetching documents:', error);
 		return null;

@@ -52,7 +52,7 @@ async fn test_login(hc: &Client) -> Result<()> {
     println!("TEST - Login for Project Tests");
     let response = hc
         .do_post(
-            "/api/login",
+            "/api/users/login",
             json!({
                 "email": "CFdefence@gmail.com",
                 "password": "MyPassword"

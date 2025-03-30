@@ -80,7 +80,7 @@ export async function get_project(project_id: number): Promise<Project | null> {
  * Calls: GET /api/project
  */
 export async function get_all_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project/`;
+	const apiUrl = `http://localhost:3001/api/project`;
 
 	try {
 		const response = await fetch(apiUrl, {
