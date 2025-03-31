@@ -5,19 +5,19 @@
 / File containing various API Backend endpoints for manipulating a project and its permissions
 /
 / API Summary:
-/ api_get_all_projects       GET     /                   - Get All Projects For Current User
-/ api_get_project            GET     /:id                - Get Project By ID
-/ api_create_project         POST    /                   - Create New Project
-/ api_update_project         PUT     /:id                - Update Project By ID
-/ api_delete_project         DELETE  /:id                - Delete Project By ID
-/ api_add_permissions        POST    /:id/permissions    - Add Permissions to User on Project
-/ api_get_permissions        GET     /:id/permissions    - Get Users With Permissions to Project
-/ api_update_permission      PUT     /:id/permissions    - Update Permissions on User to Project
-/ api_remove_permissions     DELETE  /:id/permissions/:user_id - Delete Permissions on User to Project
-/ api_force_delete_project   DELETE  /:id/force          - Delete Project and All Associated Documents
-/ api_add_document           POST    /:id/documents/:doc_id - Add Document to Project
-/ api_get_documents          GET     /:id/documents      - Get All Documents in Project
-/ api_remove_document        DELETE  /:id/documents/:doc_id - Remove Document from Project
+/ api_get_all_projects       GET     /                          - Get All Projects For Current User
+/ api_get_project            GET     /:id                       - Get Project By ID
+/ api_create_project         POST    /                          - Create New Project
+/ api_update_project         PUT     /:id                       - Update Project By ID
+/ api_delete_project         DELETE  /:id                       - Delete Project By ID
+/ api_add_permissions        POST    /:id/permissions           - Add Permissions to User on Project
+/ api_get_permissions        GET     /:id/permissions           - Get Users With Permissions to Project
+/ api_update_permission      PUT     /:id/permissions           - Update Permissions on User to Project
+/ api_remove_permissions     DELETE  /:id/permissions/:user_id  - Delete Permissions on User to Project
+/ api_force_delete_project   DELETE  /:id/force                 - Delete Project and All Associated Documents
+/ api_add_document           POST    /:id/documents/:doc_id     - Add Document to Project
+/ api_get_documents          GET     /:id/documents             - Get All Documents in Project
+/ api_remove_document        DELETE  /:id/documents/:doc_id     - Remove Document from Project
 /
 */
 

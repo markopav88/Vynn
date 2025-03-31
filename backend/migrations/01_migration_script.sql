@@ -2,6 +2,9 @@
 -- In psql run \i /path/to/your/migration_script.sql
 -- This will wipe the database
 
+DROP TABLE IF EXISTS user_keybindings CASCADE;
+DROP TABLE IF EXISTS commands CASCADE;
+
 DROP TABLE IF EXISTS document_permissions CASCADE;
 DROP TABLE IF EXISTS document_projects CASCADE;
 DROP TABLE IF EXISTS documents CASCADE;
@@ -65,6 +68,23 @@ CREATE TABLE project_permissions (
 -- Create an index for faster lookups
 CREATE INDEX idx_project_permissions_user_id ON project_permissions(user_id);
 
+-- Create commands table for holding all valid commands
+CREATE TABLE commands (
+    command_id SERIAL PRIMARY KEY,
+    command_name VARCHAR(100) NOT NULL,
+    command_description VARCHAR(150) NOT NULL,
+    default_keybinding VARCHAR(50) NOT NULL
+);
+
+-- Create user_keybindings table for holding custom keybindings users set
+CREATE TABLE user_keybindings (
+    user_id INT NOT NULL,
+    command_id INT NOT NULL,
+    keybinding VARCHAR(50) NOT NULL,
+    PRIMARY KEY (user_id, command_id),
+    FOREIGN KEY (command_id) REFERENCES commands(command_id)
+);
+
 -- Insert default users
 INSERT INTO users(name,email,password) 
 VALUES('Christian','CFdefence@gmail.com','MyPassword')
@@ -127,6 +147,19 @@ ON CONFLICT (document_id, project_id) DO NOTHING;
 INSERT INTO document_projects(document_id, project_id)
 VALUES(2, 2)
 ON CONFLICT (document_id, project_id) DO NOTHING;
+
+-- Insert Default Commands
+INSERT INTO commands(command_id, command_name, command_description, default_keybinding)
+VALUES 
+(1, 'Bold Selected', 'Bolds The Selected Text', 'Ctrl, B'),
+(2, 'Italic Selected', 'Italics The Selected Text', 'Ctrl, I'),
+(3, 'Underline Selected', 'Underline The Selected Text', 'Ctrl, U');
+
+-- Give User 1 Some Custom Keybindings
+INSERT INTO user_keybindings(user_id, command_id, keybinding)
+VALUES
+(1, 1, 'Ctrl H'), -- Bind 'Bold Selected' to Ctrl H
+(1, 2, 'Ctrl E'); -- Bind 'Italic Selected' to Ctrl E
 
 -- Set sequence values to match the highest IDs
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
