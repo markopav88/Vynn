@@ -5,11 +5,14 @@
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
-/ Class Login: Class responsible for holding login information
-/ attempt_login: function responsible for calling POST API for login
-/ logout: function responsible for calling GET API for logout
-/ get_current_user: function responsible for calling GET API for current user
-/ update_user: function responsible for calling PUT API for updating user
+/ Class User: Mapper of a class to how we are storing users in db
+/ Class Login: Data structure for login requests
+/ attempt_login: Function to attempt user login with credentials
+/ attempt_signup: Function to register a new user
+/ logout: Function to log out the current user
+/ get_current_user: Function to get the currently logged in user
+/ update_user: Function to update user information
+/ check_auth: Function to check if a user is authenticated
 /
 */
 
@@ -57,7 +60,7 @@ class SignupPayload {
  * Calls: POST /api/login
  */
 export async function attempt_login(login_payload: Login): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/login`;
+	const apiUrl = `http://localhost:3001/api/users/login`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -198,6 +201,43 @@ export async function attempt_signup(signup_input: Signup): Promise<boolean> {
         }
     } catch(error) {
         console.error("Signup request error:", error);
+        return false;
+    }
+}
+
+/**
+ * Check if the user is authenticated
+ * @returns Promise<boolean> - True if authenticated, false otherwise
+ */
+export async function check_auth(): Promise<boolean> {
+    try {
+        // Add fallback logic in case the backend is not available
+        const apiUrl = `http://localhost:3001/api/users/check-auth`;
+        console.log("Attempting to connect to backend at:", apiUrl);
+        
+        // Add timeout to prevent long waiting times if server is down
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            credentials: 'include',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log("Auth check response:", data);
+            return data.authenticated;
+        } else {
+            console.error('Auth check failed with status:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('Auth check request error:', error);
+        // Continue with the app even if backend is not available
         return false;
     }
 } 

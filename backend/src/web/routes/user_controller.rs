@@ -10,6 +10,7 @@
 / api_update_user       PUT     /users/update   - Update The Current User By Cookies
 / api_login             POST    /login          - Attempt Login And Set Cookies
 / api_logout            GET     /logout         - Logout By Wiping Cookies
+/ api_check_auth        GET     /check-auth     - Check User Authentication
 /
 */
 
@@ -214,6 +215,7 @@ pub async fn api_login(
 /// Test: test_users.rs/test_logout()
 /// Frontend: login.ts/logout()
 pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
+    println!("->> {:<12} - logout", "HANDLER");
     // Get environment variables with fallbacks for development
     let domain = option_env!("DOMAIN").unwrap_or("localhost");
     let app_env = option_env!("APP_ENV").unwrap_or("development");
@@ -238,12 +240,32 @@ pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     })));
 }
 
+/// Check if user is authenticated
+/// Accessible via: GET /api/user/check-auth
+/// Frontend: user.ts/check_auth()
+pub async fn api_check_auth(
+    cookies: Cookies,
+    Extension(_pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - check_auth", "HANDLER");
+
+    // Try to get user_id from cookie
+    let user_id = get_user_id_from_cookie(&cookies);
+    
+    // Return JSON with auth status
+    match user_id {
+        Some(_) => Ok(Json(json!({ "authenticated": true }))),
+        None => Ok(Json(json!({ "authenticated": false }))),
+    }
+}
+
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
         .route("/login", post(api_login))
-        .route("/users", post(api_create_user))
-        .route("/users/update", put(api_update_user))
-        .route("/users/:id", get(api_get_user))
-        .route("/users/logout", get(api_logout))
+        .route("/", post(api_create_user))
+        .route("/update", put(api_update_user))
+        .route("/:id", get(api_get_user))
+        .route("/logout", get(api_logout))
+        .route("/check-auth", get(api_check_auth))
 }

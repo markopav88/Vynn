@@ -31,12 +31,16 @@ pub enum Error {
     PermissionError,
     PermissionCreationError,
 
-    // Signup errors
+    // Signup Errors
     EmailAlreadyExistsError,
     DatabaseError,
 
-    // Project errors
+    // Project Errors
     ProjectNotFoundError,
+
+    // Keybinding Errors
+    DeleteKeybindingError,
+    AddUpdateKeybindingError
 }
 
 impl IntoResponse for Error {
@@ -96,6 +100,12 @@ impl IntoResponse for Error {
             }
             Self::ProjectNotFoundError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()
+            }
+            Self::DeleteKeybindingError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()   
+            }
+            Self::AddUpdateKeybindingError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response() 
             }
         }
     }

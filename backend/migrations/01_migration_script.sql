@@ -2,6 +2,9 @@
 -- In psql run \i /path/to/your/migration_script.sql
 -- This will wipe the database
 
+DROP TABLE IF EXISTS user_keybindings CASCADE;
+DROP TABLE IF EXISTS commands CASCADE;
+
 DROP TABLE IF EXISTS document_permissions CASCADE;
 DROP TABLE IF EXISTS document_projects CASCADE;
 DROP TABLE IF EXISTS documents CASCADE;
@@ -22,6 +25,7 @@ CREATE TABLE projects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) DEFAULT 'Untitled Project' NOT NULL,
     user_id INT REFERENCES users(id) ON DELETE CASCADE
+
 );
 
 -- Create documents table
@@ -64,6 +68,23 @@ CREATE TABLE project_permissions (
 
 -- Create an index for faster lookups
 CREATE INDEX idx_project_permissions_user_id ON project_permissions(user_id);
+
+-- Create commands table for holding all valid commands
+CREATE TABLE commands (
+    command_id SERIAL PRIMARY KEY,
+    command_name VARCHAR(100) NOT NULL,
+    command_description VARCHAR(150) NOT NULL,
+    default_keybinding VARCHAR(50) NOT NULL
+);
+
+-- Create user_keybindings table for holding custom keybindings users set
+CREATE TABLE user_keybindings (
+    user_id INT NOT NULL,
+    command_id INT NOT NULL,
+    keybinding VARCHAR(50) NOT NULL,
+    PRIMARY KEY (user_id, command_id),
+    FOREIGN KEY (command_id) REFERENCES commands(command_id)
+);
 
 -- Insert default users
 INSERT INTO users(name,email,password) 
@@ -121,14 +142,52 @@ ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'editor';
 -- Add document 1 to project 1
 INSERT INTO document_projects(document_id, project_id)
 VALUES(1, 1)
-ON CONFLICT (document_id, project_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
--- Add document 2 to project 2
+-- Create additional documents for the project
+INSERT INTO documents(id, name, content, user_id)
+VALUES
+(3, 'Project Overview', '# Project Overview\n\nThis document provides a high-level overview of our project goals and timeline.', 1),
+(4, 'Technical Specifications', '# Technical Specifications\n\nDetailed technical requirements and implementation details.', 1),
+(5, 'Meeting Notes', '# Meeting Notes\n\nNotes from our project planning meetings and discussions.', 1),
+(6, 'Research Findings', '# Research Findings\n\nSummary of research conducted for this project.', 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Add permissions for user 1 on these documents
+INSERT INTO document_permissions(document_id, user_id, role)
+VALUES
+(3, 1, 'owner'),
+(4, 1, 'owner'),
+(5, 1, 'owner'),
+(6, 1, 'owner')
+ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'owner';
+
+-- Add these documents to the same project as document 1 (project 1)
 INSERT INTO document_projects(document_id, project_id)
-VALUES(2, 2)
-ON CONFLICT (document_id, project_id) DO NOTHING;
+VALUES
+(3, 1),
+(4, 1),
+(5, 1),
+(6, 1)
+ON CONFLICT DO NOTHING;
+
+-- Insert Default Commands
+INSERT INTO commands(command_id, command_name, command_description, default_keybinding)
+VALUES 
+(1, 'Bold Selected', 'Bolds The Selected Text', 'Ctrl, B'),
+(2, 'Italic Selected', 'Italics The Selected Text', 'Ctrl, I'),
+(3, 'Underline Selected', 'Underline The Selected Text', 'Ctrl, U');
+
+-- Give User 1 Some Custom Keybindings
+INSERT INTO user_keybindings(user_id, command_id, keybinding)
+VALUES
+(1, 1, 'Ctrl H'), -- Bind 'Bold Selected' to Ctrl H
+(1, 2, 'Ctrl E'); -- Bind 'Italic Selected' to Ctrl E
 
 -- Set sequence values to match the highest IDs
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
+SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+
+-- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));

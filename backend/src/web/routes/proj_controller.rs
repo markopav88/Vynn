@@ -5,19 +5,19 @@
 / File containing various API Backend endpoints for manipulating a project and its permissions
 /
 / API Summary:
-/ api_get_all_projects       GET     /                   - Get All Projects For Current User
-/ api_get_project            GET     /:id                - Get Project By ID
-/ api_create_project         POST    /                   - Create New Project
-/ api_update_project         PUT     /:id                - Update Project By ID
-/ api_delete_project         DELETE  /:id                - Delete Project By ID
-/ api_add_permissions        POST    /:id/permissions    - Add Permissions to User on Project
-/ api_get_permissions        GET     /:id/permissions    - Get Users With Permissions to Project
-/ api_update_permission      PUT     /:id/permissions    - Update Permissions on User to Project
-/ api_remove_permissions     DELETE  /:id/permissions/:user_id - Delete Permissions on User to Project
-/ api_force_delete_project   DELETE  /:id/force          - Delete Project and All Associated Documents
-/ api_add_document           POST    /:id/documents/:doc_id - Add Document to Project
-/ api_get_documents          GET     /:id/documents      - Get All Documents in Project
-/ api_remove_document        DELETE  /:id/documents/:doc_id - Remove Document from Project
+/ api_get_all_projects       GET     /                          - Get All Projects For Current User
+/ api_get_project            GET     /:id                       - Get Project By ID
+/ api_create_project         POST    /                          - Create New Project
+/ api_update_project         PUT     /:id                       - Update Project By ID
+/ api_delete_project         DELETE  /:id                       - Delete Project By ID
+/ api_add_permissions        POST    /:id/permissions           - Add Permissions to User on Project
+/ api_get_permissions        GET     /:id/permissions           - Get Users With Permissions to Project
+/ api_update_permission      PUT     /:id/permissions           - Update Permissions on User to Project
+/ api_remove_permissions     DELETE  /:id/permissions/:user_id  - Delete Permissions on User to Project
+/ api_force_delete_project   DELETE  /:id/force                 - Delete Project and All Associated Documents
+/ api_add_document           POST    /:id/documents/:doc_id     - Add Document to Project
+/ api_get_documents          GET     /:id/documents             - Get All Documents in Project
+/ api_remove_document        DELETE  /:id/documents/:doc_id     - Remove Document from Project
 /
 */
 
@@ -538,15 +538,16 @@ async fn api_get_documents(
     let documents = sqlx::query_as!(
         Document,
         r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id
-           FROM documents d
-           JOIN document_projects dp ON d.id = dp.document_id
-           WHERE dp.project_id = $1"#,
+        FROM documents d
+        JOIN document_projects dp ON d.id = dp.document_id
+        WHERE dp.project_id = $1
+        ORDER BY d.id"#,
         project_id
     )
     .fetch_all(&pool)
     .await
     .map_err(|_| Error::ProjectNotFoundError)?;
-
+    
     Ok(Json(documents))
 }
 

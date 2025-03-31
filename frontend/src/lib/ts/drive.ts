@@ -5,6 +5,7 @@
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
+/ Interface Project: Structure for project data
 / create_document: Function to create a new document
 / get_all_documents: Function to get all documents the user has access to
 / delete_document: Function to delete a document by ID
@@ -16,7 +17,16 @@
 /
 */
 import { Document } from "./document";
-import { Project } from "./project";
+
+// Define and export the Project interface
+export interface Project {
+	id: string;
+	name: string;
+	description?: string;
+	created_at: string;
+	updated_at: string;
+	user_id: string;
+}
 
 /**
  * Function to create a document
@@ -137,20 +147,30 @@ export async function create_project(name: string): Promise<Project | null> {
  * Calls: GET /api/project
  */
 export async function get_all_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project/`;
+	const apiUrl = `http://localhost:3001/api/project`;
 
 	try {
+		console.log("Fetching projects from:", apiUrl);
+		
 		const response = await fetch(apiUrl, {
 			method: 'GET',
-			credentials: 'include'
+			credentials: 'include',
+			headers: {
+				'Accept': 'application/json'
+			}
 		});
 
+		console.log("Project response status:", response.status);
+		
 		if (!response.ok) {
 			console.error('Get all projects failed with status:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
 			return null;
 		}
 
 		const projects = await response.json();
+		console.log("Projects received:", projects);
 		return projects;
 	} catch (error) {
 		console.error('Get all projects error:', error);
