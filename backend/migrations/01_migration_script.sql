@@ -25,6 +25,7 @@ CREATE TABLE projects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) DEFAULT 'Untitled Project' NOT NULL,
     user_id INT REFERENCES users(id) ON DELETE CASCADE
+
 );
 
 -- Create documents table
