@@ -34,19 +34,22 @@ export class Document {
 	content: string;
 	created_at: string;
 	updated_at: string;
+	project_id?: number;
 
 	constructor(
 		new_id: number,
 		new_name: string,
 		new_content: string,
 		new_created_at: string,
-		new_updated_at: string
+		new_updated_at: string,
+		new_project_id?: number
 	) {
 		this.id = new_id;
 		this.name = new_name;
 		this.content = new_content;
 		this.created_at = new_created_at;
 		this.updated_at = new_updated_at;
+		this.project_id = new_project_id;
 	}
 }
 
@@ -110,9 +113,10 @@ export class UserKeybinding {
  * Function to get a document by ID
  * Calls: GET /api/document/:id
  */
-export async function get_document(document_id: number): Promise<Document | null> {
+export async function get_document(id: number): Promise<Document | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document_id}`;
+		// Use the original endpoint that was working before
+		const apiUrl = `http://localhost:3001/api/document/${id}`;
 		
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -123,7 +127,9 @@ export async function get_document(document_id: number): Promise<Document | null
 			return null;
 		}
 		
-		return await response.json();
+		const data = await response.json();
+		console.log('Document data received:', data);
+		return data;
 	} catch (error) {
 		console.error('Error fetching document:', error);
 		return null;
@@ -491,6 +497,32 @@ export async function delete_keybinding(commandId: number): Promise<Command | nu
 		return await response.json();
 	} catch (error) {
 		console.error('Error deleting keybinding:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to get the project associated with a document
+ * Calls: GET /api/document/:id/project
+ */
+export async function get_project_from_document(documentId: number): Promise<{project_id: number, project_name: string} | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${documentId}/project`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch project from document:', response.status);
+			return null;
+		}
+		
+		const data = await response.json();
+		console.log('Project data received:', data);
+		return data;
+	} catch (error) {
+		console.error('Error fetching project from document:', error);
 		return null;
 	}
 }

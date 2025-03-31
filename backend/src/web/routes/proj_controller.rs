@@ -538,15 +538,16 @@ async fn api_get_documents(
     let documents = sqlx::query_as!(
         Document,
         r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id
-           FROM documents d
-           JOIN document_projects dp ON d.id = dp.document_id
-           WHERE dp.project_id = $1"#,
+        FROM documents d
+        JOIN document_projects dp ON d.id = dp.document_id
+        WHERE dp.project_id = $1
+        ORDER BY d.id"#,
         project_id
     )
     .fetch_all(&pool)
     .await
     .map_err(|_| Error::ProjectNotFoundError)?;
-
+    
     Ok(Json(documents))
 }
 

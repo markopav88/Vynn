@@ -141,12 +141,34 @@ ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'editor';
 -- Add document 1 to project 1
 INSERT INTO document_projects(document_id, project_id)
 VALUES(1, 1)
-ON CONFLICT (document_id, project_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
--- Add document 2 to project 2
+-- Create additional documents for the project
+INSERT INTO documents(id, name, content, user_id)
+VALUES
+(3, 'Project Overview', '# Project Overview\n\nThis document provides a high-level overview of our project goals and timeline.', 1),
+(4, 'Technical Specifications', '# Technical Specifications\n\nDetailed technical requirements and implementation details.', 1),
+(5, 'Meeting Notes', '# Meeting Notes\n\nNotes from our project planning meetings and discussions.', 1),
+(6, 'Research Findings', '# Research Findings\n\nSummary of research conducted for this project.', 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Add permissions for user 1 on these documents
+INSERT INTO document_permissions(document_id, user_id, role)
+VALUES
+(3, 1, 'owner'),
+(4, 1, 'owner'),
+(5, 1, 'owner'),
+(6, 1, 'owner')
+ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'owner';
+
+-- Add these documents to the same project as document 1 (project 1)
 INSERT INTO document_projects(document_id, project_id)
-VALUES(2, 2)
-ON CONFLICT (document_id, project_id) DO NOTHING;
+VALUES
+(3, 1),
+(4, 1),
+(5, 1),
+(6, 1)
+ON CONFLICT DO NOTHING;
 
 -- Insert Default Commands
 INSERT INTO commands(command_id, command_name, command_description, default_keybinding)
@@ -164,4 +186,7 @@ VALUES
 -- Set sequence values to match the highest IDs
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
+SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+
+-- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));

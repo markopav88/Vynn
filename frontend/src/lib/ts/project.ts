@@ -329,7 +329,11 @@ export async function get_project_documents(projectId: number): Promise<Document
 			return null;
 		}
 		
-		return await response.json();
+		const data = await response.json();
+		console.log('Project documents received:', data);
+		
+		// The API is returning the documents directly, not in a "documents" property
+		return data || [];
 	} catch (error) {
 		console.error('Error fetching project documents:', error);
 		return null;

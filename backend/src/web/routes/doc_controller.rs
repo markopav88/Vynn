@@ -232,7 +232,7 @@ pub async fn api_update_document(
 /// Accessible via: DELETE /api/document/:id
 /// Test: test_documents.rs/test_delete_document()
 /// Frontend: document.ts/delete_document()
-async fn delete_document(
+async fn api_delete_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
@@ -283,6 +283,57 @@ async fn delete_document(
         }
 
     })));
+}
+
+/// GET handler for getting a project given a document id
+/// Accessible via: GET /api/document/:id/project
+/// Test: test_documents.rs/test_get_project_from_document()
+/// Frontend: document.ts/get_project_from_document()
+pub async fn api_get_project_from_document(
+    cookies: Cookies,
+    Path(document_id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - get_project_from_document", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has at least viewer permission for the document
+    let has_permission = check_document_permission(&pool, user_id, document_id, "viewer").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Get the project_id for this document
+    let project = sqlx::query!(
+        r#"
+        SELECT dp.project_id, p.name
+        FROM document_projects dp
+        JOIN projects p ON dp.project_id = p.id
+        WHERE dp.document_id = $1
+        LIMIT 1
+        "#,
+        document_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    // Return the project info if found
+    if let Some(project_info) = project {
+        Ok(Json(json!({
+            "project_id": project_info.project_id,
+            "project_name": project_info.name
+        })))
+    } else {
+        // Document is not part of any project
+        Ok(Json(json!({
+            "project_id": null,
+            "project_name": null
+        })))
+    }
 }
 
 /// POST handler for granting permission to a user for a document.
@@ -484,7 +535,8 @@ pub fn doc_routes() -> Router {
         .route("/", post(api_create_document))
         .route("/:id", get(api_get_document))
         .route("/:id", put(api_update_document))
-        .route("/:id", delete(delete_document))
+        .route("/:id", delete(api_delete_document))
+        .route("/:id/project", get(api_get_project_from_document))
         .route("/:id/permissions", post(api_add_permissions))
         .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", put(api_update_permission))
