@@ -5,6 +5,7 @@
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
+/ Interface Project: Structure for project data
 / create_document: Function to create a new document
 / get_all_documents: Function to get all documents the user has access to
 / delete_document: Function to delete a document by ID

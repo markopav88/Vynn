@@ -6,19 +6,18 @@
 /
 / Summary:
 / Class Project: Mapper of a class to how we are storing projects in db
-/ get_all_projects: Function to get all projects for the current user
-/ get_project: Function to get a specific project by ID
-/ create_project: Function to create a new project
-/ update_project: Function to update an existing project
+/ Class ProjectUser: Represents a user with project permissions
+/ get_project: Function to get a project by ID
+/ update_project: Function to update a project
 / delete_project: Function to delete a project
-/ force_delete_project: Function to force delete a project and all its documents
-/ add_project_permissions: Function to add permissions for a user on a project
-/ get_project_permissions: Function to get all users with permissions on a project
-/ update_project_permission: Function to update a user's permission on a project
-/ remove_project_permissions: Function to remove a user's permission from a project
-/ get_project_documents: Function to get all documents in a project
+/ force_delete_project: Function to delete a project and all documents in it
 / add_document_to_project: Function to add a document to a project
 / remove_document_from_project: Function to remove a document from a project
+/ get_project_documents: Function to get all documents in a project
+/ add_project_permissions: Function to add permissions for a user on a project
+/ update_project_permissions: Function to update a user's permissions for a project
+/ delete_project_permissions: Function to delete a user's permissions for a project
+/ get_project_permissions: Function to get all users with permissions for a project
 /
 */
 

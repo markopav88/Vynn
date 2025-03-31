@@ -1,15 +1,30 @@
 /*
 / Document.ts
 /
-/ File containing functions and logic required for frontend handling of documents
+/ File containing functions and logic required for frontend handling of documents and keybindings
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
 / Class Document: Mapper of a class to how we are storing documents in db
-/ load_document: Function ran on mount of /document/:id that will call GET API
-/ update_document: Function to call update document POST API and pass in new document state
-/ setup_auto_save: Function to setup interval of 30 seconds for auto-save 
+/ Class DocumentUser: Represents a user with document permissions
+/ Class Command: Represents a command from the database
+/ Class UserKeybinding: Represents a user's custom keybinding
+/ 
+/ Document Functions:
+/ get_document: Function to get a document by ID
+/ update_document: Function to update a document
+/ setup_auto_save: Function to setup interval of 30 seconds for auto-save
+/ saveDocument: Manual save function for when we want to bind this
+/ delete_document: Function to delete a document
+/ add_document_permissions: Function to add permissions for a user on a document
+/ update_document_permissions: Function to update a user's permissions for a document
+/ delete_document_permissions: Function to delete a user's permissions for a document
 /
+/ Keybinding Functions:
+/ get_all_commands: Function to get all available commands
+/ get_all_keybindings: Function to get all user's custom keybindings
+/ add_update_keybinding: Function to add or update a keybinding
+/ delete_keybinding: Function to delete a keybinding (reset to default)
 /
 */
 
@@ -47,6 +62,47 @@ export class DocumentUser {
 		this.name = new_name;
 		this.email = new_email;
 		this.role = new_role;
+	}
+}
+
+/**
+ * Command class representing a command from the database
+ */
+export class Command {
+	command_id: number;
+	command_name: string;
+	command_description: string;
+	default_keybinding: string;
+
+	constructor(
+		id: number,
+		name: string,
+		description: string,
+		default_keybinding: string
+	) {
+		this.command_id = id;
+		this.command_name = name;
+		this.command_description = description;
+		this.default_keybinding = default_keybinding;
+	}
+}
+
+/**
+ * UserKeybinding class representing a user's custom keybinding
+ */
+export class UserKeybinding {
+	user_id: number;
+	command_id: number;
+	keybinding: string;
+
+	constructor(
+		user_id: number,
+		command_id: number,
+		keybinding: string
+	) {
+		this.user_id = user_id;
+		this.command_id = command_id;
+		this.keybinding = keybinding;
 	}
 }
 
@@ -334,5 +390,107 @@ export async function delete_document_permissions(documentId: number, userId: nu
 	} catch (error) {
 		console.error('Error deleting document permissions:', error);
 		return false;
+	}
+}
+
+/**
+ * Function to get all available commands
+ * Calls: GET /api/command/default
+ */
+export async function get_all_commands(): Promise<Command[] | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/command/default`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch commands:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching commands:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to get all user's custom keybindings
+ * Calls: GET /api/command
+ */
+export async function get_all_keybindings(): Promise<UserKeybinding[] | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/command`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch keybindings:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching keybindings:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to add or update a keybinding
+ * Calls: PUT /api/command/:id
+ */
+export async function add_update_keybinding(commandId: number, keybinding: string): Promise<UserKeybinding | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/command/${commandId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ keybinding }),
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to update keybinding:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error updating keybinding:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to delete a keybinding (reset to default)
+ * Calls: DELETE /api/command/:id
+ */
+export async function delete_keybinding(commandId: number): Promise<Command | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/command/${commandId}`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'DELETE',
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to delete keybinding:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error deleting keybinding:', error);
+		return null;
 	}
 }

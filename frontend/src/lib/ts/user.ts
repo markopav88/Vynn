@@ -5,11 +5,14 @@
 / Will provide the communication with the backend and pass necessary information to API calls
 /
 / Summary:
-/ Class Login: Class responsible for holding login information
-/ attempt_login: function responsible for calling POST API for login
-/ logout: function responsible for calling GET API for logout
-/ get_current_user: function responsible for calling GET API for current user
-/ update_user: function responsible for calling PUT API for updating user
+/ Class User: Mapper of a class to how we are storing users in db
+/ Class Login: Data structure for login requests
+/ attempt_login: Function to attempt user login with credentials
+/ attempt_signup: Function to register a new user
+/ logout: Function to log out the current user
+/ get_current_user: Function to get the currently logged in user
+/ update_user: Function to update user information
+/ check_auth: Function to check if a user is authenticated
 /
 */
 
