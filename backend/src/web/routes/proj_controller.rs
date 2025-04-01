@@ -55,7 +55,7 @@ async fn api_get_all_projects(
     // Get all projects where the user has any permission
     let result = sqlx::query_as!(
         Project,
-        r#"SELECT p.id, p.name, p.user_id 
+        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at
            FROM projects p
            JOIN project_permissions pp ON p.id = pp.project_id
            WHERE pp.user_id = $1"#,
@@ -93,7 +93,7 @@ async fn api_get_project(
 
     let result = sqlx::query_as!(
         Project,
-        r#"SELECT id, name, user_id
+        r#"SELECT id, name, user_id, created_at, updated_at
            FROM projects 
            WHERE id = $1"#,
         id
@@ -127,7 +127,7 @@ async fn api_create_project(
         r#"
         INSERT INTO projects (name, user_id)
         VALUES ($1, $2)
-        RETURNING id, name, user_id
+        RETURNING id, name, user_id, created_at, updated_at
         "#,
         payload._name,
         user_id
@@ -184,9 +184,9 @@ async fn api_update_project(
         Project,
         r#"
         UPDATE projects 
-        SET name = $1
+        SET name = $1, updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
-        RETURNING id, name, user_id;
+        RETURNING id, name, user_id, created_at, updated_at
         "#,
         payload._name,
         id
@@ -235,7 +235,7 @@ async fn api_delete_project(
         Project,
         r#"DELETE FROM projects 
         WHERE id = $1
-        RETURNING id, name, user_id;
+        RETURNING id, name, user_id, created_at, updated_at
         "#,
         id
     )
