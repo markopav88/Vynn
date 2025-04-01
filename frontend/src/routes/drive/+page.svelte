@@ -20,6 +20,9 @@
     let currentProject: Project | null = null;
     let projectDocuments: Document[] = [];
     let projectDocLoading = false;
+    let newDocumentProjectId: string | null = null;
+    let filteredDocuments: Document[] = [];
+    let filteredProjects: Project[] = [];
     
     onMount(async () => {
         try {
@@ -43,6 +46,52 @@
     
     function setActiveCategory(category: string) {
         activeCategory = category;
+        
+        // Apply appropriate filters based on the category
+        switch(category) {
+            case 'all':
+                filteredDocuments = documents;
+                filteredProjects = projects;
+                break;
+            case 'recent':
+                // Sort documents and projects by updated_at date
+                filteredDocuments = [...documents].sort((a, b) => 
+                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                ).slice(0, 10); // Get 10 most recent
+                
+                filteredProjects = [...projects].sort((a, b) => 
+                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                ).slice(0, 10); // Get 10 most recent
+                break;
+            case 'shared':
+                // This would require backend changes to track shared status
+                // For now, just show empty lists
+                filteredDocuments = [];
+                filteredProjects = [];
+                break;
+            case 'starred':
+                // This would require backend changes to track starred status
+                // For now, just show empty lists
+                filteredDocuments = [];
+                filteredProjects = [];
+                break;
+            case 'trash':
+                // This would require backend changes to track deleted items
+                // For now, just show empty lists
+                filteredDocuments = [];
+                filteredProjects = [];
+                break;
+            default:
+                filteredDocuments = documents;
+                filteredProjects = projects;
+        }
+    }
+    
+    // Initialize filteredDocuments and filteredProjects when documents and projects are loaded
+    $: {
+        if (documents.length > 0 || projects.length > 0) {
+            setActiveCategory(activeCategory);
+        }
     }
     
     // Handle new project creation
@@ -60,6 +109,9 @@
                 // Clear the form and close the modal
                 newProjectName = '';
                 showNewProjectModal = false;
+                
+                // Show the project documents modal immediately after creation
+                handleProjectClick(project);
             } else {
                 alert('Failed to create project');
             }
@@ -81,6 +133,14 @@
             const document = await create_document(newDocumentName, newDocumentContent || '');
             
             if (document) {
+                // If we have a project ID, associate the document with the project
+                if (newDocumentProjectId) {
+                    await fetch(`http://localhost:3001/api/project/${newDocumentProjectId}/documents/${document.id}`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                }
+                
                 // Refresh the documents list
                 const refreshedDocs = await get_all_documents();
                 documents = refreshedDocs || [];
@@ -88,6 +148,7 @@
                 // Clear the form and close the modal
                 newDocumentName = '';
                 newDocumentContent = '';
+                newDocumentProjectId = null;
                 showNewDocumentModal = false;
                 
                 // Navigate to the document
@@ -140,9 +201,10 @@
         // Close the current modal
         showProjectDocsModal = false;
         
-        // Open the new document modal
+        // Open the new document modal with project context
         newDocumentName = '';
         newDocumentContent = '';
+        newDocumentProjectId = currentProject.id;
         showNewDocumentModal = true;
     }
 </script>
@@ -271,13 +333,13 @@
                                 {/each}
                                 
                                 <!-- Documents After Projects -->
-                                {#each documents as document}
+                                {#each filteredDocuments as document}
                                     <div class="col">
                                         <div class="card bg-dark border-0 h-100 item-card document-card" on:click={() => handleDocumentClick(document)}>
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
-                                                    <i class="bi bi-file-earmark-text text-white-50 fs-4 me-2"></i>
-                                                    <h5 class="card-title mb-0 text-truncate">{document.name}</h5>
+                                                    <i class="bi bi-file-earmark-text text-green fs-4 me-2"></i>
+                                                    <h5 class="card-title mb-0 text-truncate text-green">{document.name}</h5>
                                                 </div>
                                                 <p class="card-text text-white-50 small mb-1">Document</p>
                                                 <p class="card-text text-white-50 small">
@@ -389,8 +451,8 @@
                                 <div class="card bg-black border-0 h-100 document-card" on:click={() => handleDocumentClick(document)}>
                                     <div class="card-body p-3">
                                         <div class="d-flex align-items-center mb-2">
-                                            <i class="bi bi-file-earmark-text text-white-50 fs-4 me-2"></i>
-                                            <h5 class="card-title mb-0 text-truncate">{document.name}</h5>
+                                            <i class="bi bi-file-earmark-text text-green fs-4 me-2"></i>
+                                            <h5 class="card-title mb-0 text-truncate text-green">{document.name}</h5>
                                         </div>
                                         <p class="card-text text-white-50 small mb-1">
                                             Last updated: {new Date(document.updated_at).toLocaleDateString()}
@@ -464,6 +526,29 @@
         border-radius: 8px;
         padding: 1px;
         background: linear-gradient(145deg, rgba(16, 185, 129, 0.2), transparent);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
+    }
+    
+    /* Add this to your existing styles */
+    .text-green {
+        color: #10B981 !important;
+    }
+    
+    /* Make document cards have a green glow like project cards */
+    .document-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 8px;
+        padding: 1px;
+        background: linear-gradient(145deg, rgba(16, 185, 129, 0.1), transparent);
         -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
         mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
         -webkit-mask-composite: xor;

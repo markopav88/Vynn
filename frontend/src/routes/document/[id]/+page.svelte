@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
   import { get_project_documents } from '$lib/ts/project';
@@ -252,8 +252,8 @@
   }
   
   // Load document data
-  onMount(async () => {
-    try {
+	onMount(async () => {
+		try {
       documentData = await get_document(parseInt(documentId));
       if (documentData) {
         editorContent = documentData.content || '';
@@ -279,14 +279,14 @@
         
         // Initial height adjustment
         setTimeout(adjustTextareaHeight, 0);
-      } else {
+			} else {
         error = true;
       }
     } catch (e) {
       console.error('Error loading document:', e);
       error = true;
     } finally {
-      loading = false;
+			loading = false;
     }
   });
   
@@ -311,7 +311,7 @@
   }
 
   // Handle cleanup in onDestroy instead
-  onDestroy(() => {
+	onDestroy(() => {
     if (documentData) {
       const cleanup = setup_auto_save(documentData, () => {});
       if (cleanup) cleanup();
@@ -371,7 +371,7 @@
   
   <!-- Editor Container with animation -->
   <div class="editor-container">
-    {#if loading}
+	{#if loading}
       <div class="loading">Loading document...</div>
     {:else if error}
       <div class="error">Error loading document</div>
@@ -386,8 +386,8 @@
               {/each}
             </div>
             <div class="editor-textarea-static">{previousDocumentContent}</div>
-          </div>
-        </div>
+			</div>
+		</div>
       {/if}
       
       <!-- Current document -->
@@ -411,8 +411,8 @@
             {...{ autocorrect: "off" } as any}
             autocapitalize="off"
           ></textarea>
-        </div>
-      </div>
+				</div>
+			</div>
     {/if}
   </div>
   
@@ -438,9 +438,9 @@
             <span class="description">{prompt.description}</span>
           </div>
         {/each}
-      </div>
-    </div>
-  {/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
