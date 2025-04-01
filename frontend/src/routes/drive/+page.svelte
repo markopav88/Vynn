@@ -317,7 +317,13 @@
                                 <!-- Projects First -->
                                 {#each projects as project}
                                     <div class="col">
-                                        <div class="card bg-dark border-0 h-100 item-card project-card" on:click={() => handleProjectClick(project)}>
+                                        <div 
+                                            class="card bg-dark border-0 h-100 project-card" 
+                                            role="button"
+                                            tabindex="0"
+                                            on:click={() => handleProjectClick(project)}
+                                            on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}
+                                        >
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
@@ -335,7 +341,13 @@
                                 <!-- Documents After Projects -->
                                 {#each filteredDocuments as document}
                                     <div class="col">
-                                        <div class="card bg-dark border-0 h-100 item-card document-card" on:click={() => handleDocumentClick(document)}>
+                                        <div 
+                                            class="card bg-black border-0 h-100 document-card" 
+                                            role="button"
+                                            tabindex="0"
+                                            on:click={() => handleDocumentClick(document)}
+                                            on:keydown={(e) => e.key === 'Enter' && handleDocumentClick(document)}
+                                        >
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-file-earmark-text text-green fs-4 me-2"></i>
@@ -448,7 +460,13 @@
                     <div class="row row-cols-1 row-cols-md-3 g-4">
                         {#each projectDocuments as document}
                             <div class="col">
-                                <div class="card bg-black border-0 h-100 document-card" on:click={() => handleDocumentClick(document)}>
+                                <div 
+                                    class="card bg-black border-0 h-100 document-card" 
+                                    role="button"
+                                    tabindex="0"
+                                    on:click={() => handleDocumentClick(document)}
+                                    on:keydown={(e) => e.key === 'Enter' && handleDocumentClick(document)}
+                                >
                                     <div class="card-body p-3">
                                         <div class="d-flex align-items-center mb-2">
                                             <i class="bi bi-file-earmark-text text-green fs-4 me-2"></i>
@@ -492,19 +510,6 @@
     .nav-link.active {
         font-weight: 500;
         color: var(--color-primary) !important;
-    }
-    
-    .item-card {
-        transition: all 0.2s;
-        cursor: pointer;
-        background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .item-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
     
     .project-card:hover {

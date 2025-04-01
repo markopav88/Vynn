@@ -547,7 +547,7 @@ async fn api_get_documents(
     .fetch_all(&pool)
     .await
     .map_err(|_| Error::ProjectNotFoundError)?;
-    
+
     Ok(Json(documents))
 }
 

@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { logout } from '$lib/ts/user';
     import logo from '$lib/assets/logo.png';
-    import profileDefault from '$lib/assets/profile-default.svg';
+    import profileDefault from '$lib/assets/profile-image.png';
     
     export let isLoggedIn = false;
     
@@ -59,14 +59,20 @@
         <div>
             {#if isLoggedIn}
                 <div class="dropdown">
-                    <img 
-                        src={profileDefault} 
-                        alt="Profile" 
-                        class="rounded-circle profile-img"
-                        style="width: 40px; height: 40px; cursor: pointer; border: 2px solid var(--color-primary);"
+                    <button 
+                        class="btn p-0 border-0 bg-transparent" 
                         data-bs-toggle="dropdown"
                         aria-expanded="false"
-                    />
+                        aria-haspopup="true"
+                        aria-label="Profile menu"
+                    >
+                        <img 
+                            src={profileDefault} 
+                            alt="Profile" 
+                            class="rounded-circle profile-img"
+                            style="width: 40px; height: 40px; border: 2px solid var(--color-primary);"
+                        />
+                    </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
                         <li>
                             <button class="dropdown-item" on:click={goToAccount}>
