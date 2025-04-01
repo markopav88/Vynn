@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { logout } from '$lib/ts/user';
     import logo from '$lib/assets/logo.png';
+    import profileDefault from '$lib/assets/profile-default.svg';
     
     export let isLoggedIn = false;
     
@@ -21,6 +22,11 @@
             console.error("Error during logout:", error);
         }
     }
+    
+    // Add handler for account page navigation
+    function goToAccount() {
+        window.location.href = '/account';
+    }
 </script>
 
 <nav class="navbar navbar-expand navbar-dark bg-black">
@@ -35,16 +41,16 @@
         <div class="navbar-collapse justify-content-center flex-grow-1 mr-5">
             <ul class="navbar-nav mx-auto text-center">
                 <li class="nav-item mx-3">
-                    <a class="nav-link" href="/editor">Editor</a>
+                    <a class="nav-link" href="/drive">My Drive</a>
                 </li>
                 <li class="nav-item mx-3">
-                    <a class="nav-link" href="/tools">AI Tools</a>
+                    <a class="nav-link" href="/document">Editor</a>
                 </li>
                 <li class="nav-item mx-3">
-                    <a class="nav-link" href="/pricing">Pricing</a>
+                    <a class="nav-link" href="/tutorial">Tutorial</a>
                 </li>
                 <li class="nav-item mx-3">
-                    <a class="nav-link" href="/community">Community</a>
+                    <a class="nav-link" href="/help">Help</a>
                 </li>
             </ul>
         </div>
@@ -52,12 +58,29 @@
         <!-- Action Buttons -->
         <div>
             {#if isLoggedIn}
-                <button 
-                    on:click={handleLogout}
-                    class="btn btn-danger btn-sm rounded-pill"
-                >
-                    Logout
-                </button>
+                <div class="dropdown">
+                    <img 
+                        src={profileDefault} 
+                        alt="Profile" 
+                        class="rounded-circle profile-img"
+                        style="width: 40px; height: 40px; cursor: pointer; border: 2px solid var(--color-primary);"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                    />
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                        <li>
+                            <button class="dropdown-item" on:click={goToAccount}>
+                                <i class="bi bi-person me-2"></i> My Account
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item text-danger" on:click={handleLogout}>
+                                <i class="bi bi-box-arrow-right me-2"></i> Sign Out
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             {:else}
                 <a 
                     href="/signup" 
@@ -110,6 +133,16 @@
         .navbar-brand span {
             font-size: 1.2rem;
         }
+    }
+    
+    /* Profile image hover effect */
+    .profile-img {
+        transition: all 0.2s ease;
+    }
+    
+    .profile-img:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
     }
     
     /* Add these styles to your Navbar component */

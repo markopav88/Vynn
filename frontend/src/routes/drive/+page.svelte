@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { get_all_documents } from "$lib/ts/document";
-    import { get_all_projects } from "$lib/ts/drive";
+    import { get_all_documents, create_document } from "$lib/ts/document";
+    import { get_all_projects, create_project } from "$lib/ts/drive";
     import Navbar from '$lib/components/Navbar.svelte';
     import type { Document } from '$lib/ts/document';
     import type { Project } from '$lib/ts/drive';
@@ -11,6 +11,15 @@
     let projects: Project[] = [];
     let isLoading = true;
     let activeCategory = 'all';
+    let showNewProjectModal = false;
+    let showNewDocumentModal = false;
+    let showProjectDocsModal = false;
+    let newProjectName = '';
+    let newDocumentName = '';
+    let newDocumentContent = '';
+    let currentProject: Project | null = null;
+    let projectDocuments: Document[] = [];
+    let projectDocLoading = false;
     
     onMount(async () => {
         try {
@@ -36,9 +45,105 @@
         activeCategory = category;
     }
     
-    function createNewItem() {
-        // This would open a modal or dropdown for creating new items
-        console.log("Create new item clicked");
+    // Handle new project creation
+    async function handleCreateProject() {
+        if (!newProjectName.trim()) {
+            alert('Project name cannot be empty');
+            return;
+        }
+        
+        try {
+            const project = await create_project(newProjectName);
+            if (project) {
+                // Add the new project to the list
+                projects = [...projects, project];
+                // Clear the form and close the modal
+                newProjectName = '';
+                showNewProjectModal = false;
+            } else {
+                alert('Failed to create project');
+            }
+        } catch (error) {
+            console.error('Error creating project:', error);
+            alert('An error occurred while creating the project');
+        }
+    }
+    
+    // Handle new document creation
+    async function handleCreateDocument() {
+        if (!newDocumentName.trim()) {
+            alert('Document name cannot be empty');
+            return;
+        }
+        
+        try {
+            // Create a new document with the name and content
+            const document = await create_document(newDocumentName, newDocumentContent || '');
+            
+            if (document) {
+                // Refresh the documents list
+                const refreshedDocs = await get_all_documents();
+                documents = refreshedDocs || [];
+                
+                // Clear the form and close the modal
+                newDocumentName = '';
+                newDocumentContent = '';
+                showNewDocumentModal = false;
+                
+                // Navigate to the document
+                window.location.href = `/document/${document.id}`;
+            } else {
+                alert('Failed to create document');
+            }
+        } catch (error) {
+            console.error('Error creating document:', error);
+            alert('An error occurred while creating the document');
+        }
+    }
+    
+    // Handle project click
+    async function handleProjectClick(project: Project) {
+        currentProject = project;
+        projectDocLoading = true;
+        showProjectDocsModal = true;
+        
+        try {
+            // Fetch documents for this project
+            const response = await fetch(`http://localhost:3001/api/project/${project.id}/documents`, {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                projectDocuments = await response.json();
+            } else {
+                console.error('Failed to fetch project documents');
+                projectDocuments = [];
+            }
+        } catch (error) {
+            console.error('Error fetching project documents:', error);
+            projectDocuments = [];
+        } finally {
+            projectDocLoading = false;
+        }
+    }
+    
+    // Handle document click
+    function handleDocumentClick(document: Document) {
+        // Navigate to document editor
+        window.location.href = `/document/${document.id}`;
+    }
+    
+    // Create new document within a project
+    async function createDocInProject() {
+        if (!currentProject) return;
+        
+        // Close the current modal
+        showProjectDocsModal = false;
+        
+        // Open the new document modal
+        newDocumentName = '';
+        newDocumentContent = '';
+        showNewDocumentModal = true;
     }
 </script>
 
@@ -50,12 +155,6 @@
             <!-- Left Sidebar -->
             <div class="col-md-2 bg-dark p-0 border-end border-dark min-vh-100">
                 <div class="d-flex flex-column h-100 sticky-top">
-                    <!-- New Item Button -->
-                    <div class="p-3 border-bottom border-dark">
-                        <button class="btn btn-green rounded-circle" on:click={createNewItem} aria-label="Create new item">
-                            <i class="bi bi-plus-lg"></i>
-                        </button>
-                    </div>
                     
                     <!-- Navigation Categories -->
                     <div class="p-2">
@@ -90,15 +189,29 @@
                                     <i class="bi bi-trash me-2"></i> Trash
                                 </button>
                             </li>
+                            <li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
+                                <button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
+                                    <span><i class="bi bi-hdd me-2"></i> Storage</span>
+                                    <span class="text-white-50">25%</span>
+                                </button>
+                            </li>
+                            <li class="px-2">
+                                <div class="progress mb-2 mt-1" style="height: 6px;">
+                                    <div class="progress-bar bg-green" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-white-50 ps-1">2.5 GB of 10 GB used</small>
+                            </li>
                         </ul>
                     </div>
                     
-                    <!-- Storage Info (at bottom) -->
-                    <div class="mt-auto p-3 border-top border-dark">
-                        <div class="progress mb-2" style="height: 8px;">
-                            <div class="progress-bar bg-green" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <small class="text-white-50">2.5 GB of 10 GB used</small>
+                    <!-- Create New Buttons -->
+                    <div class="mt-4 p-2">
+                        <button class="btn btn-green w-100 mb-2" on:click={() => showNewProjectModal = true}>
+                            <i class="bi bi-folder-plus me-2"></i> New Project
+                        </button>
+                        <button class="btn btn-outline-light w-100" on:click={() => showNewDocumentModal = true}>
+                            <i class="bi bi-file-earmark-plus me-2"></i> New Document
+                        </button>
                     </div>
                 </div>
             </div>
@@ -119,10 +232,10 @@
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h2>All Items</h2>
                             <div>
-                                <button class="btn btn-sm btn-outline-green me-2">
+                                <button class="btn btn-sm btn-outline-green me-2" on:click={() => showNewProjectModal = true}>
                                     <i class="bi bi-folder-plus me-1"></i> New Project
                                 </button>
-                                <button class="btn btn-sm btn-outline-light">
+                                <button class="btn btn-sm btn-outline-light" on:click={() => showNewDocumentModal = true}>
                                     <i class="bi bi-file-earmark-plus me-1"></i> New Document
                                 </button>
                             </div>
@@ -133,8 +246,8 @@
                                 <i class="bi bi-inbox display-4 d-block mb-3"></i>
                                 <p>No items found</p>
                                 <div class="mt-3">
-                                    <button class="btn btn-sm btn-outline-green me-2">Create Project</button>
-                                    <button class="btn btn-sm btn-outline-light">Create Document</button>
+                                    <button class="btn btn-sm btn-outline-green me-2" on:click={() => showNewProjectModal = true}>Create Project</button>
+                                    <button class="btn btn-sm btn-outline-light" on:click={() => showNewDocumentModal = true}>Create Document</button>
                                 </div>
                             </div>
                         {:else}
@@ -142,7 +255,7 @@
                                 <!-- Projects First -->
                                 {#each projects as project}
                                     <div class="col">
-                                        <div class="card bg-dark border-0 h-100 item-card project-card">
+                                        <div class="card bg-dark border-0 h-100 item-card project-card" on:click={() => handleProjectClick(project)}>
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
@@ -160,7 +273,7 @@
                                 <!-- Documents After Projects -->
                                 {#each documents as document}
                                     <div class="col">
-                                        <div class="card bg-dark border-0 h-100 item-card document-card">
+                                        <div class="card bg-dark border-0 h-100 item-card document-card" on:click={() => handleDocumentClick(document)}>
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-file-earmark-text text-white-50 fs-4 me-2"></i>
@@ -182,6 +295,125 @@
         </div>
     </div>
 </div>
+
+<!-- New Project Modal -->
+{#if showNewProjectModal}
+<div class="modal fade show d-block" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Create New Project</h5>
+                <button type="button" class="btn-close btn-close-white" aria-label="Close" on:click={() => showNewProjectModal = false}></button>
+            </div>
+            <div class="modal-body">
+                <form on:submit|preventDefault={handleCreateProject}>
+                    <div class="mb-3">
+                        <label for="projectName" class="form-label">Project Name</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" 
+                               id="projectName" bind:value={newProjectName} 
+                               placeholder="Enter project name" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" on:click={() => showNewProjectModal = false}>Cancel</button>
+                <button type="button" class="btn btn-green" on:click={handleCreateProject}>Create Project</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+{/if}
+
+<!-- New Document Modal -->
+{#if showNewDocumentModal}
+<div class="modal fade show d-block" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Create New Document</h5>
+                <button type="button" class="btn-close btn-close-white" aria-label="Close" on:click={() => showNewDocumentModal = false}></button>
+            </div>
+            <div class="modal-body">
+                <form on:submit|preventDefault={handleCreateDocument}>
+                    <div class="mb-3">
+                        <label for="documentName" class="form-label">Document Name</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" 
+                               id="documentName" bind:value={newDocumentName} 
+                               placeholder="Enter document name" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" on:click={() => showNewDocumentModal = false}>Cancel</button>
+                <button type="button" class="btn btn-green" on:click={handleCreateDocument}>Create Document</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+{/if}
+
+<!-- Project Documents Modal -->
+{#if showProjectDocsModal && currentProject}
+<div class="modal fade show d-block" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="bi bi-folder-fill text-green me-2"></i>
+                    {currentProject.name}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" aria-label="Close" on:click={() => showProjectDocsModal = false}></button>
+            </div>
+            <div class="modal-body">
+                {#if projectDocLoading}
+                    <div class="d-flex justify-content-center my-4">
+                        <div class="spinner-border text-green" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                {:else if projectDocuments.length === 0}
+                    <div class="text-center py-4">
+                        <i class="bi bi-file-earmark-text display-4 text-white-50 mb-3"></i>
+                        <p>No documents in this project</p>
+                        <button class="btn btn-outline-light mt-2" on:click={createDocInProject}>
+                            <i class="bi bi-file-earmark-plus me-2"></i>
+                            Create Document
+                        </button>
+                    </div>
+                {:else}
+                    <div class="row row-cols-1 row-cols-md-3 g-4">
+                        {#each projectDocuments as document}
+                            <div class="col">
+                                <div class="card bg-black border-0 h-100 document-card" on:click={() => handleDocumentClick(document)}>
+                                    <div class="card-body p-3">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="bi bi-file-earmark-text text-white-50 fs-4 me-2"></i>
+                                            <h5 class="card-title mb-0 text-truncate">{document.name}</h5>
+                                        </div>
+                                        <p class="card-text text-white-50 small mb-1">
+                                            Last updated: {new Date(document.updated_at).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" on:click={() => showProjectDocsModal = false}>Close</button>
+                <button type="button" class="btn btn-green" on:click={createDocInProject}>
+                    <i class="bi bi-file-earmark-plus me-2"></i>
+                    New Document
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+{/if}
 
 <style>
     /* Custom styles for the drive page */
