@@ -16,7 +16,7 @@
 / force_delete_project: Function to force delete a project and all its documents
 /
 */
-import { Document } from "./document";
+import { Document } from './document';
 
 // Define and export the Project interface
 export interface Project {
@@ -150,18 +150,18 @@ export async function get_all_projects(): Promise<Project[] | null> {
 	const apiUrl = `http://localhost:3001/api/project`;
 
 	try {
-		console.log("Fetching projects from:", apiUrl);
-		
+		console.log('Fetching projects from:', apiUrl);
+
 		const response = await fetch(apiUrl, {
 			method: 'GET',
 			credentials: 'include',
 			headers: {
-				'Accept': 'application/json'
+				Accept: 'application/json'
 			}
 		});
 
-		console.log("Project response status:", response.status);
-		
+		console.log('Project response status:', response.status);
+
 		if (!response.ok) {
 			console.error('Get all projects failed with status:', response.status);
 			const errorText = await response.text();
@@ -170,7 +170,7 @@ export async function get_all_projects(): Promise<Project[] | null> {
 		}
 
 		const projects = await response.json();
-		console.log("Projects received:", projects);
+		console.log('Projects received:', projects);
 		return projects;
 	} catch (error) {
 		console.error('Get all projects error:', error);
@@ -184,7 +184,7 @@ export async function get_all_projects(): Promise<Project[] | null> {
  */
 export async function update_project(project_id: number, name: string): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
-	
+
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -213,7 +213,7 @@ export async function update_project(project_id: number, name: string): Promise<
  */
 export async function delete_project(project_id: number): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
-	
+
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -238,7 +238,7 @@ export async function delete_project(project_id: number): Promise<Boolean> {
  */
 export async function force_delete_project(project_id: number): Promise<Boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
-	
+
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',

@@ -77,12 +77,7 @@ export class Command {
 	command_description: string;
 	default_keybinding: string;
 
-	constructor(
-		id: number,
-		name: string,
-		description: string,
-		default_keybinding: string
-	) {
+	constructor(id: number, name: string, description: string, default_keybinding: string) {
 		this.command_id = id;
 		this.command_name = name;
 		this.command_description = description;
@@ -98,11 +93,7 @@ export class UserKeybinding {
 	command_id: number;
 	keybinding: string;
 
-	constructor(
-		user_id: number,
-		command_id: number,
-		keybinding: string
-	) {
+	constructor(user_id: number, command_id: number, keybinding: string) {
 		this.user_id = user_id;
 		this.command_id = command_id;
 		this.keybinding = keybinding;
@@ -117,16 +108,16 @@ export async function get_document(id: number): Promise<Document | null> {
 	try {
 		// Use the original endpoint that was working before
 		const apiUrl = `http://localhost:3001/api/document/${id}`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch document:', response.status);
 			return null;
 		}
-		
+
 		const data = await response.json();
 		console.log('Document data received:', data);
 		return data;
@@ -143,13 +134,13 @@ export async function get_document(id: number): Promise<Document | null> {
 export async function update_document(document: Document): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
-		
+
 		const payload = {
 			name: document.name,
 			content: document.content,
 			updated_at: new Date().toISOString().replace('Z', '')
 		};
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			headers: {
@@ -158,7 +149,7 @@ export async function update_document(document: Document): Promise<boolean> {
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error updating document:', error);
@@ -167,10 +158,7 @@ export async function update_document(document: Document): Promise<boolean> {
 }
 
 // Function to set up auto-save interval for a document
-export function setup_auto_save(
-	document: Document,
-	onSave?: (success: boolean) => void
-): () => void {
+export function setup_auto_save(document: Document, onSave?: (success: boolean) => void): () => void {
 	// Set up interval to save every 30 seconds
 	const intervalId = setInterval(async () => {
 		console.log('Auto-saving document...');
@@ -206,9 +194,7 @@ export async function saveDocument(document: Document): Promise<boolean | null> 
  * Function to get all users with permissions to a given document
  * Calls: GET /api/document/:id/permissions
  */
-export async function get_document_permissions(
-	documentData: Document
-): Promise<DocumentUser[] | null> {
+export async function get_document_permissions(documentData: Document): Promise<DocumentUser[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${documentData.id}/permissions`;
 
@@ -235,28 +221,28 @@ export async function get_document_permissions(
 export async function get_all_documents(): Promise<Document[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document`;
-		
-		console.log("Fetching documents from:", apiUrl);
-		
+
+		console.log('Fetching documents from:', apiUrl);
+
 		const response = await fetch(apiUrl, {
 			method: 'GET',
 			credentials: 'include',
 			headers: {
-				'Accept': 'application/json'
+				Accept: 'application/json'
 			}
 		});
-		
-		console.log("Document response status:", response.status);
-		
+
+		console.log('Document response status:', response.status);
+
 		if (!response.ok) {
 			console.error('Failed to fetch documents:', response.status);
 			const errorText = await response.text();
 			console.error('Error response:', errorText);
 			return null;
 		}
-		
+
 		const documents = await response.json();
-		console.log("Documents received:", documents);
+		console.log('Documents received:', documents);
 		return documents;
 	} catch (error) {
 		console.error('Error fetching documents:', error);
@@ -272,14 +258,14 @@ export async function create_document(name: string, content: string): Promise<Do
 	try {
 		const apiUrl = `http://localhost:3001/api/document`;
 		const now = new Date().toISOString().replace('Z', '');
-		
+
 		const payload = {
 			name: name,
 			content: content,
 			created_at: now,
 			updated_at: now
 		};
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			headers: {
@@ -288,12 +274,12 @@ export async function create_document(name: string, content: string): Promise<Do
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to create document:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error creating document:', error);
@@ -308,12 +294,12 @@ export async function create_document(name: string, content: string): Promise<Do
 export async function delete_document(documentId: number): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error deleting document:', error);
@@ -328,12 +314,12 @@ export async function delete_document(documentId: number): Promise<boolean> {
 export async function add_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
-		
+
 		const payload = {
 			user_id: userId,
 			role: role
 		};
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			headers: {
@@ -342,7 +328,7 @@ export async function add_document_permissions(documentId: number, userId: numbe
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error adding document permissions:', error);
@@ -357,12 +343,12 @@ export async function add_document_permissions(documentId: number, userId: numbe
 export async function update_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
-		
+
 		const payload = {
 			user_id: userId,
 			role: role
 		};
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			headers: {
@@ -371,7 +357,7 @@ export async function update_document_permissions(documentId: number, userId: nu
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error updating document permissions:', error);
@@ -386,12 +372,12 @@ export async function update_document_permissions(documentId: number, userId: nu
 export async function delete_document_permissions(documentId: number, userId: number): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions/${userId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error deleting document permissions:', error);
@@ -406,16 +392,16 @@ export async function delete_document_permissions(documentId: number, userId: nu
 export async function get_all_commands(): Promise<Command[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/command/default`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch commands:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error fetching commands:', error);
@@ -430,16 +416,16 @@ export async function get_all_commands(): Promise<Command[] | null> {
 export async function get_all_keybindings(): Promise<UserKeybinding[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/command`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch keybindings:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error fetching keybindings:', error);
@@ -454,7 +440,7 @@ export async function get_all_keybindings(): Promise<UserKeybinding[] | null> {
 export async function add_update_keybinding(commandId: number, keybinding: string): Promise<UserKeybinding | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/command/${commandId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			headers: {
@@ -463,12 +449,12 @@ export async function add_update_keybinding(commandId: number, keybinding: strin
 			body: JSON.stringify({ keybinding }),
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to update keybinding:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error updating keybinding:', error);
@@ -483,17 +469,17 @@ export async function add_update_keybinding(commandId: number, keybinding: strin
 export async function delete_keybinding(commandId: number): Promise<Command | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/command/${commandId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to delete keybinding:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error deleting keybinding:', error);
@@ -505,19 +491,21 @@ export async function delete_keybinding(commandId: number): Promise<Command | nu
  * Function to get the project associated with a document
  * Calls: GET /api/document/:id/project
  */
-export async function get_project_from_document(documentId: number): Promise<{project_id: number, project_name: string} | null> {
+export async function get_project_from_document(
+	documentId: number
+): Promise<{ project_id: number; project_name: string } | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${documentId}/project`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch project from document:', response.status);
 			return null;
 		}
-		
+
 		const data = await response.json();
 		console.log('Project data received:', data);
 		return data;
