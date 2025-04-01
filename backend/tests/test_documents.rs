@@ -31,8 +31,8 @@ async fn test_documents() -> Result<()> {
     let login_result = test_good_login(&hc).await;
     let create_result = test_create_document(&hc).await;
     let get_result = test_get_document(&hc).await;
-    let get_docs_results = test_get_all_doc(&hc).await;
-    let get_project_from_doc = test_get_project_from_document(&hc).await;
+    let get_docs_res = test_get_all_doc(&hc).await;
+    let proj_from_doc = test_get_project_from_document(&hc).await;
     let update_result = test_update_document(&hc).await;
     let add_permissions = test_add_permissions(&hc).await;
     let upd_perm = test_update_permissions(&hc).await;
@@ -46,6 +46,8 @@ async fn test_documents() -> Result<()> {
     println!("Login as User 1\t\t{}", result_to_string(&login_result));
     println!("Create Document:\t{}", result_to_string(&create_result));
     println!("Get Document:\t\t{}", result_to_string(&get_result));
+    println!("Get All Documents\t{}", result_to_string(&get_docs_res));
+    println!("Get Project From Doc\t{}", result_to_string(&proj_from_doc));
     println!("Update Document:\t{}", result_to_string(&update_result));
     println!("Add Permissions:\t{}", result_to_string(&add_permissions));
     println!("Update Permissions:\t{}", result_to_string(&upd_perm));
@@ -202,7 +204,9 @@ async fn test_get_project_from_document(hc: &Client) -> Result<()> {
     let document_id = 1;
 
     // call get API
-    let get_response = hc.do_get(&format!("/api/{}/project", document_id)).await?;
+    let get_response = hc
+        .do_get(&format!("/api/document/{}/project", document_id))
+        .await?;
     get_response.print().await;
 
     // check the response status

@@ -136,7 +136,7 @@ export async function create_project(name: string): Promise<Project | null> {
  */
 export async function update_project(project_id: number, name: string): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
-	
+
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -165,7 +165,7 @@ export async function update_project(project_id: number, name: string): Promise<
  */
 export async function delete_project(project_id: number): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
-	
+
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -190,7 +190,7 @@ export async function delete_project(project_id: number): Promise<boolean> {
  */
 export async function force_delete_project(project_id: number): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
-	
+
 	try {
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -216,12 +216,12 @@ export async function force_delete_project(project_id: number): Promise<boolean>
 export async function add_project_permissions(projectId: number, userId: number, role: string): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
-		
+
 		const payload = {
 			user_id: userId,
 			role: role
 		};
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			headers: {
@@ -230,7 +230,7 @@ export async function add_project_permissions(projectId: number, userId: number,
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error adding project permissions:', error);
@@ -245,16 +245,16 @@ export async function add_project_permissions(projectId: number, userId: number,
 export async function get_project_permissions(projectId: number): Promise<ProjectUser[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch project permissions:', response.status);
 			return null;
 		}
-		
+
 		const data = await response.json();
 		return data.users || null;
 	} catch (error) {
@@ -270,12 +270,12 @@ export async function get_project_permissions(projectId: number): Promise<Projec
 export async function update_project_permission(projectId: number, userId: number, role: string): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
-		
+
 		const payload = {
 			user_id: userId,
 			role: role
 		};
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			headers: {
@@ -284,7 +284,7 @@ export async function update_project_permission(projectId: number, userId: numbe
 			body: JSON.stringify(payload),
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error updating project permission:', error);
@@ -299,12 +299,12 @@ export async function update_project_permission(projectId: number, userId: numbe
 export async function remove_project_permissions(projectId: number, userId: number): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions/${userId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error removing project permissions:', error);
@@ -319,19 +319,19 @@ export async function remove_project_permissions(projectId: number, userId: numb
 export async function get_project_documents(projectId: number): Promise<Document[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch project documents:', response.status);
 			return null;
 		}
-		
+
 		const data = await response.json();
 		console.log('Project documents received:', data);
-		
+
 		// The API is returning the documents directly, not in a "documents" property
 		return data || [];
 	} catch (error) {
@@ -347,7 +347,7 @@ export async function get_project_documents(projectId: number): Promise<Document
 export async function add_document_to_project(projectId: number, documentId: number): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents/${documentId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			headers: {
@@ -356,7 +356,7 @@ export async function add_document_to_project(projectId: number, documentId: num
 			body: JSON.stringify({}),
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error adding document to project:', error);
@@ -371,12 +371,12 @@ export async function add_document_to_project(projectId: number, documentId: num
 export async function remove_document_from_project(projectId: number, documentId: number): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents/${documentId}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error removing document from project:', error);
