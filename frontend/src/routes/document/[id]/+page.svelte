@@ -306,14 +306,19 @@
   
   // Function to perform search based on command input
   function performSearch() {
-    if (!commandInput || !editorContent) {
+    // Check if editor content is empty
+    if (!editorContent.trim()) {
       searchResults = [];
       currentSearchIndex = -1;
-      
-      // Show error if search term is empty
-      if (commandInput === '') {
-        showCommandError('Please enter a search term');
-      }
+      showCommandError('No content to search in');
+      return;
+    }
+    
+    // Check if search term is empty
+    if (!commandInput.trim()) {
+      searchResults = [];
+      currentSearchIndex = -1;
+      showCommandError('Please enter a search term');
       return;
     }
     
@@ -626,6 +631,24 @@
     // First prevent any OS bindings
     preventBrowserDefaults(event);
     
+    // Handle document switching with Ctrl+number in any mode
+    if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      // Check if the key is a number from 1-9
+      const numKey = parseInt(event.key);
+      if (!isNaN(numKey) && numKey >= 1 && numKey <= 9) {
+        // Check if we have a document at this index
+        if (projectDocuments.length >= numKey) {
+          // Get the document ID at index (numKey-1)
+          const docId = projectDocuments[numKey - 1].id;
+          
+          // Switch to that document
+          switchDocument(docId);
+          event.preventDefault();
+          return;
+        }
+      }
+    }
+    
     // In NORMAL mode, prevent most key inputs
     if (editorMode === 'NORMAL') {
       // Always prevent default for most keys in NORMAL mode
@@ -687,6 +710,9 @@
       
       // Use our normal mode handler for navigation
       handleNormalModeKeydown(event, editorElement);
+    } else if (editorMode === 'INSERT') {
+      // In INSERT mode, we don't need to prevent most keys
+      // Just handle Escape to exit INSERT mode
     }
     
     if (event.key === 'Escape') {
@@ -918,14 +944,11 @@
   <!-- Fixed Status Bar - moved outside the editor wrapper -->
   <div class="status-bar">
     <div class="mode-indicator">
-      {editorMode}
-      
-      <!-- Command input that appears next to mode indicator -->
+      <span class="mode {editorMode.toLowerCase()}">{editorMode}</span>
       {#if editorMode === 'COMMAND'}
         <div class="command-container">
           <span class="command-prefix">{commandPrefix}</span>
           <input
-            type="text"
             bind:this={commandInputElement}
             bind:value={commandInput}
             on:input={handleCommandInput}
@@ -934,19 +957,15 @@
             autocomplete="off"
             spellcheck="false"
           />
-          
-          <!-- Error message that appears above the command input -->
           {#if commandError}
-            <div class="command-error">
-              {commandError}
-            </div>
+            <div class="command-error">{commandError}</div>
           {/if}
         </div>
       {/if}
     </div>
     
     <div class="cursor-position">
-      Line: {cursorLine}, Column: {cursorColumn}
+      <span>Line: {cursorLine}, Col: {cursorColumn}</span>
     </div>
   </div>
 </div>
@@ -1416,5 +1435,18 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+  
+  /* Add style for the shortcut hint */
+  .shortcut-hint {
+    margin-left: 12px;
+    color: rgba(229, 229, 229, 0.6);
+    font-size: 12px;
+  }
+  
+  /* Update cursor position to accommodate the hint */
+  .cursor-position {
+    display: flex;
+    align-items: center;
   }
 </style> 
