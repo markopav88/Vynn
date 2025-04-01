@@ -15,7 +15,7 @@
 
 use std::result;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use backend::result_to_string;
 use chrono::Utc;
 use httpc_test::Client;
@@ -31,8 +31,8 @@ async fn test_documents() -> Result<()> {
     let login_result = test_good_login(&hc).await;
     let create_result = test_create_document(&hc).await;
     let get_result = test_get_document(&hc).await;
-    // ! Need test_get_all_doc() 
-    // ! Need api_get_project_from_document test
+    let get_docs_results = test_get_all_doc(&hc).await;
+    let get_project_from_doc = test_get_project_from_document(&hc).await;
     let update_result = test_update_document(&hc).await;
     let add_permissions = test_add_permissions(&hc).await;
     let upd_perm = test_update_permissions(&hc).await;
@@ -146,6 +146,24 @@ async fn test_get_document(hc: &Client) -> Result<()> {
     Ok(())
 }
 
+async fn test_get_all_doc(hc: &Client) -> Result<()> {
+    println!("TEST - Get All Documents");
+
+    // Get all documents signed in user has
+    let get_response = hc.do_get("/api/document").await?;
+    get_response.print().await?;
+
+    // Check if the get request was successful
+    if !get_response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Get All Documents failed with status: {}",
+            get_response.status()
+        ));
+    }
+
+    Ok(())
+}
+
 async fn test_update_document(hc: &Client) -> Result<()> {
     println!("TEST - Update Document");
 
@@ -171,6 +189,27 @@ async fn test_update_document(hc: &Client) -> Result<()> {
         return Err(anyhow::anyhow!(
             "Update Document failed with status: {}",
             update_response.status()
+        ));
+    }
+
+    Ok(())
+}
+
+async fn test_get_project_from_document(hc: &Client) -> Result<()> {
+    println!("TEST - Get Project From Document");
+
+    // lets use document 1 because user 1 has access
+    let document_id = 1;
+
+    // call get API
+    let get_response = hc.do_get(&format!("/api/{}/project", document_id)).await?;
+    get_response.print().await;
+
+    // check the response status
+    if !get_response.status().is_success() {
+        return Err(anyhow!(
+            "Get Project From Document ID failed with status: {}",
+            get_response.status()
         ));
     }
 
