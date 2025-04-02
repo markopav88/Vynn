@@ -102,26 +102,29 @@
 				<!-- Right side: Demo image -->
 				<div class="col-md-6 mt-15 mt-md-0 d-flex justify-content-end fade-in" style="margin-top: -10rem;">
 					<div class="position-relative ms-md-5" style="margin-right: -10rem;">
-						<!-- Editor Demo GIF -->
+						<!-- Placeholder image -->
 						<div
 							class="bg-dark rounded-3 shadow-lg p-3 d-flex align-items-center justify-content-center"
-							style="width: 700px; height: 500px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;"
+							style="width: 700px; height: 500px; border: 1px solid rgba(255,255,255,0.1);"
 						>
-							<div class="editor-demo">
-								<div class="demo-header">
-									<div class="demo-buttons">
-										<span class="demo-button"></span>
-										<span class="demo-button"></span>
-										<span class="demo-button"></span>
-									</div>
-									<div class="demo-title">document.md — Vynn Editor</div>
-								</div>
-								<div class="demo-content">
-									<div class="typing-animation">
-										<span class="typing-text">The quick brown fox jumps over the lazy dog</span>
-										<span class="cursor"></span>
-									</div>
-								</div>
+							<div class="text-center">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="80"
+									height="80"
+									fill="currentColor"
+									class="bi bi-code-square text-green mb-3"
+									viewBox="0 0 16 16"
+								>
+									<path
+										d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
+									/>
+									<path
+										d="M6.854 4.646a.5.5 0 0 1 0 .708L4.207 8l2.647 2.646a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 0 1 .708 0zm2.292 0a.5.5 0 0 0 0 .708L11.793 8l-2.647 2.646a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708 0z"
+									/>
+								</svg>
+								<p class="text-white-50">Vynn Editor Demo</p>
+								<p class="text-white-50 small">(Product screenshot will be displayed here)</p>
 							</div>
 						</div>
 
@@ -405,117 +408,5 @@
 	}
 	.row > .fade-in:nth-child(3) {
 		transition-delay: 0.5s;
-	}
-
-	/* Editor Demo Animation Styles */
-	.editor-demo {
-		width: 100%;
-		height: 100%;
-		background-color: #1e1e1e;
-		border-radius: 8px;
-		overflow: hidden;
-		font-family: monospace;
-	}
-
-	.demo-header {
-		display: flex;
-		align-items: center;
-		background-color: #252525;
-		padding: 8px 12px;
-		border-bottom: 1px solid #333;
-	}
-
-	.demo-buttons {
-		display: flex;
-		gap: 6px;
-		margin-right: 20px;
-	}
-
-	.demo-button {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		background-color: #ff5f56;
-	}
-
-	.demo-button:nth-child(2) {
-		background-color: #ffbd2e;
-	}
-
-	.demo-button:nth-child(3) {
-		background-color: #27c93f;
-	}
-
-	.demo-title {
-		color: #aaa;
-		font-size: 14px;
-	}
-
-	.demo-content {
-		padding: 20px;
-		height: calc(100% - 50px);
-		color: #eee;
-	}
-
-	.typing-animation {
-		display: inline-block;
-		position: relative;
-	}
-
-	.typing-text {
-		opacity: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		border-right: 2px solid transparent;
-		animation:
-			typing 4s steps(40) 1s forwards,
-			blink-caret 0.75s step-end infinite;
-	}
-
-	.cursor {
-		position: absolute;
-		right: -2px;
-		top: 0;
-		height: 100%;
-		width: 2px;
-		background-color: var(--color-primary);
-		animation: blink-cursor 0.75s step-end infinite;
-	}
-
-	@keyframes typing {
-		from {
-			width: 0;
-			opacity: 1;
-		}
-		to {
-			width: 100%;
-			opacity: 1;
-		}
-	}
-
-	@keyframes blink-cursor {
-		from,
-		to {
-			background-color: transparent;
-		}
-		50% {
-			background-color: var(--color-primary);
-		}
-	}
-
-	.fade-in {
-		opacity: 0;
-		transform: translateY(20px);
-		transition:
-			opacity 0.8s ease,
-			transform 0.8s ease;
-	}
-
-	.featured-card {
-		border-top: 3px solid var(--color-primary) !important;
-	}
-
-	.popular-badge {
-		z-index: 1;
 	}
 </style>
