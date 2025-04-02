@@ -708,6 +708,9 @@
 
 		// Always update cursor position
 		updateCursorPosition();
+
+		// Add this at the end of the function
+		updateLineNumbers();
 	}
 
 	// Update the updateCursorPosition function to be more accurate
@@ -791,6 +794,9 @@
 					setTimeout(() => {
 						navbarReady = true;
 					}, 400); // Delay navbar animation to happen after document picker
+
+					// Add this line to update line numbers when document loads
+					updateLineNumbers();
 				} else {
 					error = true;
 				}
@@ -811,7 +817,7 @@
 		};
 	});
 
-	// Add a function to handle input events in the editor
+	// Update the handleInput function to properly handle pasted content
 	function handleInput(event: Event) {
 		// If in NORMAL mode, prevent typing by reverting the content
 		if (editorMode === 'NORMAL') {
@@ -830,8 +836,31 @@
 		} else {
 			// In INSERT mode, update the content and line numbers
 			editorContent = editorElement.value;
-			lines = editorContent.split('\n');
+			updateLineNumbers();
 			adjustTextareaHeight();
+		}
+	}
+
+	// Improved updateLineNumbers function
+	function updateLineNumbers() {
+		// Split content by newlines to get lines
+		lines = editorContent.split('\n');
+		
+		// Ensure we have at least one line
+		if (lines.length === 0) {
+			lines = [''];
+		}
+		
+		// Update active line index based on cursor position
+		if (editorElement) {
+			const cursorPos = editorElement.selectionStart;
+			const textBeforeCursor = editorContent.substring(0, cursorPos);
+			activeLineIndex = (textBeforeCursor.match(/\n/g) || []).length;
+			
+			// Update cursor line and column for status bar
+			cursorLine = activeLineIndex + 1;
+			const lastNewlinePos = textBeforeCursor.lastIndexOf('\n');
+			cursorColumn = lastNewlinePos === -1 ? cursorPos + 1 : cursorPos - lastNewlinePos;
 		}
 	}
 
@@ -916,6 +945,17 @@
 			editorElement.focus();
 		}
 	}
+
+	// Add this to your script section
+	function handlePaste(event: ClipboardEvent) {
+		// Let the paste happen normally
+		setTimeout(() => {
+			// After paste completes, update the line numbers
+			editorContent = editorElement.value;
+			updateLineNumbers();
+			adjustTextareaHeight();
+		}, 0);
+	}
 </script>
 
 <svelte:head>
@@ -988,7 +1028,7 @@
 			>
 				<div class="editor-content">
 					<div class="line-numbers">
-						{#each lines as line, i}
+						{#each Array(lines.length) as _, i}
 							<div class="line-number {i === activeLineIndex ? 'active' : ''}">{i + 1}</div>
 						{/each}
 					</div>
@@ -997,6 +1037,7 @@
 						bind:value={editorContent}
 						on:keydown={handleKeyDown}
 						on:input={handleInput}
+						on:paste={handlePaste}
 						class="editor-textarea"
 						spellcheck="false"
 						autocomplete="off"
