@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS documents CASCADE;
 DROP TABLE IF EXISTS project_permissions CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS user_profile_images;
 
 -- Create users table
 CREATE TABLE users (
@@ -89,6 +90,13 @@ CREATE TABLE user_keybindings (
     keybinding VARCHAR(50) NOT NULL,
     PRIMARY KEY (user_id, command_id),
     FOREIGN KEY (command_id) REFERENCES commands(command_id)
+);
+
+-- Create table for user profile images
+CREATE TABLE user_profile_images (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    image_data BYTEA NOT NULL,
+    content_type VARCHAR(255) NOT NULL DEFAULT 'image/jpeg'
 );
 
 -- Insert default users

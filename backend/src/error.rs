@@ -17,6 +17,8 @@ pub enum Error {
     UserCreationError,
     LoginFailError,
     UserIdUpdateError,
+    ProfilePicError,
+    ProfilePicSizeError,
 
     // Document Errors
     DocumentNotFoundError,
@@ -41,6 +43,7 @@ pub enum Error {
     // Keybinding Errors
     DeleteKeybindingError,
     AddUpdateKeybindingError
+
 }
 
 impl IntoResponse for Error {
@@ -105,6 +108,12 @@ impl IntoResponse for Error {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response()   
             }
             Self::AddUpdateKeybindingError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response() 
+            }
+            Self::ProfilePicError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response() 
+            }
+            Self::ProfilePicSizeError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response() 
             }
         }

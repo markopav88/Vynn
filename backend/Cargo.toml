@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = {version = "0.6", features = ["macros"] }
+axum = { version = "0.6", features = ["macros", "multipart"] }
 tokio = { version = "1.0", features = ["full"] }
 sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-rustls", "macros", "time", "chrono"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -19,6 +19,8 @@ anyhow = "1"
 httpc-test = "0.1.1"
 http = "0.2"
 argon2 = "0.5.0"
+futures-util = "0.3"
+multipart = "0.18.0"
 
 [dev-dependencies]
 anyhow = "1"
