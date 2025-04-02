@@ -34,6 +34,8 @@ export class Document {
 	content: string;
 	created_at: string;
 	updated_at: string;
+	is_starred: boolean;
+	is_trashed: boolean;
 	project_id?: number;
 
 	constructor(
@@ -42,6 +44,8 @@ export class Document {
 		new_content: string,
 		new_created_at: string,
 		new_updated_at: string,
+		new_is_starred: boolean = false,
+		new_is_trashed: boolean = false,
 		new_project_id?: number
 	) {
 		this.id = new_id;
@@ -49,6 +53,8 @@ export class Document {
 		this.content = new_content;
 		this.created_at = new_created_at;
 		this.updated_at = new_updated_at;
+		this.is_starred = new_is_starred;
+		this.is_trashed = new_is_trashed;
 		this.project_id = new_project_id;
 	}
 }
@@ -511,6 +517,109 @@ export async function get_project_from_document(
 		return data;
 	} catch (error) {
 		console.error('Error fetching project from document:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to toggle 'starred' status of a document
+ */
+export async function toggle_star_document(document: Document): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${document.id}/star`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error toggling star status:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to move a document to trash
+ */
+export async function trash_document(document: Document): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${document.id}/trash`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error trashing document:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to restore a document from trash
+ */
+export async function restore_document(document: Document): Promise<boolean> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/${document.id}/restore`;
+		
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			credentials: 'include'
+		});
+		
+		return response.ok;
+	} catch (error) {
+		console.error('Error restoring document:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to get all starred documents
+ */
+export async function get_starred_documents(): Promise<Document[] | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/starred`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch starred documents:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching starred documents:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to get all trashed documents
+ */
+export async function get_trashed_documents(): Promise<Document[] | null> {
+	try {
+		const apiUrl = `http://localhost:3001/api/document/trash`;
+		
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+		
+		if (!response.ok) {
+			console.error('Failed to fetch trashed documents:', response.status);
+			return null;
+		}
+		
+		return await response.json();
+	} catch (error) {
+		console.error('Error fetching trashed documents:', error);
 		return null;
 	}
 }

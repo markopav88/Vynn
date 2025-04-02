@@ -24,8 +24,11 @@ CREATE TABLE users (
 CREATE TABLE projects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) DEFAULT 'Untitled Project' NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_starred BOOLEAN DEFAULT FALSE,
+    is_trashed BOOLEAN DEFAULT FALSE,
     user_id INT REFERENCES users(id) ON DELETE CASCADE
-
 );
 
 -- Create documents table
@@ -35,6 +38,8 @@ CREATE TABLE documents (
     content TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_starred BOOLEAN DEFAULT FALSE,
+    is_trashed BOOLEAN DEFAULT FALSE,
     user_id INT REFERENCES users(id) ON DELETE CASCADE
 );
 
