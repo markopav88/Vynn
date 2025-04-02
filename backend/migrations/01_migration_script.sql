@@ -93,7 +93,7 @@ CREATE TABLE user_keybindings (
 
 -- Insert default users
 INSERT INTO users(name,email,password) 
-VALUES('Christian','CFdefence@gmail.com','MyPassword')
+VALUES('Christian','CFdefence@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$kNRxgrDUnkl79WdlNuLXOw$v+gZeEyNvLQNvw2Q3l6T7HQOerrVSbRfOnp/Cx1xadk')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO users(name,email,password) 

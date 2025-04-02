@@ -1,11 +1,13 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents } from "$lib/ts/document";
+    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, type Document } from "$lib/ts/document";
     import { get_all_projects, create_project, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects } from "$lib/ts/drive";
     import { add_document_to_project, get_project_documents } from "$lib/ts/project";
-    import Navbar from '$lib/components/Navbar.svelte';
-    import type { Document } from '$lib/ts/document';
     import type { Project } from '$lib/ts/drive';
+
+    import Navbar from '$lib/components/Navbar.svelte';
+
+    import '$lib/assets/style/drive.css';
     
     let isLoggedIn = true;
     let documents: Document[] = [];
@@ -448,8 +450,12 @@
                                 <!-- Projects First -->
                                 {#each filteredProjects as project}
                                     <div class="col">
-                                        <div class="card bg-dark border-0 h-100 item-card project-card position-relative" 
+                                        <div 
+                                            class="card bg-dark border-0 h-100 project-card" 
+                                            role="button"
+                                            tabindex="0"
                                             on:click={() => handleProjectClick(project)}
+                                            on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}
                                             on:dragover={(e) => handleDragOver(e, project)}
                                             on:dragleave={handleDragLeave}
                                             on:drop={(e) => handleDrop(e, project)}>
@@ -467,14 +473,22 @@
                                             <!-- Action icons for projects -->
                                             <div class="card-actions">
                                                 {#if activeCategory === 'trash'}
-                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore">
+                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore" aria-label="Restore project from trash">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 {:else}
-                                                    <button class="action-icon star-icon" on:click={(e) => handleToggleStarProject(e, project)} title="Star">
+                                                    <button 
+                                                        class="action-icon star-icon" 
+                                                        on:click={(e) => handleToggleStarProject(e, project)} 
+                                                        aria-label={project.is_starred ? "Unstar project" : "Star project"}
+                                                    >
                                                         <i class="bi {project.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
                                                     </button>
-                                                    <button class="action-icon trash-icon" on:click={(e) => handleTrashProject(e, project)} title="Trash">
+                                                    <button 
+                                                        class="action-icon trash-icon" 
+                                                        on:click={(e) => handleTrashProject(e, project)} 
+                                                        aria-label="Move project to trash"
+                                                    >
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 {/if}
@@ -486,8 +500,12 @@
                                 <!-- Documents After Projects -->
                                 {#each filteredDocuments as document}
                                     <div class="col">
-                                        <div class="card bg-dark border-0 h-100 item-card document-card position-relative" 
+                                        <div 
+                                            class="card bg-dark border-0 h-100 document-card" 
+                                            role="button"
+                                            tabindex="0"
                                             on:click={() => handleDocumentClick(document)}
+                                            on:keydown={(e) => e.key === 'Enter' && handleDocumentClick(document)}
                                             draggable={!document.is_trashed}
                                             on:dragstart={(e) => handleDragStart(e, document)}>
                                             <div class="card-body p-3">
@@ -504,14 +522,14 @@
                                             <!-- Action icons for documents -->
                                             <div class="card-actions">
                                                 {#if activeCategory === 'trash'}
-                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreDocument(e, document)} title="Restore">
+                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreDocument(e, document)} title="Restore" aria-label="Restore document from trash">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 {:else}
-                                                    <button class="action-icon star-icon" on:click={(e) => handleToggleStarDocument(e, document)} title="Star">
+                                                    <button class="action-icon star-icon" on:click={(e) => handleToggleStarDocument(e, document)} title="Star" aria-label="Star document">
                                                         <i class="bi {document.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
                                                     </button>
-                                                    <button class="action-icon trash-icon" on:click={(e) => handleTrashDocument(e, document)} title="Trash">
+                                                    <button class="action-icon trash-icon" on:click={(e) => handleTrashDocument(e, document)} title="Trash" aria-label="Move document to trash">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 {/if}
@@ -652,119 +670,3 @@
 </div>
 <div class="modal-backdrop fade show"></div>
 {/if}
-
-<style>
-    /* Custom styles for the drive page */
-    .nav-link {
-        border-radius: 5px;
-        margin-bottom: 5px;
-        transition: all 0.2s;
-    }
-    
-    .nav-link:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-    
-    .nav-link.active {
-        font-weight: 500;
-        color: var(--color-primary) !important;
-    }
-    
-    .item-card {
-        transition: all 0.2s;
-        cursor: pointer;
-        background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .item-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-    }
-    
-    .project-card:hover {
-        border-left: 3px solid var(--color-primary);
-    }
-    
-    .document-card:hover {
-        border-left: 3px solid #6c757d;
-    }
-    
-    /* Green glow for project cards */
-    .project-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        border-radius: 8px;
-        padding: 1px;
-        background: linear-gradient(145deg, rgba(16, 185, 129, 0.2), transparent);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
-    }
-    
-    /* Card actions styles */
-    .card-actions {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        display: flex;
-        gap: 8px;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-    }
-    
-    .item-card:hover .card-actions {
-        opacity: 1;
-    }
-    
-    .action-icon {
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: rgba(0, 0, 0, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #ffffff;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    
-    .action-icon:hover {
-        transform: scale(1.1);
-    }
-    
-    .star-icon:hover {
-        color: #ffc107;
-        border-color: #ffc107;
-    }
-    
-    .trash-icon:hover {
-        color: #dc3545;
-        border-color: #dc3545;
-    }
-    
-    .restore-icon:hover {
-        color: #10B981;
-        border-color: #10B981;
-    }
-    
-    /* Green text for document titles */
-    .text-green {
-        color: #10B981 !important;
-    }
-    
-    /* Drag and drop styles */
-    .drag-over {
-        border: 2px dashed #10B981 !important;
-        background-color: rgba(16, 185, 129, 0.1) !important;
-    }
-</style> 

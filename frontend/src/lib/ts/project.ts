@@ -21,6 +21,8 @@
 /
 */
 
+import type { Document } from './document';
+
 export class Project {
 	id: number;
 	name: string;
@@ -316,10 +318,10 @@ export async function remove_project_permissions(projectId: number, userId: numb
  * Function to get all documents in a project
  * Calls: GET /api/project/:id/documents
  */
-export async function get_project_documents(projectId: number): Promise<Document[] | null> {
-	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents`;
+export async function get_project_documents(project_id: number): Promise<Document[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/documents`;
 
+	try {
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
@@ -332,7 +334,6 @@ export async function get_project_documents(projectId: number): Promise<Document
 		const data = await response.json();
 		console.log('Project documents received:', data);
 
-		// The API is returning the documents directly, not in a "documents" property
 		return data || [];
 	} catch (error) {
 		console.error('Error fetching project documents:', error);
