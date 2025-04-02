@@ -254,39 +254,29 @@
 			commandError = '';
 		}, 3000);
 	}
-
-	// Function to handle command execution
-	function executeCommand(event: KeyboardEvent) {
+	// Function to handle command execution when in command mode
+	function handleCommandExecution(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
 			// Exit command mode on Escape
-			exitCommandMode();
 			event.preventDefault();
+			exitCommandMode();
 			return;
 		}
 
 		if (event.key === 'Enter') {
-			// Execute the command on Enter
-			let success = true;
-
-			if (commandPrefix === ':') {
-				// Handle command execution
-				success = handleColonCommand(commandInput);
-			} else if (commandPrefix === '/' || commandPrefix === '?') {
-				// Handle search navigation
-				if (searchResults.length > 0) {
-					navigateToSearchResult();
-				} else {
-					success = false;
-				}
-			}
-
-			// Exit command mode after executing only if successful
-			if (success) {
-				exitCommandMode();
-			}
-
 			event.preventDefault();
-			return;
+			
+			if (commandPrefix === '/') {
+				// Forward search from cursor
+				searchDocument(commandInput, false);
+			} else if (commandPrefix === '?') {
+				// Backward search from cursor
+				searchDocument(commandInput, true);
+			}
+			// Handle other commands...
+			
+			// Exit command mode
+			exitCommandMode();
 		}
 
 		// Handle search navigation with n/N keys
@@ -851,6 +841,81 @@
 			if (autoSaveCleanup) autoSaveCleanup();
 		}
 	});
+
+	// Update the search function to search from cursor position
+	function searchDocument(searchTerm: string, backwards = false) {
+		if (!searchTerm) return;
+		
+		// Clear previous search results
+		searchResults = [];
+		currentSearchIndex = -1;
+		
+		// Get current cursor position in the document
+		const cursorPosition = getCursorPosition();
+		
+		// Find all occurrences of the search term
+		let index = -1;
+		const term = searchTerm.toLowerCase();
+		const content = editorContent.toLowerCase();
+		
+		while ((index = content.indexOf(term, index + 1)) !== -1) {
+			searchResults.push(index);
+		}
+		
+		if (searchResults.length === 0) {
+			showCommandError(`No matches found for '${searchTerm}'`);
+			return;
+		}
+		
+		// Find the next/previous match relative to cursor position
+		if (backwards) {
+			// Find the closest result that comes before the cursor
+			currentSearchIndex = searchResults.findIndex(pos => pos >= cursorPosition) - 1;
+			if (currentSearchIndex < 0) currentSearchIndex = searchResults.length - 1; // Wrap around
+		} else {
+			// Find the closest result that comes after the cursor
+			currentSearchIndex = searchResults.findIndex(pos => pos >= cursorPosition);
+			if (currentSearchIndex === -1) currentSearchIndex = 0; // Wrap around
+		}
+		
+		// Navigate to the found position
+		navigateToSearchResult();
+	}
+
+	// Update the executeCommand function to handle both / and ? commands
+	function executeCommand(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			
+			if (commandPrefix === '/') {
+				// Forward search from cursor
+				searchDocument(commandInput, false);
+			} else if (commandPrefix === '?') {
+				// Backward search from cursor
+				searchDocument(commandInput, true);
+			}
+			// Handle other commands...
+			
+			// Exit command mode
+			setEditorMode('NORMAL');
+		}
+	}
+
+	// Add this function to get the current cursor position
+	function getCursorPosition(): number {
+		if (!editorElement) return 0;
+		return editorElement.selectionStart;
+	}
+
+	// Add this function to set the editor mode
+	function setEditorMode(mode: string) {
+		editorMode = mode;
+		
+		// If switching to NORMAL mode, ensure editor has focus
+		if (mode === 'NORMAL' && editorElement) {
+			editorElement.focus();
+		}
+	}
 </script>
 
 <svelte:head>
