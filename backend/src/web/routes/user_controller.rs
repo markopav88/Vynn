@@ -23,6 +23,10 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower_cookies::cookie::time::Duration;
 use tower_cookies::{Cookie, Cookies};
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2
+};
 
 use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
@@ -83,15 +87,20 @@ pub async fn api_create_user(
         return Err(Error::EmailAlreadyExistsError);
     }
 
-    // Email is available, proceed with user creation
+    // Hash the password
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)
+        .map_err(|_| Error::UserCreationError)?
+        .to_string();
 
-    // First insert the user
+    // Insert the user with hashed password
     let result = sqlx::query_as!(
         User,
         "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email",
         payload.name,
         payload.email,
-        payload.password
+        password_hash
     )
     .fetch_one(&pool)
     .await;
@@ -162,7 +171,7 @@ pub async fn api_login(
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
 
-    // Grab email and password from database and compare it to the payload
+    // Get user from database
     let result = sqlx::query!(
         "SELECT id, email, password
          FROM users
@@ -174,8 +183,16 @@ pub async fn api_login(
 
     match result {
         Ok(record) => {
-            if payload.email == record.email && payload.password == record.password {
-                // Get environment variables with fallbacks for development
+            // Verify password
+            let parsed_hash = PasswordHash::new(&record.password)
+                .map_err(|_| Error::LoginFailError)?;
+            
+            let password_verified = Argon2::default()
+                .verify_password(payload.password.as_bytes(), &parsed_hash)
+                .is_ok();
+
+            if password_verified {
+                // Create token and set cookie as before
                 let domain = option_env!("DOMAIN").unwrap_or("localhost");
                 let app_env = option_env!("APP_ENV").unwrap_or("development");
                 let on_production = app_env == "production";

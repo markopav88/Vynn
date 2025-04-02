@@ -18,6 +18,7 @@ chrono = { version = "0.4.31", features = ["serde"] }
 anyhow = "1"
 httpc-test = "0.1.1"
 http = "0.2"
+argon2 = "0.5.0"
 
 [dev-dependencies]
 anyhow = "1"
