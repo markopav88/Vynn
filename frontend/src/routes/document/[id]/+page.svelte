@@ -4,11 +4,13 @@
 	import { page } from '$app/stores';
 
 	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
+	import { logout } from '$lib/ts/user'
 	import { get_project_documents } from '$lib/ts/project';
 	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
 
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
+	import profileDefault from '$lib/assets/profile-image.png';
 
 	import '$lib/assets/style/document.css'
 
@@ -26,8 +28,8 @@
 	// Editor state
 	let editorContent = '';
 	let editorMode = 'NORMAL';
-	let cursorLine = 1;
-	let cursorColumn = 1;
+	let cursorLine = 1; // for indicator in bottom right
+	let cursorColumn = 1; // for indicator in bottom right
 	let editorElement: HTMLTextAreaElement;
 
 	// Add this for line numbers
@@ -42,15 +44,10 @@
 	let previousActiveLineIndex = 0;
 	let animationHeight = 0; // Store the height for consistent animation
 
-	// Add a constant for line height and minimum lines
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
-	const MIN_LINES = 30;
-
-	// Add a variable to track when the document is ready to display
-	let documentReady = false;
-
-	// Add a variable to track when project documents are loaded
-	let projectDocumentsLoaded = false;
+	const MIN_LINES = 30; // minimum lines to display
+	let documentReady = false;	// to track when the document is ready to display
+	let projectDocumentsLoaded = false; // to track when project documents are loaded
 
 	// Add a variable to track when navbar should fade in
 	let navbarReady = false;
@@ -253,44 +250,6 @@
 		commandErrorTimeout = setTimeout(() => {
 			commandError = '';
 		}, 3000);
-	}
-	// Function to handle command execution when in command mode
-	function handleCommandExecution(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
-			// Exit command mode on Escape
-			event.preventDefault();
-			exitCommandMode();
-			return;
-		}
-
-		if (event.key === 'Enter') {
-			event.preventDefault();
-			
-			if (commandPrefix === '/') {
-				// Forward search from cursor
-				searchDocument(commandInput, false);
-			} else if (commandPrefix === '?') {
-				// Backward search from cursor
-				searchDocument(commandInput, true);
-			}
-			// Handle other commands...
-			
-			// Exit command mode
-			exitCommandMode();
-		}
-
-		// Handle search navigation with n/N keys
-		if (
-			(commandPrefix === '/' || commandPrefix === '?') &&
-			(event.key === 'n' || event.key === 'N') &&
-			searchResults.length > 0
-		) {
-			const forward = (event.key === 'n' && commandPrefix === '/') || (event.key === 'N' && commandPrefix === '?');
-
-			navigateSearchResults(forward);
-			event.preventDefault();
-			return;
-		}
 	}
 
 	// Function to perform search based on command input
@@ -956,6 +915,28 @@
 			adjustTextareaHeight();
 		}, 0);
 	}
+
+	// Add handler for account page navigation
+    function goToAccount() {
+        window.location.href = '/account';
+    }
+
+	async function handleLogout() {
+        try {
+            console.log("Attempting to logout...");
+            const success = await logout();
+            
+            if (success) {
+                console.log("Logout successful, redirecting to homepage");
+                window.location.href = '/';
+            } else {
+                console.error("Logout failed");
+                alert("Failed to logout. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error during logout:", error);
+        }
+    }
 </script>
 
 <svelte:head>
@@ -975,9 +956,35 @@
 				</div>
 			</a>
 			<div class="spacer"></div>
-			<a href="/profile" class="profile-link" aria-label="Go to Profile">
-				<div class="profile-image"></div>
-			</a>
+			<div class="dropdown">
+				<button 
+					class="btn p-0 border-0 bg-transparent" 
+					data-bs-toggle="dropdown"
+					aria-expanded="false"
+					aria-haspopup="true"
+					aria-label="Profile menu"
+				>
+					<img 
+						src={profileDefault} 
+						alt="Profile" 
+						class="rounded-circle profile-img"
+						style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px;"
+					/>
+				</button>
+				<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+					<li>
+						<button class="dropdown-item" on:click={goToAccount}>
+							<i class="bi bi-person me-2"></i> My Account
+						</button>
+					</li>
+					<li><hr class="dropdown-divider"></li>
+					<li>
+						<button class="dropdown-item text-danger" on:click={handleLogout}>
+							<i class="bi bi-box-arrow-right me-2"></i> Sign Out
+						</button>
+					</li>
+				</ul>
+			</div>
 		</nav>
 	</div>
 
