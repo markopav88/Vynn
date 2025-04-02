@@ -18,22 +18,14 @@
 - Build: Account Functionality and Vim Functions
 - Deploy: **stable version & finalize documentation**
 
-## Phase 4: Customizable Binding and Additional Fun Features
+## Phase 4: Customizable Binding and Additional Fun Features DUE 4/15
 
 - Build: Customizable Binding UI
 - Deploy: Other Fun Features
 - Implement: Addition Project Requirements
 
-## Phase 5: AI Integration
+## Phase 5: AI Integration DUE 5/1
 
 - Integrate: **AI-assisted editing & auto-complete**
 - Fine-tune: **AI responses**
 - Implement: **real-time collaborative AI features**
-
-### **TODO**
-- **Flesh out the rest of the APIS**
-- **Implement Middleware for authentication/other checks/setting cookies in APIS**
-- **Expand Editor Functions**
-- **Flesh out frontend**
-- **AI Integration**
-- **Deploy**
