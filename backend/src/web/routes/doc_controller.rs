@@ -52,25 +52,27 @@ pub async fn api_get_document(
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
 
     if has_permission {
-    let result = sqlx::query_as!(
-        Document,
+        let result = sqlx::query_as!(
+            Document,
             r#"SELECT 
                 id, 
                 name, 
                 content, 
                 created_at, 
                 updated_at, 
-                user_id 
+                user_id,
+                is_starred,
+                is_trashed
             FROM documents WHERE id = $1"#,
-        document_id
-    )
-    .fetch_one(&pool)
-    .await;
+            document_id
+        )
+        .fetch_one(&pool)
+        .await;
 
-    match result {
-        Ok(document) => Ok(Json(document)),
-        Err(_) => Err(Error::UserNotFoundError),
-    }
+        match result {
+            Ok(document) => Ok(Json(document)),
+            Err(_) => Err(Error::UserNotFoundError),
+        }
     } else {
         Err(Error::PermissionError)
     }
@@ -92,7 +94,7 @@ pub async fn api_get_all_documents(
     // Get all documents where the user has any permission
     let result = sqlx::query_as!(
         Document,
-        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id
+        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id, is_starred, is_trashed
            FROM documents d
            JOIN document_permissions dp ON d.id = dp.document_id
            WHERE dp.user_id = $1"#,
@@ -115,7 +117,7 @@ pub async fn api_create_document(
     Json(payload): Json<CreateDocumentPayload>,
 ) -> Result<Json<Document>> {
     println!("->> {:<12} - create_document", "HANDLER");
-    
+
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
@@ -158,7 +160,9 @@ pub async fn api_create_document(
                     content,
                     created_at,
                     updated_at,
-                    user_id 
+                    user_id,
+                    is_starred,
+                    is_trashed
                 FROM documents WHERE id = $1"#,
                 record.id
             )
