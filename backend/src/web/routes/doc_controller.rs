@@ -529,6 +529,202 @@ pub async fn api_remove_permissions(
     }
 }
 
+/// PUT handler for starring a document.
+/// Accessible via: PUT /api/document/:id/star
+pub async fn api_toggle_star_document(
+    cookies: Cookies,
+    Path(document_id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_toggle_star_document", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has at least editor permission
+    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Get current star status
+    let document = sqlx::query!(
+        r#"
+        SELECT is_starred
+        FROM documents 
+        WHERE id = $1
+        "#,
+        document_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DocumentNotFoundError)?;
+
+    // Toggle the star status
+    let new_status = !document.is_starred.unwrap_or(false);
+
+    // Update the document
+    let _ = sqlx::query!(
+        r#"
+        UPDATE documents 
+        SET is_starred = $1
+        WHERE id = $2;
+        "#,
+        new_status,
+        document_id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "Document star status updated",
+            "is_starred": new_status
+        }
+    })))
+}
+
+/// PUT handler for moving a document to trash.
+/// Accessible via: PUT /api/document/:id/trash
+pub async fn api_trash_document(
+    cookies: Cookies,
+    Path(document_id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_trash_document", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has at least editor permission
+    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Update the document
+    let _ = sqlx::query!(
+        r#"
+        UPDATE documents 
+        SET is_trashed = true
+        WHERE id = $1;
+        "#,
+        document_id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "Document moved to trash"
+        }
+    })))
+}
+
+/// PUT handler for restoring a document from trash.
+/// Accessible via: PUT /api/document/:id/restore
+pub async fn api_restore_document(
+    cookies: Cookies,
+    Path(document_id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_restore_document", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has at least editor permission
+    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Update the document
+    let _ = sqlx::query!(
+        r#"
+        UPDATE documents 
+        SET is_trashed = false
+        WHERE id = $1;
+        "#,
+        document_id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "Document restored from trash"
+        }
+    })))
+}
+
+/// GET handler for retrieving all starred documents for a user.
+/// Accessible via: GET /api/document/starred
+pub async fn api_get_starred_documents(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Document>>> {
+    println!("->> {:<12} - api_get_starred_documents", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all starred documents for this user
+    let documents = sqlx::query_as!(
+        Document,
+        r#"
+        SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id, d.is_starred, d.is_trashed
+        FROM documents d
+        JOIN document_permissions dp ON d.id = dp.document_id
+        WHERE dp.user_id = $1 AND d.is_starred = true AND d.is_trashed = false
+        "#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(documents))
+}
+
+/// GET handler for retrieving all trashed documents for a user.
+/// Accessible via: GET /api/document/trash
+pub async fn api_get_trashed_documents(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Document>>> {
+    println!("->> {:<12} - api_get_trashed_documents", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all trashed documents for this user
+    let documents = sqlx::query_as!(
+        Document,
+        r#"
+        SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id, d.is_starred, d.is_trashed
+        FROM documents d
+        JOIN document_permissions dp ON d.id = dp.document_id
+        WHERE dp.user_id = $1 AND d.is_trashed = true
+        "#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(documents))
+}
+
 pub fn doc_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_documents))
@@ -541,4 +737,9 @@ pub fn doc_routes() -> Router {
         .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", put(api_update_permission))
         .route("/:id/permissions/:user_id", delete(api_remove_permissions))
+        .route("/:id/star", put(api_toggle_star_document))
+        .route("/:id/trash", put(api_trash_document))
+        .route("/:id/restore", put(api_restore_document))
+        .route("/starred", get(api_get_starred_documents))
+        .route("/trash", get(api_get_trashed_documents))
 }

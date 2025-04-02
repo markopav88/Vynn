@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { get_all_documents, create_document } from "$lib/ts/document";
-    import { get_all_projects, create_project } from "$lib/ts/drive";
+    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents } from "$lib/ts/document";
+    import { get_all_projects, create_project, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects } from "$lib/ts/drive";
+    import { add_document_to_project, get_project_documents } from "$lib/ts/project";
     import Navbar from '$lib/components/Navbar.svelte';
     import type { Document } from '$lib/ts/document';
     import type { Project } from '$lib/ts/drive';
@@ -9,6 +10,10 @@
     let isLoggedIn = true;
     let documents: Document[] = [];
     let projects: Project[] = [];
+    let starredDocuments: Document[] = [];
+    let starredProjects: Project[] = [];
+    let trashedDocuments: Document[] = [];
+    let trashedProjects: Project[] = [];
     let isLoading = true;
     let activeCategory = 'all';
     let showNewProjectModal = false;
@@ -17,23 +22,30 @@
     let newProjectName = '';
     let newDocumentName = '';
     let newDocumentContent = '';
+    let newDocumentProjectId: string | null = null;
     let currentProject: Project | null = null;
     let projectDocuments: Document[] = [];
     let projectDocLoading = false;
-    let newDocumentProjectId: string | null = null;
-    let filteredDocuments: Document[] = [];
-    let filteredProjects: Project[] = [];
+    let draggedDocument: Document | null = null;
     
     onMount(async () => {
         try {
-            // Fetch documents and projects in parallel
-            const [docsResult, projectsResult] = await Promise.all([
+            // Fetch all data in parallel
+            const [docsResult, projectsResult, starredDocsResult, starredProjsResult, trashedDocsResult, trashedProjsResult] = await Promise.all([
                 get_all_documents(),
-                get_all_projects()
+                get_all_projects(),
+                get_starred_documents(),
+                get_starred_projects(),
+                get_trashed_documents(),
+                get_trashed_projects()
             ]);
             
             documents = docsResult || [];
             projects = projectsResult || [];
+            starredDocuments = starredDocsResult || [];
+            starredProjects = starredProjsResult || [];
+            trashedDocuments = trashedDocsResult || [];
+            trashedProjects = trashedProjsResult || [];
             
             console.log("Documents loaded:", documents);
             console.log("Projects loaded:", projects);
@@ -46,52 +58,6 @@
     
     function setActiveCategory(category: string) {
         activeCategory = category;
-        
-        // Apply appropriate filters based on the category
-        switch(category) {
-            case 'all':
-                filteredDocuments = documents;
-                filteredProjects = projects;
-                break;
-            case 'recent':
-                // Sort documents and projects by updated_at date
-                filteredDocuments = [...documents].sort((a, b) => 
-                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-                ).slice(0, 10); // Get 10 most recent
-                
-                filteredProjects = [...projects].sort((a, b) => 
-                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-                ).slice(0, 10); // Get 10 most recent
-                break;
-            case 'shared':
-                // This would require backend changes to track shared status
-                // For now, just show empty lists
-                filteredDocuments = [];
-                filteredProjects = [];
-                break;
-            case 'starred':
-                // This would require backend changes to track starred status
-                // For now, just show empty lists
-                filteredDocuments = [];
-                filteredProjects = [];
-                break;
-            case 'trash':
-                // This would require backend changes to track deleted items
-                // For now, just show empty lists
-                filteredDocuments = [];
-                filteredProjects = [];
-                break;
-            default:
-                filteredDocuments = documents;
-                filteredProjects = projects;
-        }
-    }
-    
-    // Initialize filteredDocuments and filteredProjects when documents and projects are loaded
-    $: {
-        if (documents.length > 0 || projects.length > 0) {
-            setActiveCategory(activeCategory);
-        }
     }
     
     // Handle new project creation
@@ -135,10 +101,7 @@
             if (document) {
                 // If we have a project ID, associate the document with the project
                 if (newDocumentProjectId) {
-                    await fetch(`http://localhost:3001/api/project/${newDocumentProjectId}/documents/${document.id}`, {
-                        method: 'POST',
-                        credentials: 'include'
-                    });
+                    await add_document_to_project(parseInt(newDocumentProjectId), document.id);
                 }
                 
                 // Refresh the documents list
@@ -170,12 +133,10 @@
         
         try {
             // Fetch documents for this project
-            const response = await fetch(`http://localhost:3001/api/project/${project.id}/documents`, {
-                credentials: 'include'
-            });
+            const projectDocs = await get_project_documents(parseInt(project.id));
             
-            if (response.ok) {
-                projectDocuments = await response.json();
+            if (projectDocs) {
+                projectDocuments = projectDocs;
             } else {
                 console.error('Failed to fetch project documents');
                 projectDocuments = [];
@@ -190,8 +151,10 @@
     
     // Handle document click
     function handleDocumentClick(document: Document) {
-        // Navigate to document editor
-        window.location.href = `/document/${document.id}`;
+        if (!document.is_trashed) {
+            // Navigate to document editor
+            window.location.href = `/document/${document.id}`;
+        }
     }
     
     // Create new document within a project
@@ -207,6 +170,174 @@
         newDocumentProjectId = currentProject.id;
         showNewDocumentModal = true;
     }
+    
+    // Toggle star status for a document
+    async function handleToggleStarDocument(event: Event, document: Document) {
+        event.stopPropagation(); // Prevent document click
+        
+        const success = await toggle_star_document(document);
+        if (success) {
+            // Toggle the starred status locally
+            document.is_starred = !document.is_starred;
+            
+            // Update the starred documents list
+            if (document.is_starred) {
+                starredDocuments = [...starredDocuments, document];
+            } else {
+                starredDocuments = starredDocuments.filter(d => d.id !== document.id);
+            }
+        }
+    }
+    
+    // Toggle star status for a project
+    async function handleToggleStarProject(event: Event, project: Project) {
+        event.stopPropagation(); // Prevent project click
+        
+        const success = await toggle_star_project(parseInt(project.id));
+        if (success) {
+            // Toggle the starred status locally
+            project.is_starred = !project.is_starred;
+            
+            // Update the starred projects list
+            if (project.is_starred) {
+                starredProjects = [...starredProjects, project];
+            } else {
+                starredProjects = starredProjects.filter(p => p.id !== project.id);
+            }
+        }
+    }
+    
+    // Move document to trash
+    async function handleTrashDocument(event: Event, document: Document) {
+        event.stopPropagation(); // Prevent document click
+        
+        const success = await trash_document(document);
+        if (success) {
+            // Update the document's trashed status locally
+            document.is_trashed = true;
+            
+            // Update the trashed documents list
+            trashedDocuments = [...trashedDocuments, document];
+            
+            // Remove from starred documents if it was starred
+            if (document.is_starred) {
+                starredDocuments = starredDocuments.filter(d => d.id !== document.id);
+            }
+        }
+    }
+    
+    // Move project to trash
+    async function handleTrashProject(event: Event, project: Project) {
+        event.stopPropagation(); // Prevent project click
+        
+        const success = await trash_project(parseInt(project.id));
+        if (success) {
+            // Update the project's trashed status locally
+            project.is_trashed = true;
+            
+            // Update the trashed projects list
+            trashedProjects = [...trashedProjects, project];
+            
+            // Remove from starred projects if it was starred
+            if (project.is_starred) {
+                starredProjects = starredProjects.filter(p => p.id !== project.id);
+            }
+        }
+    }
+    
+    // Restore document from trash
+    async function handleRestoreDocument(event: Event, document: Document) {
+        event.stopPropagation(); // Prevent document click
+        
+        const success = await restore_document(document);
+        if (success) {
+            // Update the document's trashed status locally
+            document.is_trashed = false;
+            
+            // Remove from trashed documents list
+            trashedDocuments = trashedDocuments.filter(d => d.id !== document.id);
+        }
+    }
+    
+    // Restore project from trash
+    async function handleRestoreProject(event: Event, project: Project) {
+        event.stopPropagation(); // Prevent project click
+        
+        const success = await restore_project(parseInt(project.id));
+        if (success) {
+            // Update the project's trashed status locally
+            project.is_trashed = false;
+            
+            // Remove from trashed projects list
+            trashedProjects = trashedProjects.filter(p => p.id !== project.id);
+        }
+    }
+    
+    // Drag and drop functionality
+    function handleDragStart(event: DragEvent, document: Document) {
+        draggedDocument = document;
+        if (event.dataTransfer) {
+            event.dataTransfer.setData('text/plain', document.id.toString());
+            event.dataTransfer.effectAllowed = 'move';
+        }
+    }
+    
+    function handleDragOver(event: DragEvent, project: Project) {
+        event.preventDefault();
+        if (event.currentTarget) {
+            (event.currentTarget as HTMLElement).classList.add('drag-over');
+        }
+    }
+    
+    function handleDragLeave(event: DragEvent) {
+        if (event.currentTarget) {
+            (event.currentTarget as HTMLElement).classList.remove('drag-over');
+        }
+    }
+    
+    async function handleDrop(event: DragEvent, project: Project) {
+        event.preventDefault();
+        if (event.currentTarget) {
+            (event.currentTarget as HTMLElement).classList.remove('drag-over');
+        }
+        
+        if (draggedDocument) {
+            // Add document to project
+            const success = await add_document_to_project(parseInt(project.id), draggedDocument.id);
+            
+            if (success) {
+                // Show success message or update UI
+                alert(`Document "${draggedDocument.name}" added to project "${project.name}"`);
+            }
+            
+            draggedDocument = null;
+        }
+    }
+    
+    // Computed properties for filtered views
+    $: filteredDocuments = activeCategory === 'all' 
+        ? documents.filter(d => !d.is_trashed)
+        : activeCategory === 'starred' 
+            ? starredDocuments.filter(d => !d.is_trashed)
+            : activeCategory === 'trash'
+                ? trashedDocuments
+                : activeCategory === 'recent'
+                    ? [...documents].filter(d => !d.is_trashed).sort((a, b) => 
+                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                    ).slice(0, 10)
+                    : [];
+    
+    $: filteredProjects = activeCategory === 'all'
+        ? projects.filter(p => !p.is_trashed)
+        : activeCategory === 'starred'
+            ? starredProjects.filter(p => !p.is_trashed)
+            : activeCategory === 'trash'
+                ? trashedProjects
+                : activeCategory === 'recent'
+                    ? [...projects].filter(p => !p.is_trashed).sort((a, b) => 
+                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                    ).slice(0, 10)
+                    : [];
 </script>
 
 <div class="bg-black min-vh-100 d-flex flex-column">
@@ -315,15 +446,13 @@
                         {:else}
                             <div class="row row-cols-1 row-cols-md-4 g-4">
                                 <!-- Projects First -->
-                                {#each projects as project}
+                                {#each filteredProjects as project}
                                     <div class="col">
-                                        <div 
-                                            class="card bg-dark border-0 h-100 project-card" 
-                                            role="button"
-                                            tabindex="0"
+                                        <div class="card bg-dark border-0 h-100 item-card project-card position-relative" 
                                             on:click={() => handleProjectClick(project)}
-                                            on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}
-                                        >
+                                            on:dragover={(e) => handleDragOver(e, project)}
+                                            on:dragleave={handleDragLeave}
+                                            on:drop={(e) => handleDrop(e, project)}>
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
@@ -334,6 +463,22 @@
                                                     Updated: {new Date(project.updated_at).toLocaleDateString()}
                                                 </p>
                                             </div>
+                                            
+                                            <!-- Action icons for projects -->
+                                            <div class="card-actions">
+                                                {#if activeCategory === 'trash'}
+                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                {:else}
+                                                    <button class="action-icon star-icon" on:click={(e) => handleToggleStarProject(e, project)} title="Star">
+                                                        <i class="bi {project.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
+                                                    </button>
+                                                    <button class="action-icon trash-icon" on:click={(e) => handleTrashProject(e, project)} title="Trash">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                {/if}
+                                            </div>
                                         </div>
                                     </div>
                                 {/each}
@@ -341,13 +486,10 @@
                                 <!-- Documents After Projects -->
                                 {#each filteredDocuments as document}
                                     <div class="col">
-                                        <div 
-                                            class="card bg-black border-0 h-100 document-card" 
-                                            role="button"
-                                            tabindex="0"
+                                        <div class="card bg-dark border-0 h-100 item-card document-card position-relative" 
                                             on:click={() => handleDocumentClick(document)}
-                                            on:keydown={(e) => e.key === 'Enter' && handleDocumentClick(document)}
-                                        >
+                                            draggable={!document.is_trashed}
+                                            on:dragstart={(e) => handleDragStart(e, document)}>
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-file-earmark-text text-green fs-4 me-2"></i>
@@ -357,6 +499,22 @@
                                                 <p class="card-text text-white-50 small">
                                                     Updated: {new Date(document.updated_at).toLocaleDateString()}
                                                 </p>
+                                            </div>
+                                            
+                                            <!-- Action icons for documents -->
+                                            <div class="card-actions">
+                                                {#if activeCategory === 'trash'}
+                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreDocument(e, document)} title="Restore">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                {:else}
+                                                    <button class="action-icon star-icon" on:click={(e) => handleToggleStarDocument(e, document)} title="Star">
+                                                        <i class="bi {document.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
+                                                    </button>
+                                                    <button class="action-icon trash-icon" on:click={(e) => handleTrashDocument(e, document)} title="Trash">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                {/if}
                                             </div>
                                         </div>
                                     </div>
@@ -512,6 +670,19 @@
         color: var(--color-primary) !important;
     }
     
+    .item-card {
+        transition: all 0.2s;
+        cursor: pointer;
+        background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .item-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
     .project-card:hover {
         border-left: 3px solid var(--color-primary);
     }
@@ -538,26 +709,62 @@
         pointer-events: none;
     }
     
-    /* Add this to your existing styles */
+    /* Card actions styles */
+    .card-actions {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 8px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    
+    .item-card:hover .card-actions {
+        opacity: 1;
+    }
+    
+    .action-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .action-icon:hover {
+        transform: scale(1.1);
+    }
+    
+    .star-icon:hover {
+        color: #ffc107;
+        border-color: #ffc107;
+    }
+    
+    .trash-icon:hover {
+        color: #dc3545;
+        border-color: #dc3545;
+    }
+    
+    .restore-icon:hover {
+        color: #10B981;
+        border-color: #10B981;
+    }
+    
+    /* Green text for document titles */
     .text-green {
         color: #10B981 !important;
     }
     
-    /* Make document cards have a green glow like project cards */
-    .document-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        border-radius: 8px;
-        padding: 1px;
-        background: linear-gradient(145deg, rgba(16, 185, 129, 0.1), transparent);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
+    /* Drag and drop styles */
+    .drag-over {
+        border: 2px dashed #10B981 !important;
+        background-color: rgba(16, 185, 129, 0.1) !important;
     }
 </style> 

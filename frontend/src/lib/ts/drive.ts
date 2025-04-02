@@ -25,6 +25,8 @@ export interface Project {
 	description?: string;
 	created_at: string;
 	updated_at: string;
+	is_starred: boolean;
+	is_trashed: boolean;
 	user_id: string;
 }
 
@@ -254,5 +256,125 @@ export async function force_delete_project(project_id: number): Promise<Boolean>
 	} catch (error) {
 		console.error('Force delete project error:', error);
 		return false;
+	}
+}
+
+/**
+ * Function to toggle 'starred' status of a project
+ */
+export async function toggle_star_project(project_id: number): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/star`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Toggle star project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Toggle star project error:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to move a project to trash
+ */
+export async function trash_project(project_id: number): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/trash`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Trash project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Trash project error:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to restore a project from trash
+ */
+export async function restore_project(project_id: number): Promise<Boolean> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/restore`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'PUT',
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			return true;
+		} else {
+			console.error('Restore project failed with status:', response.status);
+			return false;
+		}
+	} catch (error) {
+		console.error('Restore project error:', error);
+		return false;
+	}
+}
+
+/**
+ * Function to get all starred projects
+ */
+export async function get_starred_projects(): Promise<Project[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/starred`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Get starred projects failed with status:', response.status);
+			return null;
+		}
+
+		const projects = await response.json();
+		return projects;
+	} catch (error) {
+		console.error('Get starred projects error:', error);
+		return null;
+	}
+}
+
+/**
+ * Function to get all trashed projects
+ */
+export async function get_trashed_projects(): Promise<Project[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/trash`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Get trashed projects failed with status:', response.status);
+			return null;
+		}
+
+		const projects = await response.json();
+		return projects;
+	} catch (error) {
+		console.error('Get trashed projects error:', error);
+		return null;
 	}
 }

@@ -9,6 +9,8 @@ pub struct Project {
     pub user_id: Option<i32>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub is_starred: Option<bool>,
+    pub is_trashed: Option<bool>,
 }
 
 // Payload for creating a new project

@@ -55,7 +55,7 @@ async fn api_get_all_projects(
     // Get all projects where the user has any permission
     let result = sqlx::query_as!(
         Project,
-        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at
+        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at,is_trashed, is_starred
            FROM projects p
            JOIN project_permissions pp ON p.id = pp.project_id
            WHERE pp.user_id = $1"#,
@@ -93,7 +93,7 @@ async fn api_get_project(
 
     let result = sqlx::query_as!(
         Project,
-        r#"SELECT id, name, user_id, created_at, updated_at
+        r#"SELECT id, name, user_id, created_at, updated_at,is_trashed, is_starred
            FROM projects 
            WHERE id = $1"#,
         id
@@ -127,7 +127,7 @@ async fn api_create_project(
         r#"
         INSERT INTO projects (name, user_id)
         VALUES ($1, $2)
-        RETURNING id, name, user_id, created_at, updated_at
+        RETURNING id, name, user_id, created_at, updated_at,is_trashed, is_starred
         "#,
         payload._name,
         user_id
@@ -186,7 +186,7 @@ async fn api_update_project(
         UPDATE projects 
         SET name = $1, updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
-        RETURNING id, name, user_id, created_at, updated_at
+        RETURNING id, name, user_id, created_at, updated_at,is_trashed, is_starred
         "#,
         payload._name,
         id
@@ -235,7 +235,7 @@ async fn api_delete_project(
         Project,
         r#"DELETE FROM projects 
         WHERE id = $1
-        RETURNING id, name, user_id, created_at, updated_at
+        RETURNING id, name, user_id, created_at, updated_at, is_trashed, is_starred
         "#,
         id
     )
@@ -537,7 +537,7 @@ async fn api_get_documents(
     // Get all documents in the project
     let documents = sqlx::query_as!(
         Document,
-        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id
+        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id,is_trashed, is_starred
         FROM documents d
         JOIN document_projects dp ON d.id = dp.document_id
         WHERE dp.project_id = $1
@@ -671,6 +671,202 @@ async fn api_remove_document(
     }
 }
 
+/// PUT handler for starring a project.
+/// Accessible via: PUT /api/project/:id/star
+async fn api_toggle_star_project(
+    cookies: Cookies,
+    Path(id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_toggle_star_project", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has at least editor permission
+    let has_permission = check_project_permission(&pool, user_id, id, "editor").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Get current star status
+    let project = sqlx::query!(
+        r#"
+        SELECT is_starred
+        FROM projects 
+        WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::ProjectNotFoundError)?;
+
+    // Toggle the star status
+    let new_status = !project.is_starred.unwrap_or(false);
+
+    // Update the project
+    let _ = sqlx::query!(
+        r#"
+        UPDATE projects 
+        SET is_starred = $1
+        WHERE id = $2
+        "#,
+        new_status,
+        id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "Project star status updated",
+            "is_starred": new_status
+        }
+    })))
+}
+
+/// PUT handler for moving a project to trash.
+/// Accessible via: PUT /api/project/:id/trash
+async fn api_trash_project(
+    cookies: Cookies,
+    Path(id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_trash_project", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has owner permission
+    let has_permission = check_project_permission(&pool, user_id, id, "owner").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Update the project
+    let _ = sqlx::query!(
+        r#"
+        UPDATE projects 
+        SET is_trashed = true
+        WHERE id = $1
+        "#,
+        id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "Project moved to trash"
+        }
+    })))
+}
+
+/// PUT handler for restoring a project from trash.
+/// Accessible via: PUT /api/project/:id/restore
+async fn api_restore_project(
+    cookies: Cookies,
+    Path(id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_restore_project", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has owner permission
+    let has_permission = check_project_permission(&pool, user_id, id, "owner").await?;
+
+    if !has_permission {
+        return Err(Error::PermissionError);
+    }
+
+    // Update the project
+    let _ = sqlx::query!(
+        r#"
+        UPDATE projects 
+        SET is_trashed = false
+        WHERE id = $1
+        "#,
+        id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "Project restored from trash"
+        }
+    })))
+}
+
+/// GET handler for retrieving all starred projects for a user.
+/// Accessible via: GET /api/project/starred
+async fn api_get_starred_projects(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Project>>> {
+    println!("->> {:<12} - api_get_starred_projects", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all starred projects for this user
+    let result = sqlx::query_as!(
+        Project,
+        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at, p.is_starred, p.is_trashed
+           FROM projects p
+           JOIN project_permissions pp ON p.id = pp.project_id
+           WHERE pp.user_id = $1 AND p.is_starred = true AND p.is_trashed = false"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await;
+
+    match result {
+        Ok(projects) => Ok(Json(projects)),
+        Err(_) => Err(Error::ProjectNotFoundError),
+    }
+}
+
+/// GET handler for retrieving all trashed projects for a user.
+/// Accessible via: GET /api/project/trash
+async fn api_get_trashed_projects(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Project>>> {
+    println!("->> {:<12} - api_get_trashed_projects", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all trashed projects for this user
+    let result = sqlx::query_as!(
+        Project,
+        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at, p.is_starred, p.is_trashed
+           FROM projects p
+           JOIN project_permissions pp ON p.id = pp.project_id
+           WHERE pp.user_id = $1 AND p.is_trashed = true"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await;
+
+    match result {
+        Ok(projects) => Ok(Json(projects)),
+        Err(_) => Err(Error::ProjectNotFoundError),
+    }
+}
+
 pub fn project_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_projects))
@@ -686,4 +882,9 @@ pub fn project_routes() -> Router {
         .route("/:id/documents", get(api_get_documents))
         .route("/:id/documents/:doc_id", post(api_add_document))
         .route("/:id/documents/:doc_id", delete(api_remove_document))
+        .route("/:id/star", put(api_toggle_star_project))
+        .route("/:id/trash", put(api_trash_project))
+        .route("/:id/restore", put(api_restore_project))
+        .route("/starred", get(api_get_starred_projects))
+        .route("/trash", get(api_get_trashed_projects))
 }
