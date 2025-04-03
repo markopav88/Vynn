@@ -1,0 +1,72 @@
+"""
+3/21 - 
+⌘K to generate a command
+Looking at the codebase is the fronend apis able to work with the backend APIs?. Also how do you think I can work in these general topics (shoe me the logic how you would go commit by commit) and let me know if they even make sense based on what I am trying to make 
+3/21/25 TO DO
+1.Match test conventions
+2.All backend apis match conventions and work
+-DEBUG IN TESTS look for example: doc that does not exist, how does it respond
+3.Go into the drive and make the frontend functions to call the backend
+
+drive.ts
+Test projects
+Project controller
+After APIS are done 
+UI logic
+Backend authorization 
+
+2.What did we fix in 2. Ensure Backend APIs Match Conventions and Work
+
+3.How to impliment commit 7 again for each thing you add in the future make sure you doint duplicate code/logic that has already been done make sure ot check if previous logic for certian fucntions/things is already present in the codebase before making additions
+
+4.what are the issues in my backend preventing cargo run from compling and how can they be fixed and why
+
+5.Ok what now - lol
+
+6.Please fix the login so it works and the account details i sign up with persist so i can then properly login to view the application
+
+7.So now what can i succeessful do? Before you give me a answer make sure you test everything we have done so far 
+
+8.Nope! Still getting "Cannot connect to the server. Please make sure the backend is running at http://localhost:3001."
+
+9.This is good i can now sign up and login with the same details. Now that i am at the projects page. When i try to create a project I get "Failed to create project" also I dont see any of the UI being functional to what it is saying it can do. Please make sure the UI is functional
+
+10.Structure the projects page in the way of different "cards" on the page. When i try to make a new project is is still failing to be created "Project creation failed: Failed to create project
+" so I can use my VIM like editer inside of my unqiue project in the projects folder. Pleas emake it so everything works how it should according to the codebase logic. Then once your finished tell what has been done so far the logic behind it
+
+11.How do you recommend I do the fn api_update_project following the simialr format to the async fn api_create_project,async fn api_get_project,async fn get_projects functions
+
+12.For the code present, we get this error:
+```
+cannot find value `project` in this scope
+not found in this scope
+```
+How can I resolve this? If you propose a fix, please make it concise.
+
+13.i get errors every time i try to naviagte to there was there any depencies added in the commits that i should have added to my machine since then?
+
+14.I want you to please impliment all of these functions and do it step by step so i can see each steo and turn it into a commit here is my tasks i want you to impliment for my demo. Make sure this doesnt go super off the rails and says sharp so that my project can still be working how it is right now, just impliment them without breaking anything please. Here are my tasks:1.Projects need a last updated for project,follow document structure
+2.New document and new project buttons working,api call function ,navigation so i don't need to manually do in the chrome search bar
+3.Moes storage to follow suits of other buttons, don't need the plus at the top  
+4.Fix navbar component in navbar.svelte
+Get rid of logout and just do a profile picture,add account and signout
+5.Gif demo on the homepage 
+6.Make navigation when i click so i dont have to manually do through the search bar 
+7.Navigate to the editor
+8.When we click a project/folder, try to get it to show the docs within that project
+9.Cursor prompts 
+
+15.Make it so the creating a new project button works and the new project can store documents inside and the recent,starred,and trash buttons on the left sidebar of the http://localhost:5173/drive page need to work and function as intented. Also make sure the document titles that i input are not so dark make them a green color similar to the color of the new project button
+
+16.please make it so that i can make a document and use the "editor" on that document. I would like the document/documents to be able to be added to a project. PLease make sure the Buttons to create a document do what they are supposed to do (be able to create a document with the editor functional inside).Please make sure I can create a project(the create project buttons work and i can drag documents inside of projects from the drive all items page to be able to orgainze my documents into a project.Please make it so on each new document bubble i can star it(the left sub bar starred works and shows all the starred documents when i click on it you will make this possible by adding a small interactive star on the document "bubble" inside of the all items page. The star will be small in the top right corner of the docuemnts bubble and light up/fill in yellow when starred. Also make it so i can be able to see the recent documents i have created.Following a simialr convention make so i can put documents/projects in the trash(they are organized inside the left sub-bar trash button(when i click the trash button it will show all trashed projects/documents)
+
+17.
+
+
+
+
+
+
+
+
+"""
