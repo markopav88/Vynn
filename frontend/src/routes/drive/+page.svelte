@@ -9,6 +9,8 @@
 
     import '$lib/assets/style/drive.css';
     
+    import Toast from '$lib/components/Toast.svelte';
+    
     let isLoggedIn = true;
     let documents: Document[] = [];
     let projects: Project[] = [];
@@ -30,6 +32,21 @@
     let projectDocLoading = false;
     let draggedDocument: Document | null = null;
     
+    // Add these variables for breadcrumb navigation
+    let currentView = 'drive';
+    let displayedDocuments: Document[] = [];
+    
+    // Add this near your other variable declarations
+    let projectDocumentsMap = new Map<string, number[]>();
+    
+    // Add these variables for toast notifications
+    type ToastData = {
+        message: string;
+        type: 'success' | 'error' | 'warning';
+    };
+    
+    let toasts: ToastData[] = [];
+    
     onMount(async () => {
         try {
             // Fetch all data in parallel
@@ -49,6 +66,9 @@
             trashedDocuments = trashedDocsResult || [];
             trashedProjects = trashedProjsResult || [];
             
+            // Initialize displayed documents
+            updateDisplayedDocuments();
+            
             console.log("Documents loaded:", documents);
             console.log("Projects loaded:", projects);
         } catch (error) {
@@ -58,14 +78,48 @@
         }
     });
     
+    // Add this function to update displayed documents based on current view and filters
+    function updateDisplayedDocuments() {
+        if (currentProject && currentProject.id) {
+            // Show only documents in the current project
+            displayedDocuments = documents.filter(doc => 
+                projectDocumentsMap.get(currentProject?.id ?? '')?.includes(doc.id) ?? false
+            );
+        } else if (activeCategory === 'starred') {
+            // Show only starred documents
+            displayedDocuments = starredDocuments;
+        } else if (activeCategory === 'trash') {
+            // Show only trashed documents
+            displayedDocuments = trashedDocuments;
+        } else {
+            // Default view - all documents (not trashed)
+            displayedDocuments = documents.filter(doc => !doc.is_trashed);
+        }
+    }
+    
     function setActiveCategory(category: string) {
         activeCategory = category;
+        currentProject = null;
+        currentView = 'drive';
+        
+        // Update displayed documents based on the selected category
+        updateDisplayedDocuments();
+    }
+    
+    // Function to show a toast notification
+    function showToast(message: string, type: 'success' | 'error' | 'warning' = 'success') {
+        toasts = [...toasts, { message, type }];
+    }
+    
+    // Function to remove a toast
+    function removeToast(index: number) {
+        toasts = toasts.filter((_, i) => i !== index);
     }
     
     // Handle new project creation
     async function handleCreateProject() {
         if (!newProjectName.trim()) {
-            alert('Project name cannot be empty');
+            showToast('Project name cannot be empty', 'error');
             return;
         }
         
@@ -80,19 +134,22 @@
                 
                 // Show the project documents modal immediately after creation
                 handleProjectClick(project);
+                
+                // Show success toast
+                showToast(`Project "${project.name}" created successfully`);
             } else {
-                alert('Failed to create project');
+                showToast('Failed to create project', 'error');
             }
         } catch (error) {
             console.error('Error creating project:', error);
-            alert('An error occurred while creating the project');
+            showToast('An error occurred while creating the project', 'error');
         }
     }
     
     // Handle new document creation
     async function handleCreateDocument() {
         if (!newDocumentName.trim()) {
-            alert('Document name cannot be empty');
+            showToast('Document name cannot be empty', 'error');
             return;
         }
         
@@ -101,9 +158,17 @@
             const document = await create_document(newDocumentName, newDocumentContent || '');
             
             if (document) {
-                // If we have a project ID, associate the document with the project
-                if (newDocumentProjectId) {
-                    await add_document_to_project(parseInt(newDocumentProjectId), document.id);
+                // If we're in a project view or have a selected project ID, associate the document with the project
+                const projectId = currentProject?.id || newDocumentProjectId;
+                
+                if (projectId) {
+                    await add_document_to_project(parseInt(projectId), document.id);
+                    
+                    // If we're in a project view, update the project documents map
+                    if (currentProject && currentProject.id) {
+                        const currentDocs = projectDocumentsMap.get(currentProject.id) || [];
+                        projectDocumentsMap.set(currentProject.id, [...currentDocs, document.id]);
+                    }
                 }
                 
                 // Refresh the documents list
@@ -116,39 +181,39 @@
                 newDocumentProjectId = null;
                 showNewDocumentModal = false;
                 
-                // Navigate to the document
-                window.location.href = `/document/${document.id}`;
+                // Update displayed documents
+                updateDisplayedDocuments();
+                
+                // Show success toast
+                showToast(`Document "${document.name}" created successfully`);
             } else {
-                alert('Failed to create document');
+                showToast('Failed to create document', 'error');
             }
         } catch (error) {
             console.error('Error creating document:', error);
-            alert('An error occurred while creating the document');
+            showToast('An error occurred while creating the document', 'error');
         }
     }
     
     // Handle project click
     async function handleProjectClick(project: Project) {
         currentProject = project;
-        projectDocLoading = true;
-        showProjectDocsModal = true;
+        currentView = 'project';
         
-        try {
-            // Fetch documents for this project
-            const projectDocs = await get_project_documents(parseInt(project.id));
-            
-            if (projectDocs) {
-                projectDocuments = projectDocs;
-            } else {
-                console.error('Failed to fetch project documents');
-                projectDocuments = [];
+        // Load project documents if not already loaded
+        if (!projectDocumentsMap.has(project.id)) {
+            try {
+                const projectDocs = await get_project_documents(parseInt(project.id));
+                if (projectDocs) {
+                    projectDocumentsMap.set(project.id, projectDocs.map(doc => doc.id));
+                }
+            } catch (error) {
+                console.error("Error loading project documents:", error);
             }
-        } catch (error) {
-            console.error('Error fetching project documents:', error);
-            projectDocuments = [];
-        } finally {
-            projectDocLoading = false;
         }
+        
+        // Update displayed documents
+        updateDisplayedDocuments();
     }
     
     // Handle document click
@@ -173,39 +238,67 @@
         showNewDocumentModal = true;
     }
     
-    // Toggle star status for a document
+    // Toggle star on document
     async function handleToggleStarDocument(event: Event, document: Document) {
         event.stopPropagation(); // Prevent document click
         
         const success = await toggle_star_document(document);
         if (success) {
-            // Toggle the starred status locally
+            // Update the document's starred status locally
             document.is_starred = !document.is_starred;
             
-            // Update the starred documents list
+            // Update starred documents list
             if (document.is_starred) {
+                // Add to starred documents
                 starredDocuments = [...starredDocuments, document];
+                showToast(`Document "${document.name}" added to starred`, 'success');
             } else {
+                // Remove from starred documents
                 starredDocuments = starredDocuments.filter(d => d.id !== document.id);
+                showToast(`Document "${document.name}" removed from starred`, 'success');
+                
+                // If we're in the starred view, remove this document from displayed documents
+                if (activeCategory === 'starred') {
+                    displayedDocuments = displayedDocuments.filter(d => d.id !== document.id);
+                }
             }
+            
+            // Force UI update by creating a new array reference
+            documents = [...documents];
+            
+            // Also update the document in displayedDocuments to ensure the UI updates
+            if (activeCategory !== 'starred' || document.is_starred) {
+                displayedDocuments = displayedDocuments.map(d => 
+                    d.id === document.id ? {...document} : d
+                );
+            }
+        } else {
+            showToast('Failed to update star status', 'error');
         }
     }
     
-    // Toggle star status for a project
+    // Toggle star on project
     async function handleToggleStarProject(event: Event, project: Project) {
         event.stopPropagation(); // Prevent project click
         
         const success = await toggle_star_project(parseInt(project.id));
         if (success) {
-            // Toggle the starred status locally
+            // Update the project's starred status locally
             project.is_starred = !project.is_starred;
             
-            // Update the starred projects list
+            // Update starred projects list
             if (project.is_starred) {
                 starredProjects = [...starredProjects, project];
+                showToast(`Project "${project.name}" added to starred`, 'success');
             } else {
                 starredProjects = starredProjects.filter(p => p.id !== project.id);
+                showToast(`Project "${project.name}" removed from starred`, 'success');
             }
+            
+            // Force UI update
+            projects = [...projects];
+        } else {
+            showToast('Failed to update star status', 'error');
         }
     }
     
@@ -218,13 +311,23 @@
             // Update the document's trashed status locally
             document.is_trashed = true;
             
-            // Update the trashed documents list
+            // Add to trashed documents list
             trashedDocuments = [...trashedDocuments, document];
             
-            // Remove from starred documents if it was starred
-            if (document.is_starred) {
-                starredDocuments = starredDocuments.filter(d => d.id !== document.id);
+            // Remove from main documents list
+            documents = documents.filter(d => d.id !== document.id);
+            
+            // Update displayed documents
+            if (activeCategory !== 'trash') {
+                displayedDocuments = displayedDocuments.filter(d => d.id !== document.id);
+            } else {
+                // If we're in trash view, add it to displayed documents
+                displayedDocuments = [...displayedDocuments, document];
             }
+            
+            showToast(`Document "${document.name}" moved to trash`, 'success');
+        } else {
+            showToast('Failed to move document to trash', 'error');
         }
     }
     
@@ -237,13 +340,15 @@
             // Update the project's trashed status locally
             project.is_trashed = true;
             
-            // Update the trashed projects list
+            // Add to trashed projects list
             trashedProjects = [...trashedProjects, project];
             
-            // Remove from starred projects if it was starred
-            if (project.is_starred) {
-                starredProjects = starredProjects.filter(p => p.id !== project.id);
-            }
+            // Remove from displayed projects
+            projects = projects.filter(p => p.id !== project.id);
+            
+            showToast(`Project "${project.name}" moved to trash`, 'success');
+        } else {
+            showToast('Failed to move project to trash', 'error');
         }
     }
     
@@ -256,8 +361,18 @@
             // Update the document's trashed status locally
             document.is_trashed = false;
             
+            // Add back to main documents list
+            documents = [...documents, document];
+            
             // Remove from trashed documents list
             trashedDocuments = trashedDocuments.filter(d => d.id !== document.id);
+            
+            // Update displayed documents to refresh the view
+            updateDisplayedDocuments();
+            
+            showToast(`Document "${document.name}" restored from trash`, 'success');
+        } else {
+            showToast('Failed to restore document', 'error');
         }
     }
     
@@ -270,8 +385,18 @@
             // Update the project's trashed status locally
             project.is_trashed = false;
             
+            // Add back to main projects list
+            projects = [...projects, project];
+            
             // Remove from trashed projects list
             trashedProjects = trashedProjects.filter(p => p.id !== project.id);
+            
+            // Update displayed documents to refresh the view
+            updateDisplayedDocuments();
+            
+            showToast(`Project "${project.name}" restored from trash`, 'success');
+        } else {
+            showToast('Failed to restore project', 'error');
         }
     }
     
@@ -304,43 +429,61 @@
         }
         
         if (draggedDocument) {
+            // Check if document is already in the project
+            const currentDocs = projectDocumentsMap.get(project.id) || [];
+            if (currentDocs.includes(draggedDocument.id)) {
+                // Show warning toast
+                showToast(`Document "${draggedDocument.name}" is already in project "${project.name}"`, 'warning');
+                draggedDocument = null;
+                return;
+            }
+            
             // Add document to project
             const success = await add_document_to_project(parseInt(project.id), draggedDocument.id);
             
             if (success) {
-                // Show success message or update UI
-                alert(`Document "${draggedDocument.name}" added to project "${project.name}"`);
+                // Show success toast
+                showToast(`Document "${draggedDocument.name}" added to project "${project.name}"`, 'success');
+                
+                // Update the project documents map
+                projectDocumentsMap.set(project.id, [...currentDocs, draggedDocument.id]);
+                
+                // If we're currently viewing this project, update the displayed documents
+                if (currentProject && currentProject.id === project.id) {
+                    updateDisplayedDocuments();
+                }
+            } else {
+                // Show error toast
+                showToast(`Failed to add document to project`, 'error');
             }
             
             draggedDocument = null;
         }
     }
     
-    // Computed properties for filtered views
-    $: filteredDocuments = activeCategory === 'all' 
-        ? documents.filter(d => !d.is_trashed)
-        : activeCategory === 'starred' 
-            ? starredDocuments.filter(d => !d.is_trashed)
-            : activeCategory === 'trash'
-                ? trashedDocuments
-                : activeCategory === 'recent'
-                    ? [...documents].filter(d => !d.is_trashed).sort((a, b) => 
-                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-                    ).slice(0, 10)
-                    : [];
+    // Add function to return to main drive view
+    function returnToDrive() {
+        currentProject = null;
+        currentView = 'drive';
+        updateDisplayedDocuments();
+    }
     
-    $: filteredProjects = activeCategory === 'all'
-        ? projects.filter(p => !p.is_trashed)
-        : activeCategory === 'starred'
-            ? starredProjects.filter(p => !p.is_trashed)
-            : activeCategory === 'trash'
-                ? trashedProjects
-                : activeCategory === 'recent'
-                    ? [...projects].filter(p => !p.is_trashed).sort((a, b) => 
-                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-                    ).slice(0, 10)
-                    : [];
+    // Update category change handler to reset project view
+    function changeCategory(category: string) {
+        activeCategory = category;
+        currentProject = null;
+        currentView = 'drive';
+        updateDisplayedDocuments();
+    }
 </script>
+
+{#each toasts as toast, i}
+    <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => removeToast(i)} 
+    />
+{/each}
 
 <div class="bg-black min-vh-100 d-flex flex-column">
     <Navbar {isLoggedIn} />
@@ -399,8 +542,11 @@
                         </ul>
                     </div>
                     
-                    <!-- Create New Buttons -->
-                    <div class="mt-4 p-2">
+                    <!-- Spacer to push buttons down but not all the way -->
+                    <div style="min-height: 440px;"></div>
+                    
+                    <!-- Create buttons at bottom -->
+                    <div class="p-3 border-top border-dark">
                         <button class="btn btn-green w-100 mb-2" on:click={() => showNewProjectModal = true}>
                             <i class="bi bi-folder-plus me-2"></i> New Project
                         </button>
@@ -415,6 +561,24 @@
             <div class="col-md-10 bg-black p-4">
                 <h1 class="mb-4">My Drive</h1>
                 
+                <!-- Add breadcrumb navigation with custom styling -->
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <button 
+                                class="btn btn-link p-0 {!currentProject ? 'text-green' : 'text-white'}" 
+                                on:click={returnToDrive}>
+                                Drive
+                            </button>
+                        </li>
+                        {#if currentProject}
+                            <li class="breadcrumb-item active text-green" aria-current="page">
+                                {currentProject.name}
+                            </li>
+                        {/if}
+                    </ol>
+                </nav>
+                
                 {#if isLoading}
                     <div class="d-flex justify-content-center my-5">
                         <div class="spinner-border text-green" role="status">
@@ -423,7 +587,7 @@
                     </div>
                 {:else}
                     <!-- Unified Items Section -->
-                    <div>
+                    <div class="mt-7">
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h2>All Items</h2>
                             <div>
@@ -448,41 +612,66 @@
                         {:else}
                             <div class="row row-cols-1 row-cols-md-4 g-4">
                                 <!-- Projects First -->
-                                {#each filteredProjects as project}
-                                    <div class="col">
-                                        <div 
-                                            class="card bg-dark border-0 h-100 project-card" 
-                                            role="button"
-                                            tabindex="0"
-                                            on:click={() => handleProjectClick(project)}
-                                            on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}
-                                            on:dragover={(e) => handleDragOver(e, project)}
-                                            on:dragleave={handleDragLeave}
-                                            on:drop={(e) => handleDrop(e, project)}>
-                                            <div class="card-body p-3">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
-                                                    <h5 class="card-title mb-0 text-truncate">{project.name}</h5>
+                                {#if !currentProject && activeCategory === 'trash'}
+                                    {#each trashedProjects as project}
+                                        <div class="col">
+                                            <div 
+                                                class="card bg-dark border-0 h-100 project-card" 
+                                                role="button"
+                                                tabindex="0"
+                                                on:click={() => handleProjectClick(project)}
+                                                on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}>
+                                                <div class="card-body p-3">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
+                                                        <h5 class="card-title mb-0 text-truncate">{project.name}</h5>
+                                                    </div>
+                                                    <p class="card-text text-white-50 small mb-1">Project</p>
+                                                    <p class="card-text text-white-50 small">
+                                                        Updated: {new Date(project.updated_at).toLocaleDateString()}
+                                                    </p>
                                                 </div>
-                                                <p class="card-text text-white-50 small mb-1">Project</p>
-                                                <p class="card-text text-white-50 small">
-                                                    Updated: {new Date(project.updated_at).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                            
-                                            <!-- Action icons for projects -->
-                                            <div class="card-actions">
-                                                {#if activeCategory === 'trash'}
+                                                
+                                                <!-- Action icons for trashed projects -->
+                                                <div class="card-actions">
                                                     <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore" aria-label="Restore project from trash">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
-                                                {:else}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {/each}
+                                {:else if !currentProject && activeCategory === 'starred'}
+                                    {#each starredProjects as project}
+                                        <div class="col">
+                                            <div 
+                                                class="card bg-dark border-0 h-100 project-card" 
+                                                role="button"
+                                                tabindex="0"
+                                                on:click={() => handleProjectClick(project)}
+                                                on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}
+                                                on:dragover={(e) => handleDragOver(e, project)}
+                                                on:dragleave={handleDragLeave}
+                                                on:drop={(e) => handleDrop(e, project)}>
+                                                <div class="card-body p-3">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
+                                                        <h5 class="card-title mb-0 text-truncate">{project.name}</h5>
+                                                    </div>
+                                                    <p class="card-text text-white-50 small mb-1">Project</p>
+                                                    <p class="card-text text-white-50 small">
+                                                        Updated: {new Date(project.updated_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                
+                                                <!-- Action icons for starred projects -->
+                                                <div class="card-actions">
                                                     <button 
                                                         class="action-icon star-icon" 
                                                         on:click={(e) => handleToggleStarProject(e, project)} 
-                                                        aria-label={project.is_starred ? "Unstar project" : "Star project"}
+                                                        aria-label="Unstar project"
                                                     >
-                                                        <i class="bi {project.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
+                                                        <i class="bi bi-star-fill text-warning"></i>
                                                     </button>
                                                     <button 
                                                         class="action-icon trash-icon" 
@@ -491,14 +680,63 @@
                                                     >
                                                         <i class="bi bi-trash"></i>
                                                     </button>
-                                                {/if}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                {/each}
+                                    {/each}
+                                {:else if !currentProject && activeCategory !== 'trash' && activeCategory !== 'starred'}
+                                    {#each projects as project}
+                                        <div class="col">
+                                            <div 
+                                                class="card bg-dark border-0 h-100 project-card" 
+                                                role="button"
+                                                tabindex="0"
+                                                on:click={() => handleProjectClick(project)}
+                                                on:keydown={(e) => e.key === 'Enter' && handleProjectClick(project)}
+                                                on:dragover={(e) => handleDragOver(e, project)}
+                                                on:dragleave={handleDragLeave}
+                                                on:drop={(e) => handleDrop(e, project)}>
+                                                <div class="card-body p-3">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
+                                                        <h5 class="card-title mb-0 text-truncate">{project.name}</h5>
+                                                    </div>
+                                                    <p class="card-text text-white-50 small mb-1">Project</p>
+                                                    <p class="card-text text-white-50 small">
+                                                        Updated: {new Date(project.updated_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                
+                                                <!-- Action icons for projects -->
+                                                <div class="card-actions">
+                                                    {#if activeCategory === 'trash'}
+                                                        <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore" aria-label="Restore project from trash">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    {:else}
+                                                        <button 
+                                                            class="action-icon star-icon" 
+                                                            on:click={(e) => handleToggleStarProject(e, project)} 
+                                                            aria-label={project.is_starred ? "Unstar project" : "Star project"}
+                                                        >
+                                                            <i class="bi {project.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
+                                                        </button>
+                                                        <button 
+                                                            class="action-icon trash-icon" 
+                                                            on:click={(e) => handleTrashProject(e, project)} 
+                                                            aria-label="Move project to trash"
+                                                        >
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {/each}
+                                {/if}
                                 
                                 <!-- Documents After Projects -->
-                                {#each filteredDocuments as document}
+                                {#each displayedDocuments as document}
                                     <div class="col">
                                         <div 
                                             class="card bg-dark border-0 h-100 document-card" 
@@ -506,7 +744,7 @@
                                             tabindex="0"
                                             on:click={() => handleDocumentClick(document)}
                                             on:keydown={(e) => e.key === 'Enter' && handleDocumentClick(document)}
-                                            draggable={!document.is_trashed}
+                                            draggable={!currentProject}
                                             on:dragstart={(e) => handleDragStart(e, document)}>
                                             <div class="card-body p-3">
                                                 <div class="d-flex align-items-center mb-2">
@@ -526,10 +764,18 @@
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 {:else}
-                                                    <button class="action-icon star-icon" on:click={(e) => handleToggleStarDocument(e, document)} title="Star" aria-label="Star document">
+                                                    <button 
+                                                        class="action-icon star-icon" 
+                                                        on:click={(e) => handleToggleStarDocument(e, document)} 
+                                                        aria-label={document.is_starred ? "Unstar document" : "Star document"}
+                                                    >
                                                         <i class="bi {document.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
                                                     </button>
-                                                    <button class="action-icon trash-icon" on:click={(e) => handleTrashDocument(e, document)} title="Trash" aria-label="Move document to trash">
+                                                    <button 
+                                                        class="action-icon trash-icon" 
+                                                        on:click={(e) => handleTrashDocument(e, document)} 
+                                                        aria-label="Move document to trash"
+                                                    >
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 {/if}

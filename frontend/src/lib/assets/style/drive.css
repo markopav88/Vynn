@@ -98,5 +98,30 @@
 }
 
 .card-actions {
-    z-index: 2;
+    z-index: 10;
+}
+
+/* Show card actions on hover */
+.project-card:hover .card-actions,
+.document-card:hover .card-actions {
+    opacity: 1;
+}
+
+/* Add these breadcrumb styles to the end of the file */
+
+/* Breadcrumb styling */
+.breadcrumb-item + .breadcrumb-item::before {
+    color: #6c757d; /* Subdued color for the separator */
+}
+
+.breadcrumb-item.active {
+    color: #10B981 !important; /* Green color for active breadcrumb */
+}
+
+.breadcrumb-item a {
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    text-decoration: underline;
 }
