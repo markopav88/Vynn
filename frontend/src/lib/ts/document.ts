@@ -200,9 +200,9 @@ export async function saveDocument(document: Document): Promise<boolean | null> 
  * Function to get all users with permissions to a given document
  * Calls: GET /api/document/:id/permissions
  */
-export async function get_document_permissions(documentData: Document): Promise<DocumentUser[] | null> {
+export async function get_document_permissions(document_id: number): Promise<DocumentUser[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentData.id}/permissions`;
+		const apiUrl = `http://localhost:3001/api/document/${document_id}/permissions`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -213,7 +213,7 @@ export async function get_document_permissions(documentData: Document): Promise<
 		}
 
 		const data = await response.json();
-		return data.users || null;
+		return data || null;
 	} catch (error) {
 		console.error('Error loading document users:', error);
 		return null;
@@ -364,10 +364,15 @@ export async function update_document_permissions(documentId: number, userId: nu
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(errorText || 'Failed to update document permissions');
+		}
+
+		return true;
 	} catch (error) {
 		console.error('Error updating document permissions:', error);
-		return false;
+		throw error; // Re-throw the error to be handled by the caller
 	}
 }
 
@@ -381,13 +386,21 @@ export async function delete_document_permissions(documentId: number, userId: nu
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
+			headers: {
+				'Content-Type': 'application/json'
+			},
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(errorText || 'Failed to remove user from document');
+		}
+
+		return true;
 	} catch (error) {
 		console.error('Error deleting document permissions:', error);
-		return false;
+		throw error; // Re-throw the error to be handled by the caller
 	}
 }
 

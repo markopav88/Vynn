@@ -438,6 +438,36 @@ pub async fn api_get_profile_image(
     }
 }
 
+/// Search users by email
+/// Accessible via: GET /api/users/search?q=search_term
+/// Returns a list of users matching the search term
+pub async fn api_search_users(
+    Extension(pool): Extension<PgPool>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<Vec<User>>> {
+    println!("->> {:<12} - search_users", "HANDLER");
+
+    // Get search term from query params
+    let search_term = params.get("q").unwrap_or(&"".to_string()).to_string();
+
+    // If search term is empty, return empty list
+    if search_term.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    // Search for users with email containing the search term
+    let users = sqlx::query_as!(
+        User,
+        r#"SELECT id, name, email FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
+        format!("%{}%", search_term)
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(users))
+}
+
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
@@ -449,4 +479,5 @@ pub fn user_routes() -> Router {
         .route("/check-auth", get(api_check_auth))
         .route("/profile-image", post(api_upload_profile_image))
         .route("/:id/profile-image", get(api_get_profile_image))
+        .route("/search", get(api_search_users))
 }

@@ -441,6 +441,34 @@ pub async fn api_update_permission(
         return Err(Error::PermissionError);
     }
 
+    // Check if this is an ownership transfer
+    if payload.role == "owner" {
+        // Get the current owner's role
+        let current_owner = sqlx::query!(
+            "SELECT user_id, role FROM document_permissions 
+             WHERE document_id = $1 AND role = 'owner'",
+            document_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+
+        // If the current owner is different from the user being made owner
+        if current_owner.user_id != payload.user_id {
+            // Update the current owner to editor
+            sqlx::query!(
+                "UPDATE document_permissions 
+                 SET role = 'editor'
+                 WHERE document_id = $1 AND user_id = $2",
+                document_id,
+                current_owner.user_id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+        }
+    }
+
     // Update the permission
     let result = sqlx::query!(
         "UPDATE document_permissions 
@@ -448,7 +476,7 @@ pub async fn api_update_permission(
          WHERE document_id = $2 AND user_id = $3",
         payload.role,
         document_id,
-        payload.user_id // The user whose permission is being updated
+        payload.user_id
     )
     .execute(&pool)
     .await;
@@ -505,12 +533,6 @@ pub async fn api_remove_permissions(
     .fetch_optional(&pool)
     .await;
 
-    // If we're removing an owner and there's only one owner, prevent it
-    if let (Ok(owners_count), Ok(Some(record))) = (&owners_count_result, &is_target_owner) {
-        if record.role == "owner" && owners_count.count.unwrap_or(0) <= 1 {
-            return Err(Error::PermissionError);
-        }
-    }
 
     // Remove the permission
     let result = sqlx::query!(

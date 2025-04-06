@@ -11,6 +11,8 @@
     
     import Toast from '$lib/components/Toast.svelte';
     
+    import ShareModal from '$lib/components/ShareModal.svelte';
+    
     let isLoggedIn = true;
     let documents: Document[] = [];
     let projects: Project[] = [];
@@ -46,6 +48,12 @@
     };
     
     let toasts: ToastData[] = [];
+    
+    // Add these new variables
+    let shareModalOpen = false;
+    let shareModalType: 'document' | 'project' = 'document';
+    let shareModalId: number = 0;
+    let shareModalTitle = '';
     
     onMount(async () => {
         try {
@@ -516,6 +524,18 @@
         currentView = 'drive';
         updateDisplayedDocuments();
     }
+
+    // Add this new function
+    function openShareModal(type: 'document' | 'project', id: number, title: string) {
+        shareModalType = type;
+        shareModalId = id;
+        shareModalTitle = title;
+        shareModalOpen = true;
+    }
+
+    function closeShareModal() {
+        shareModalOpen = false;
+    }
 </script>
 
 {#each toasts as toast, i}
@@ -715,6 +735,13 @@
                                                         <i class="bi bi-star-fill text-warning"></i>
                                                     </button>
                                                     <button 
+                                                        class="action-icon share-icon" 
+                                                        on:click={(e) => { e.stopPropagation(); openShareModal('project', parseInt(project.id), project.name); }}
+                                                        aria-label="Share project"
+                                                    >
+                                                        <i class="bi bi-share"></i>
+                                                    </button>
+                                                    <button 
                                                         class="action-icon trash-icon" 
                                                         on:click={(e) => handleTrashProject(e, project)} 
                                                         aria-label="Move project to trash"
@@ -761,6 +788,13 @@
                                                             aria-label={project.is_starred ? "Unstar project" : "Star project"}
                                                         >
                                                             <i class="bi {project.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
+                                                        </button>
+                                                        <button 
+                                                            class="action-icon share-icon" 
+                                                            on:click={(e) => { e.stopPropagation(); openShareModal('project', parseInt(project.id), project.name); }}
+                                                            aria-label="Share project"
+                                                        >
+                                                            <i class="bi bi-share"></i>
                                                         </button>
                                                         <button 
                                                             class="action-icon trash-icon" 
@@ -811,6 +845,13 @@
                                                         aria-label={document.is_starred ? "Unstar document" : "Star document"}
                                                     >
                                                         <i class="bi {document.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
+                                                    </button>
+                                                    <button 
+                                                        class="action-icon share-icon" 
+                                                        on:click={(e) => { e.stopPropagation(); openShareModal('document', document.id, document.name); }}
+                                                        aria-label="Share document"
+                                                    >
+                                                        <i class="bi bi-share"></i>
                                                     </button>
                                                     <button 
                                                         class="action-icon trash-icon" 
@@ -957,3 +998,86 @@
 </div>
 <div class="modal-backdrop fade show"></div>
 {/if}
+
+<!-- ShareModal component -->
+<ShareModal
+    bind:isOpen={shareModalOpen}
+    type={shareModalType}
+    id={shareModalId}
+    title={shareModalTitle}
+    on:close={closeShareModal}
+    on:toast={({ detail }) => showToast(detail.message, detail.type)}
+    on:confirm={({ detail }) => {
+        if (confirm(detail.message)) {
+            detail.onConfirm();
+        } else {
+            detail.onCancel && detail.onCancel();
+        }
+    }}
+/>
+
+<!-- Add these styles -->
+<style>
+    .card {
+        position: relative;
+        overflow: visible;
+        transition: all 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+    }
+
+    .card-actions {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        display: flex;
+        gap: 0.5rem;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 0.25rem;
+        border-radius: 4px;
+    }
+
+    .card:hover .card-actions {
+        opacity: 1;
+    }
+
+    .action-icon {
+        background: none;
+        border: none;
+        padding: 0.25rem;
+        cursor: pointer;
+        color: var(--color-text-secondary);
+        transition: color 0.2s ease;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+    }
+
+    .action-icon:hover {
+        color: var(--color-primary);
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .trash-icon:hover {
+        color: var(--color-error);
+    }
+
+    .share-icon:hover {
+        color: var(--color-primary);
+    }
+
+    /* Ensure the card body doesn't overlap with the actions */
+    .card-body {
+        position: relative;
+        z-index: 1;
+    }
+</style>

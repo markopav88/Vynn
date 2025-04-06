@@ -228,7 +228,7 @@ export async function get_project_permissions(projectId: number): Promise<Projec
 		}
 
 		const data = await response.json();
-		return data.users || null;
+		return data || null;
 	} catch (error) {
 		console.error('Error fetching project permissions:', error);
 		return null;
@@ -257,10 +257,15 @@ export async function update_project_permission(projectId: number, userId: numbe
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(errorText || 'Failed to update project permissions');
+		}
+
+		return true;
 	} catch (error) {
 		console.error('Error updating project permission:', error);
-		return false;
+		throw error;
 	}
 }
 
@@ -274,13 +279,21 @@ export async function remove_project_permissions(projectId: number, userId: numb
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
+			headers: {
+				'Content-Type': 'application/json'
+			},
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(errorText || 'Failed to remove user from project');
+		}
+
+		return true;
 	} catch (error) {
 		console.error('Error removing project permissions:', error);
-		return false;
+		throw error;
 	}
 }
 
