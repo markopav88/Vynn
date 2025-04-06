@@ -151,6 +151,12 @@
 				// Update current document index
 				currentDocumentIndex = projectDocuments.findIndex((doc) => doc.id === docId);
 
+				// Get project info for the new document to ensure project name is correct
+				const projectInfo = await get_project_from_document(docId);
+				if (projectInfo && projectInfo.project_id) {
+					documentData.project_name = projectInfo.project_name;
+				}
+
 				// Wait for animation to complete
 				setTimeout(() => {
 					isAnimating = false;
@@ -195,12 +201,16 @@
 						projectDocumentsMap.set(doc.id, doc);
 					});
 
-					// Set projectDocumentsLoaded to true
-					projectDocumentsLoaded = true;
+					// Set the project name in documentData
+					documentData.project_name = projectInfo.project_name;
 				}
 			}
+			// Set projectDocumentsLoaded to true regardless of whether document is in a project
+			projectDocumentsLoaded = true;
 		} catch (error) {
 			console.error('Error loading project documents:', error);
+			// Still set projectDocumentsLoaded to true even if there's an error
+			projectDocumentsLoaded = true;
 		}
 	}
 
@@ -989,18 +999,27 @@
 	</div>
 
 	<!-- Project Document Switcher -->
-	{#if projectDocumentsLoaded && projectDocuments.length > 1}
+	{#if projectDocumentsLoaded}
 		<div class="document-switcher fade-in">
-			{#each projectDocuments as doc, index}
+			{#if projectDocuments.length > 0}
+				{#each projectDocuments as doc, index}
+					<button
+						class="doc-button"
+						class:active={doc.id.toString() === documentId}
+						on:click={() => switchDocument(doc.id)}
+						disabled={doc.id.toString() === documentId}
+					>
+						{index + 1}
+					</button>
+				{/each}
+			{:else}
 				<button
-					class="doc-button"
-					class:active={doc.id.toString() === documentId}
-					on:click={() => switchDocument(doc.id)}
-					disabled={doc.id.toString() === documentId}
+					class="doc-button active"
+					disabled
 				>
-					{index + 1}
+					1
 				</button>
-			{/each}
+			{/if}
 		</div>
 	{/if}
 
@@ -1077,6 +1096,16 @@
 					{/if}
 				</div>
 			{/if}
+		</div>
+
+		<div class="document-name">
+			<span>
+				{#if documentData?.project_name}
+					{documentData.project_name}/{documentData.name || 'Untitled'}
+				{:else}
+					{documentData?.name || 'Untitled'}
+				{/if}
+			</span>
 		</div>
 
 		<div class="cursor-position">
