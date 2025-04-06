@@ -103,36 +103,6 @@ export async function get_all_projects(): Promise<Project[] | null> {
 }
 
 /**
- * Function to create a new project
- * Calls: POST /api/project
- */
-export async function create_project(name: string): Promise<Project | null> {
-	const apiUrl = `http://localhost:3001/api/project/`;
-
-	try {
-		const response = await fetch(apiUrl, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ _name: name }),
-			credentials: 'include'
-		});
-
-		if (!response.ok) {
-			console.error('Create project failed with status:', response.status);
-			return null;
-		}
-
-		const project = await response.json();
-		return project;
-	} catch (error) {
-		console.error('Create project error:', error);
-		return null;
-	}
-}
-
-/**
  * Function to update a project
  * Calls: PUT /api/project/:id
  */

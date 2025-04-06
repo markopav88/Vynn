@@ -119,7 +119,7 @@ export async function delete_document(document_id: number): Promise<Boolean> {
  * Calls: POST /api/project
  */
 export async function create_project(name: string): Promise<Project | null> {
-	const apiUrl = `http://localhost:3001/api/project/`;
+	const apiUrl = `http://localhost:3001/api/project`;
 
 	try {
 		const response = await fetch(apiUrl, {

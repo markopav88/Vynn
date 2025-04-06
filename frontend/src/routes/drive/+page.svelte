@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, type Document } from "$lib/ts/document";
-    import { get_all_projects, create_project, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects } from "$lib/ts/drive";
+    import { get_all_projects, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects, create_project } from "$lib/ts/drive";
     import { add_document_to_project, get_project_documents } from "$lib/ts/project";
     import type { Project } from '$lib/ts/drive';
 
@@ -86,21 +86,59 @@
                 projectDocumentsMap.get(currentProject?.id ?? '')?.includes(doc.id) ?? false
             );
         } else if (activeCategory === 'starred') {
-            // Show only starred documents
-            displayedDocuments = starredDocuments;
+            // Show only starred documents that are not trashed
+            displayedDocuments = starredDocuments.filter(doc => !doc.is_trashed);
         } else if (activeCategory === 'trash') {
             // Show only trashed documents
             displayedDocuments = trashedDocuments;
         } else {
-            // Default view - all documents (not trashed)
-            displayedDocuments = documents.filter(doc => !doc.is_trashed);
+            // Default view - show only documents that are not in any project and not trashed
+            displayedDocuments = documents.filter(doc => {
+                // Skip trashed documents
+                if (doc.is_trashed) return false;
+                
+                // Check if document is in any project
+                for (const [_, projectDocs] of projectDocumentsMap) {
+                    if (projectDocs.includes(doc.id)) return false;
+                }
+                
+                return true;
+            });
         }
     }
     
-    function setActiveCategory(category: string) {
+    async function setActiveCategory(category: string) {
         activeCategory = category;
         currentProject = null;
         currentView = 'drive';
+        
+        try {
+            if (category === 'starred') {
+                // Refresh starred items when switching to starred view
+                const [starredDocsResult, starredProjsResult] = await Promise.all([
+                    get_starred_documents(),
+                    get_starred_projects()
+                ]);
+                
+                starredDocuments = starredDocsResult || [];
+                starredProjects = starredProjsResult || [];
+            } else if (category === 'all') {
+                // Refresh all items when switching to main view
+                const [docsResult, projectsResult, starredDocsResult, starredProjsResult] = await Promise.all([
+                    get_all_documents(),
+                    get_all_projects(),
+                    get_starred_documents(),
+                    get_starred_projects()
+                ]);
+                
+                documents = docsResult || [];
+                projects = projectsResult || [];
+                starredDocuments = starredDocsResult || [];
+                starredProjects = starredProjsResult || [];
+            }
+        } catch (error) {
+            console.error("Error refreshing items:", error);
+        }
         
         // Update displayed documents based on the selected category
         updateDisplayedDocuments();
@@ -131,9 +169,6 @@
                 // Clear the form and close the modal
                 newProjectName = '';
                 showNewProjectModal = false;
-                
-                // Show the project documents modal immediately after creation
-                handleProjectClick(project);
                 
                 // Show success toast
                 showToast(`Project "${project.name}" created successfully`);
@@ -317,6 +352,9 @@
             // Remove from main documents list
             documents = documents.filter(d => d.id !== document.id);
             
+            // Remove from starred documents list if it was starred
+            starredDocuments = starredDocuments.filter(d => d.id !== document.id);
+            
             // Update displayed documents
             if (activeCategory !== 'trash') {
                 displayedDocuments = displayedDocuments.filter(d => d.id !== document.id);
@@ -345,6 +383,9 @@
             
             // Remove from displayed projects
             projects = projects.filter(p => p.id !== project.id);
+            
+            // Remove from starred projects list if it was starred
+            starredProjects = starredProjects.filter(p => p.id !== project.id);
             
             showToast(`Project "${project.name}" moved to trash`, 'success');
         } else {
