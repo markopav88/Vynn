@@ -515,25 +515,6 @@ pub async fn api_remove_permissions(
         return Err(Error::PermissionError);
     }
 
-    // Prevent removing the last owner
-    let owners_count_result = sqlx::query!(
-        "SELECT COUNT(*) as count FROM document_permissions 
-         WHERE document_id = $1 AND role = 'owner'",
-        document_id
-    )
-    .fetch_one(&pool)
-    .await;
-
-    let is_target_owner = sqlx::query!(
-        "SELECT role FROM document_permissions 
-         WHERE document_id = $1 AND user_id = $2",
-        document_id,
-        user_id
-    )
-    .fetch_optional(&pool)
-    .await;
-
-
     // Remove the permission
     let result = sqlx::query!(
         "DELETE FROM document_permissions 

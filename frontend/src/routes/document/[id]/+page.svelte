@@ -696,31 +696,49 @@
 		}
 	}
 
-	// Update the adjustTextareaHeight function to handle more lines
+	// Update the adjustTextareaHeight function to handle both growing and shrinking
 	function adjustTextareaHeight() {
 		if (!editorElement) return;
 
 		// Reset height to auto to get the correct scrollHeight
 		editorElement.style.height = 'auto';
 
-		// Set height to scrollHeight to fit all content
-		const newHeight = Math.max(
-			editorElement.scrollHeight,
-			LINE_HEIGHT * MIN_LINES // Ensure minimum height
-		);
+		// Calculate number of lines in the content
+		const numberOfLines = editorContent.split('\n').length;
+		
+		// Calculate the height based on number of lines
+		const contentHeight = numberOfLines * LINE_HEIGHT;
+		
+		// Calculate the minimum height based on MIN_LINES
+		const minHeight = LINE_HEIGHT * MIN_LINES;
 
+		// Set height to the larger of content height or minimum height
+		const newHeight = Math.max(contentHeight, minHeight);
+
+		// Apply the new height to textarea with overflow handling
 		editorElement.style.height = `${newHeight}px`;
+		editorElement.style.overflowY = contentHeight > minHeight ? 'auto' : 'hidden';
 
-		// Also update the line numbers container height
+		// Update the line numbers container height and overflow
 		const lineNumbersContainer = document.querySelector('.line-numbers') as HTMLElement;
 		if (lineNumbersContainer) {
 			lineNumbersContainer.style.height = `${newHeight}px`;
+			lineNumbersContainer.style.overflowY = contentHeight > minHeight ? 'hidden' : 'hidden';
 		}
 
-		// Make sure the editor container can grow to accommodate the content
+		// Update the editor container height and overflow
 		const editorContainer = document.querySelector('.editor-container') as HTMLElement;
 		if (editorContainer) {
-			editorContainer.style.minHeight = `${newHeight + 100}px`; // Add some extra space
+			editorContainer.style.height = `${newHeight}px`;
+			editorContainer.style.minHeight = `${newHeight}px`;
+			editorContainer.style.overflowY = contentHeight > minHeight ? 'auto' : 'hidden';
+		}
+
+		// Update the editor wrapper to handle overflow
+		const editorWrapper = document.querySelector('.editor-wrapper') as HTMLElement;
+		if (editorWrapper) {
+			editorWrapper.style.height = `${newHeight}px`;
+			editorWrapper.style.overflowY = contentHeight > minHeight ? 'auto' : 'hidden';
 		}
 	}
 
