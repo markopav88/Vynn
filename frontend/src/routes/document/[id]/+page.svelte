@@ -722,7 +722,7 @@
 		activeLineIndex = Math.min(Math.max(0, activeLineIndex), totalLines - 1);
 	}
 
-	// Update the adjustTextareaHeight function to handle both growing and shrinking
+	// Update the adjustTextareaHeight function to handle full page scrolling
 	function adjustTextareaHeight() {
 		if (!editorElement) return;
 
@@ -738,33 +738,39 @@
 		// Calculate the minimum height based on MIN_LINES
 		const minHeight = LINE_HEIGHT * MIN_LINES;
 
-		// Set height to the larger of content height or minimum height
-		const newHeight = Math.max(contentHeight, minHeight);
+		// Set height to the larger of content height or minimum height, plus extra padding
+		const newHeight = Math.max(contentHeight, minHeight) + 48; // Add extra padding
 
-		// Apply the new height to textarea with overflow handling
+		// Apply the new height to textarea without overflow
 		editorElement.style.height = `${newHeight}px`;
-		editorElement.style.overflowY = contentHeight > minHeight ? 'auto' : 'hidden';
+		editorElement.style.overflowY = 'hidden';
 
-		// Update the line numbers container height and overflow
+		// Update the line numbers container height
 		const lineNumbersContainer = document.querySelector('.line-numbers') as HTMLElement;
 		if (lineNumbersContainer) {
 			lineNumbersContainer.style.height = `${newHeight}px`;
-			lineNumbersContainer.style.overflowY = contentHeight > minHeight ? 'hidden' : 'hidden';
+			lineNumbersContainer.style.overflowY = 'hidden';
 		}
 
-		// Update the editor container height and overflow
+		// Update the editor container height
 		const editorContainer = document.querySelector('.editor-container') as HTMLElement;
 		if (editorContainer) {
 			editorContainer.style.height = `${newHeight}px`;
 			editorContainer.style.minHeight = `${newHeight}px`;
-			editorContainer.style.overflowY = contentHeight > minHeight ? 'auto' : 'hidden';
+			editorContainer.style.overflowY = 'hidden';
 		}
 
-		// Update the editor wrapper to handle overflow
+		// Update the editor wrapper
 		const editorWrapper = document.querySelector('.editor-wrapper') as HTMLElement;
 		if (editorWrapper) {
 			editorWrapper.style.height = `${newHeight}px`;
-			editorWrapper.style.overflowY = contentHeight > minHeight ? 'auto' : 'hidden';
+			editorWrapper.style.overflowY = 'hidden';
+		}
+
+		// Update the editor page container to be at least as tall as the editor
+		const editorPage = document.querySelector('.editor-page') as HTMLElement;
+		if (editorPage) {
+			editorPage.style.minHeight = `${newHeight + 200}px`; // Add extra space for navbar and status bar
 		}
 	}
 
@@ -830,7 +836,7 @@
 		};
 	});
 
-	// Update the handleInput function to ensure proper line tracking
+	// Update the handleInput function to handle Enter key presses correctly
 	function handleInput(event: Event) {
 		if (editorMode === 'NORMAL') {
 			// Get the current selection
@@ -847,12 +853,42 @@
 			event.preventDefault();
 		} else {
 			// In INSERT mode, update the content
+			const previousContent = editorContent;
 			editorContent = editorElement.value;
 			
-			// Update cursor position first
-			updateCursorPosition();
+			// Get current cursor position
+			const position = editorElement.selectionStart;
+			const textBeforeCursor = editorContent.substring(0, position);
 			
-			// Then update line numbers and adjust height
+			// Check if Enter was pressed (new line created)
+			const previousLines = previousContent.split('\n');
+			const currentLines = editorContent.split('\n');
+			const isNewLine = currentLines.length > previousLines.length;
+			
+			if (isNewLine) {
+				// For new lines, set the active line to where the cursor is
+				const newlines = textBeforeCursor.split('\n');
+				cursorLine = newlines.length;
+				activeLineIndex = cursorLine - 1;
+			} else {
+				// For normal input, calculate based on cursor position
+				const newlines = [...textBeforeCursor.matchAll(/\n/g)];
+				cursorLine = newlines.length + 1;
+				activeLineIndex = cursorLine - 1;
+			}
+			
+			// Ensure bounds
+			const totalLines = currentLines.length;
+			if (cursorLine > totalLines) {
+				cursorLine = totalLines;
+				activeLineIndex = totalLines - 1;
+			} else if (cursorLine < 1) {
+				cursorLine = 1;
+				activeLineIndex = 0;
+			}
+			
+			// Update line numbers and adjust height
+			lines = currentLines;
 			updateLineNumbers();
 			adjustTextareaHeight();
 		}
@@ -1166,16 +1202,189 @@
 </div>
 
 <style>
+.editor-page {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+}
+
+.background-image {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.15;
+    pointer-events: none;
+}
+
+.navbar-container {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: rgba(var(--color-background-rgb), 0.95);
+    backdrop-filter: blur(5px);
+    border-bottom: none;
+}
+
+.editor-container {
+    flex: 1;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    padding-bottom: calc(4rem + 60px); /* Increased bottom padding significantly */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+}
+
+.editor-wrapper {
+    position: relative;
+    width: 100%;
+    background-color: rgba(40, 40, 40, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    margin-bottom: 40px; /* Increased margin at bottom */
+}
+
+.editor-content {
+    display: flex;
+    width: 100%;
+    position: relative;
+    background: transparent;
+    border-radius: 8px;
+    min-height: 100%;
+}
+
+.line-numbers {
+    position: sticky;
+    left: 0;
+    padding-top: 0.5rem;
+    padding-bottom: 3rem; /* Match textarea padding */
+    background-color: rgba(40, 40, 40, 0.3);
+    border-right: 1px solid var(--color-border);
+    z-index: 1;
+    backdrop-filter: blur(5px);
+    width: 3.5rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+}
+
+.editor-textarea {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    padding: 0.5rem 1rem;
+    padding-bottom: 3rem; /* Increased bottom padding */
+    resize: none;
+    outline: none;
+    min-height: 100%;
+}
+
 .line-number {
     color: var(--color-text-muted);
-    padding: 0 10px;
+    padding: 0 0.5rem;
     text-align: right;
     user-select: none;
-    line-height: 1.5rem; /* LINE_HEIGHT */
+    line-height: 1.5rem;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+    height: 1.5rem; /* Explicit height for each line number */
 }
 
 .line-number.active {
     color: var(--color-primary);
     background-color: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2rem;
+    background-color: rgba(var(--color-background-rgb), 0.95);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    z-index: 100;
+    backdrop-filter: blur(5px);
+}
+
+/* Animation classes */
+.fade-in {
+    opacity: 0;
+    animation: fadeIn 0.3s ease-in forwards;
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Document switcher styles */
+.document-switcher {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    background-color: rgba(var(--color-background-rgb), 0.95);
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    animation: fadeIn 0.3s ease-in forwards 0.2s;
+}
+
+.doc-button {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.doc-button:hover:not(:disabled) {
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.doc-button.active {
+    background-color: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.doc-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 </style>
