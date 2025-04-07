@@ -573,22 +573,17 @@
 		return position;
 	}
 
-	// Update handleKeyDown to support the new commands
+	// Update handleKeyDown to handle arrow keys consistently in both modes
 	function handleKeyDown(event: KeyboardEvent) {
 		// First prevent any OS bindings
 		preventBrowserDefaults(event);
 
 		// Handle document switching with Ctrl+number in any mode
 		if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
-			// Check if the key is a number from 1-9
 			const numKey = parseInt(event.key);
 			if (!isNaN(numKey) && numKey >= 1 && numKey <= 9) {
-				// Check if we have a document at this index
 				if (projectDocuments.length >= numKey) {
-					// Get the document ID at index (numKey-1)
 					const docId = projectDocuments[numKey - 1].id;
-
-					// Switch to that document
 					switchDocument(docId);
 					event.preventDefault();
 					return;
@@ -596,9 +591,37 @@
 			}
 		}
 
-		// In NORMAL mode, prevent most key inputs
+		// Special handling for arrow keys in both modes
+		if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+			const totalLines = editorContent.split('\n').length;
+			const currentPosition = editorElement.selectionStart;
+			const textBeforeCursor = editorContent.substring(0, currentPosition);
+			const currentLineNumber = textBeforeCursor.split('\n').length;
+
+			// Handle bounds for both modes
+			if (event.key === 'ArrowDown' && currentLineNumber >= totalLines) {
+				event.preventDefault();
+				cursorLine = totalLines;
+				activeLineIndex = totalLines - 1;
+				updateLineNumbers();
+				return;
+			} else if (event.key === 'ArrowUp' && currentLineNumber <= 1) {
+				event.preventDefault();
+				cursorLine = 1;
+				activeLineIndex = 0;
+				updateLineNumbers();
+				return;
+			}
+
+			// Let the arrow key event happen
+			setTimeout(() => {
+				updateCursorPosition();
+				updateLineNumbers();
+			}, 0);
+		}
+
+		// Normal mode specific handling
 		if (editorMode === 'NORMAL') {
-			// Always prevent default for most keys in NORMAL mode
 			const allowedKeys = [
 				'Escape',
 				'ArrowUp',
@@ -612,15 +635,13 @@
 				'Tab'
 			];
 
-			// Also allow command keys
 			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd'];
 
-			// Allow Ctrl combinations
 			if (!event.ctrlKey && !allowedKeys.includes(event.key) && !commandKeys.includes(event.key)) {
 				event.preventDefault();
 			}
 
-			// Handle mode switches
+			// Handle mode switches and commands
 			if (event.key === 'i') {
 				editorMode = 'INSERT';
 				event.preventDefault();
@@ -638,36 +659,22 @@
 				event.preventDefault();
 				return;
 			} else if (event.key === 'x') {
-				// Delete selected text
 				deleteText();
 				event.preventDefault();
 				return;
 			} else if (event.key === 'p') {
-				// Paste text
 				pasteText();
 				event.preventDefault();
 				return;
-			} else if (event.key === 'd') {
-				// Check for 'dd' sequence
-				const handled = handleNormalModeSequence('d');
-				if (handled) {
-					event.preventDefault();
-					return;
-				}
-			} else if (event.key === 'y') {
-				// Check for 'yy' sequence
-				const handled = handleNormalModeSequence('y');
+			} else if (event.key === 'd' || event.key === 'y') {
+				const handled = handleNormalModeSequence(event.key);
 				if (handled) {
 					event.preventDefault();
 					return;
 				}
 			}
 
-			// Use our normal mode handler for navigation
 			handleNormalModeKeydown(event, editorElement);
-		} else if (editorMode === 'INSERT') {
-			// In INSERT mode, we don't need to prevent most keys
-			// Just handle Escape to exit INSERT mode
 		}
 
 		if (event.key === 'Escape') {
@@ -675,25 +682,44 @@
 			event.preventDefault();
 		}
 
-		// Always update cursor position
-		updateCursorPosition();
-
-		// Add this at the end of the function
-		updateLineNumbers();
+		// Update cursor position and line numbers for non-arrow key events
+		if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+			updateCursorPosition();
+			updateLineNumbers();
+		}
 	}
 
-	// Update the updateCursorPosition function to be more accurate
+	// Update the updateCursorPosition function to ensure accurate line highlighting
 	function updateCursorPosition() {
-		if (editorElement) {
-			const position = editorElement.selectionStart;
-			const text = editorElement.value;
-			const textBeforeCursor = text.substring(0, position);
-			const lines = textBeforeCursor.split('\n');
-
-			cursorLine = lines.length;
-			cursorColumn = lines[lines.length - 1].length + 1;
-			activeLineIndex = lines.length - 1;
+		if (!editorElement) return;
+		
+		const position = editorElement.selectionStart;
+		const text = editorContent;
+		const totalLines = text.split('\n').length;
+		
+		// Find all newline positions before cursor
+		const textBeforeCursor = text.substring(0, position);
+		const newlines = [...textBeforeCursor.matchAll(/\n/g)];
+		
+		// Calculate current line (1-based) and active line index (0-based)
+		cursorLine = newlines.length + 1;
+		activeLineIndex = newlines.length; // This should match the cursor line minus 1
+		
+		// Calculate column position
+		const lastNewlinePos = textBeforeCursor.lastIndexOf('\n');
+		cursorColumn = lastNewlinePos === -1 ? position + 1 : position - lastNewlinePos;
+		
+		// Handle bounds checking
+		if (cursorLine > totalLines) {
+			cursorLine = totalLines;
+			activeLineIndex = totalLines - 1;
+		} else if (cursorLine < 1) {
+			cursorLine = 1;
+			activeLineIndex = 0;
 		}
+		
+		// Double-check bounds for safety
+		activeLineIndex = Math.min(Math.max(0, activeLineIndex), totalLines - 1);
 	}
 
 	// Update the adjustTextareaHeight function to handle both growing and shrinking
@@ -804,9 +830,8 @@
 		};
 	});
 
-	// Update the handleInput function to properly handle pasted content
+	// Update the handleInput function to ensure proper line tracking
 	function handleInput(event: Event) {
-		// If in NORMAL mode, prevent typing by reverting the content
 		if (editorMode === 'NORMAL') {
 			// Get the current selection
 			const selectionStart = editorElement.selectionStart;
@@ -821,14 +846,19 @@
 			// Prevent the input
 			event.preventDefault();
 		} else {
-			// In INSERT mode, update the content and line numbers
+			// In INSERT mode, update the content
 			editorContent = editorElement.value;
+			
+			// Update cursor position first
+			updateCursorPosition();
+			
+			// Then update line numbers and adjust height
 			updateLineNumbers();
 			adjustTextareaHeight();
 		}
 	}
 
-	// Improved updateLineNumbers function
+	// Update the updateLineNumbers function to use cursor position directly
 	function updateLineNumbers() {
 		// Split content by newlines to get lines
 		lines = editorContent.split('\n');
@@ -838,16 +868,19 @@
 			lines = [''];
 		}
 		
-		// Update active line index based on cursor position
-		if (editorElement) {
-			const cursorPos = editorElement.selectionStart;
-			const textBeforeCursor = editorContent.substring(0, cursorPos);
-			activeLineIndex = (textBeforeCursor.match(/\n/g) || []).length;
+		// Update line numbers display
+		const lineNumbersContainer = document.querySelector('.line-numbers') as HTMLElement;
+		if (lineNumbersContainer) {
+			// Clear existing line numbers
+			lineNumbersContainer.innerHTML = '';
 			
-			// Update cursor line and column for status bar
-			cursorLine = activeLineIndex + 1;
-			const lastNewlinePos = textBeforeCursor.lastIndexOf('\n');
-			cursorColumn = lastNewlinePos === -1 ? cursorPos + 1 : cursorPos - lastNewlinePos;
+			// Create new line numbers with correct highlighting
+			lines.forEach((_, index) => {
+				const lineNumberDiv = document.createElement('div');
+				lineNumberDiv.className = `line-number ${index === activeLineIndex ? 'active' : ''}`;
+				lineNumberDiv.textContent = (index + 1).toString();
+				lineNumbersContainer.appendChild(lineNumberDiv);
+			});
 		}
 	}
 
@@ -1131,3 +1164,18 @@
 		</div>
 	</div>
 </div>
+
+<style>
+.line-number {
+    color: var(--color-text-muted);
+    padding: 0 10px;
+    text-align: right;
+    user-select: none;
+    line-height: 1.5rem; /* LINE_HEIGHT */
+}
+
+.line-number.active {
+    color: var(--color-primary);
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+}
+</style>
