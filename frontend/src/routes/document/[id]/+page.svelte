@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { jsPDF } from 'jspdf';
 
 	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
 	import { logout } from '$lib/ts/user'
@@ -70,6 +71,9 @@
 	let clipboardText = '';
 	let normalModeBuffer = '';
 	let normalModeBufferTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// Add state for commands overlay
+	let showCommands = false;
 
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
@@ -1034,6 +1038,61 @@
             console.error("Error during logout:", error);
         }
     }
+
+	// Add export to PDF function
+	async function exportToPDF() {
+		if (!documentData) return;
+		
+		try {
+			// Create a new PDF document
+			const doc = new jsPDF({
+				orientation: 'portrait',
+				unit: 'mm',
+				format: 'a4'
+			});
+			
+			// Set font and text properties
+			doc.setFont('Helvetica');
+			doc.setFontSize(16);
+			
+			// Add document title
+			doc.text(documentData.name || 'Untitled Document', 20, 20);
+			
+			// Add line under title
+			doc.setLineWidth(0.5);
+			doc.line(20, 25, 190, 25);
+			
+			// Add creation date
+			const createdAt = new Date(documentData.created_at).toLocaleDateString();
+			doc.setFontSize(10);
+			doc.text(`Created: ${createdAt}`, 20, 32);
+			
+			// Add content with line wrapping
+			doc.setFontSize(12);
+			const lines = editorContent.split('\n');
+			let y = 40;
+			const lineHeight = 7;
+			
+			for (const line of lines) {
+				// Check if we need a new page
+				if (y > 270) {
+					doc.addPage();
+					y = 20;
+				}
+				
+				// Add the line to the PDF
+				const splitLines = doc.splitTextToSize(line, 170);
+				doc.text(splitLines, 20, y);
+				y += splitLines.length * lineHeight;
+			}
+			
+			// Save the PDF with the document name
+			doc.save(`${documentData.name || 'document'}.pdf`);
+		} catch (error) {
+			console.error('Error exporting PDF:', error);
+			alert('Failed to export PDF. Please try again.');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -1053,6 +1112,17 @@
 				</div>
 			</a>
 			<div class="spacer"></div>
+			
+			<!-- Export to PDF button -->
+			<button 
+				class="btn btn-outline-light btn-sm me-3" 
+				on:click={exportToPDF}
+				title="Export to PDF"
+				disabled={loading || error}
+			>
+				<i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+			</button>
+			
 			<div class="dropdown">
 				<button 
 					class="btn p-0 border-0 bg-transparent" 
@@ -1196,7 +1266,63 @@
 		</div>
 
 		<div class="cursor-position">
+			<button class="commands-toggle" on:click={() => showCommands = !showCommands} title="Toggle Commands Reference">
+				<i class="bi bi-info-circle"></i>
+			</button>
 			<span>Line: {cursorLine}, Col: {cursorColumn}</span>
+		</div>
+	</div>
+
+	<!-- Add commands cheat sheet overlay -->
+	<div class="commands-overlay" class:show-commands={showCommands}>
+		<div class="commands-header">
+			<h5>Vim Command Reference</h5>
+			<button class="commands-close" on:click={() => showCommands = false}>×</button>
+		</div>
+		<div class="commands-body">
+			<div class="commands-section">
+				<h6>Mode Switching</h6>
+				<ul>
+					<li><span class="key">i</span> Enter Insert mode</li>
+					<li><span class="key">Esc</span> Return to Normal mode</li>
+					<li><span class="key">:</span> Enter Command mode</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Navigation</h6>
+				<ul>
+					<li><span class="key">h j k l</span> Move left, down, up, right</li>
+					<li><span class="key">0</span> Start of line</li>
+					<li><span class="key">$</span> End of line</li>
+					<li><span class="key">gg</span> Start of document</li>
+					<li><span class="key">G</span> End of document</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Editing</h6>
+				<ul>
+					<li><span class="key">x</span> Delete character</li>
+					<li><span class="key">dd</span> Delete line</li>
+					<li><span class="key">yy</span> Copy line</li>
+					<li><span class="key">p</span> Paste after cursor</li>
+					<li><span class="key">P</span> Paste before cursor</li>
+					<li><span class="key">u</span> Undo</li>
+					<li><span class="key">Ctrl+r</span> Redo</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Search & Replace</h6>
+				<ul>
+					<li><span class="key">/pattern</span> Search forward</li>
+					<li><span class="key">?pattern</span> Search backward</li>
+					<li><span class="key">n</span> Next match</li>
+					<li><span class="key">N</span> Previous match</li>
+					<li><span class="key">:%s/old/new/g</span> Replace all</li>
+				</ul>
+			</div>
 		</div>
 	</div>
 </div>
@@ -1386,5 +1512,120 @@
 .doc-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Add these styles for the commands overlay */
+.commands-overlay {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    width: 300px;
+    background-color: rgba(18, 18, 18, 0.9);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    color: #e5e5e5;
+    z-index: 1000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    transform: translateX(20px);
+    pointer-events: none;
+    transition: all 0.3s ease;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.commands-overlay.show-commands {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+}
+
+.commands-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.commands-header h5 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-primary);
+}
+
+.commands-close {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 10px;
+}
+
+.commands-close:hover {
+    color: #fff;
+}
+
+.commands-body {
+    padding: 10px 15px;
+}
+
+.commands-section {
+    margin-bottom: 15px;
+}
+
+.commands-section h6 {
+    margin-bottom: 8px;
+    color: var(--color-primary);
+    font-size: 13px;
+}
+
+.commands-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.commands-section li {
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.key {
+    display: inline-block;
+    padding: 2px 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    margin-right: 8px;
+    font-weight: bold;
+    color: var(--color-primary-light);
+}
+
+.commands-toggle {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    margin-right: 10px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+.commands-toggle:hover {
+    color: var(--color-primary);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Make sure these styles don't conflict with existing ones */
+.cursor-position {
+    display: flex;
+    align-items: center;
 }
 </style>
