@@ -1516,7 +1516,7 @@
 		</div>
 
 		<div class="cursor-position">
-			<button class="commands-toggle" on:click={() => showCommands = !showCommands} title="Toggle Commands Reference">
+			<button class="commands-toggle" on:click={() => showCommands = !showCommands} title="Toggle Commands Reference" aria-label="Toggle commands reference">
 				<i class="bi bi-info-circle"></i>
 			</button>
 			<span>Line: {cursorLine}, Col: {cursorColumn}</span>
@@ -1527,7 +1527,7 @@
 	<div class="commands-overlay" class:show-commands={showCommands}>
 		<div class="commands-header">
 			<h5>Vim Command Reference</h5>
-			<button class="commands-close" on:click={() => showCommands = false}>×</button>
+			<button class="commands-close" on:click={() => showCommands = false} aria-label="Close commands reference">×</button>
 		</div>
 		<div class="commands-body">
 			<div class="commands-section">
@@ -1735,7 +1735,8 @@
     justify-content: center;
     gap: 0.5rem;
     padding: 0.5rem;
-    margin-top: 0.5rem;
+    margin-top: 2rem;
+	margin-bottom: -.5rem;
     background-color: rgba(var(--color-background-rgb), 0.95);
     backdrop-filter: blur(5px);
     opacity: 0;
