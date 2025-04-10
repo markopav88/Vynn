@@ -45,8 +45,10 @@
 	let previousActiveLineIndex = 0;
 	let animationHeight = 0; // Store the height for consistent animation
 
+	// Constants for editor configuration
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
 	const MIN_LINES = 30; // minimum lines to display
+	const MAX_COLUMN_WIDTH = 111; // maximum characters per line
 	let documentReady = false;	// to track when the document is ready to display
 	let projectDocumentsLoaded = false; // to track when project documents are loaded
 
@@ -379,7 +381,7 @@
 					goto('/drive');
 				});
 			}
-			} else {
+		} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
 			return false;
@@ -874,63 +876,241 @@
 		}
 	}
 
-	// Update the handleInput function to handle Enter key presses correctly
+	// Function to handle automatic line wrapping - fixed to prevent premature wrapping
+	function autoWrapLine(text: string): string {
+		if (!text) return '';
+		
+		// Split into existing lines first
+		const lines = text.split('\n');
+		const wrappedLines = [];
+		
+		for (const line of lines) {
+			// If line is exactly at or under the limit, keep it as is
+			if (line.length <= MAX_COLUMN_WIDTH) {
+				wrappedLines.push(line);
+			} else {
+				// Line is too long and needs wrapping
+				let remainingText = line;
+				
+				while (remainingText.length > MAX_COLUMN_WIDTH) {
+					// Find the best place to break (prefer at spaces)
+					// Only look for spaces up to MAX_COLUMN_WIDTH (not MAX_COLUMN_WIDTH-1)
+					let breakIndex = remainingText.lastIndexOf(' ', MAX_COLUMN_WIDTH);
+					
+					// If no good break point or it's too far back, break exactly at the column limit
+					if (breakIndex === -1 || breakIndex < MAX_COLUMN_WIDTH - 20) {
+						breakIndex = MAX_COLUMN_WIDTH;
+					}
+					
+					// Add the segment up to the break point
+					wrappedLines.push(remainingText.substring(0, breakIndex));
+					
+					// Continue with the rest of the text, making sure to remove any leading spaces
+					remainingText = remainingText.substring(breakIndex).trimStart();
+				}
+				
+				// Add any remaining text as a new line (only if there's actually content)
+				if (remainingText.length > 0) {
+					wrappedLines.push(remainingText);
+				}
+			}
+		}
+		
+		return wrappedLines.join('\n');
+	}
+	
+	// Updated handleInput to prevent premature wrapping
 	function handleInput(event: Event) {
 		if (editorMode === 'NORMAL') {
-			// Get the current selection
+			// Normal mode handling (unchanged)
 			const selectionStart = editorElement.selectionStart;
 			const selectionEnd = editorElement.selectionEnd;
-
-			// Revert to previous content
 			editorElement.value = editorContent;
-
-			// Restore selection
 			editorElement.setSelectionRange(selectionStart - 1, selectionEnd - 1);
-
-			// Prevent the input
 			event.preventDefault();
 		} else {
-			// In INSERT mode, update the content
+			// In INSERT mode
 			const previousContent = editorContent;
-			editorContent = editorElement.value;
+			let currentContent = editorElement.value;
+			const cursorPos = editorElement.selectionStart;
 			
-			// Get current cursor position
-			const position = editorElement.selectionStart;
-			const textBeforeCursor = editorContent.substring(0, position);
+			// Check if wrapping is needed - only if a line is STRICTLY longer than the limit
+			const contentLines = currentContent.split('\n');
+			let needsWrapping = false;
 			
-			// Check if Enter was pressed (new line created)
-			const previousLines = previousContent.split('\n');
-			const currentLines = editorContent.split('\n');
-			const isNewLine = currentLines.length > previousLines.length;
+			for (const line of contentLines) {
+				if (line.length > MAX_COLUMN_WIDTH) {
+					needsWrapping = true;
+					break;
+				}
+			}
 			
-			if (isNewLine) {
-				// For new lines, set the active line to where the cursor is
-				const newlines = textBeforeCursor.split('\n');
-				cursorLine = newlines.length;
-				activeLineIndex = cursorLine - 1;
+			// Apply wrapping if needed
+			if (needsWrapping) {
+				// Save text before cursor to calculate new cursor position later
+				const beforeCursor = currentContent.substring(0, cursorPos);
+				
+				// Apply wrapping
+				const wrappedContent = autoWrapLine(currentContent);
+				
+				// Only update if wrapping actually changed something
+				if (wrappedContent !== currentContent) {
+					// Update content
+					editorContent = wrappedContent;
+					editorElement.value = wrappedContent;
+					
+					// Recalculate cursor position
+					const wrappedBeforeCursor = autoWrapLine(beforeCursor);
+					const newCursorPos = wrappedBeforeCursor.length;
+					
+					// Set cursor position
+					editorElement.setSelectionRange(newCursorPos, newCursorPos);
+					
+					// Update current content after wrapping
+					currentContent = wrappedContent;
+				} else {
+					editorContent = currentContent;
+				}
 			} else {
-				// For normal input, calculate based on cursor position
-				const newlines = [...textBeforeCursor.matchAll(/\n/g)];
-				cursorLine = newlines.length + 1;
-				activeLineIndex = cursorLine - 1;
+				// No wrapping needed
+				editorContent = currentContent;
 			}
 			
-			// Ensure bounds
-			const totalLines = currentLines.length;
-			if (cursorLine > totalLines) {
-				cursorLine = totalLines;
-				activeLineIndex = totalLines - 1;
-			} else if (cursorLine < 1) {
-				cursorLine = 1;
-				activeLineIndex = 0;
-			}
+			// After all content changes, update line tracking
+			const finalPosition = editorElement.selectionStart;
+			const finalTextBeforeCursor = currentContent.substring(0, finalPosition);
 			
-			// Update line numbers and adjust height
-			lines = currentLines;
+			// Count actual newlines to determine line number
+			const newlineMatches = finalTextBeforeCursor.match(/\n/g);
+			const lineCount = newlineMatches ? newlineMatches.length + 1 : 1;
+			
+			// Update cursor line and active line index
+			cursorLine = lineCount;
+			activeLineIndex = lineCount - 1;
+			
+			// Update the lines array
+			lines = currentContent.split('\n');
+			
+			// Update line numbers and adjust textarea height
 			updateLineNumbers();
+			updateCursorPosition(); // Make sure cursor position indicator is updated
 			adjustTextareaHeight();
 		}
 	}
+	
+	// Update the paste handler to ensure consistent line handling
+	function handlePaste(event: ClipboardEvent) {
+		// Let the paste happen normally
+		setTimeout(() => {
+			// Get content after paste
+			const pastedContent = editorElement.value;
+			const cursorPos = editorElement.selectionStart;
+			
+			// Check if any line needs wrapping
+			const contentLines = pastedContent.split('\n');
+			let needsWrapping = false;
+			
+			for (const line of contentLines) {
+				if (line.length > MAX_COLUMN_WIDTH) {
+					needsWrapping = true;
+					break;
+				}
+			}
+			
+			// Apply wrapping if needed
+			if (needsWrapping) {
+				// Get text before cursor to calculate new position later
+				const beforeCursor = pastedContent.substring(0, cursorPos);
+				
+				// Apply wrapping
+				const wrappedContent = autoWrapLine(pastedContent);
+				
+				// Update content
+				editorContent = wrappedContent;
+				editorElement.value = wrappedContent;
+				
+				// Calculate new cursor position
+				const wrappedBeforeCursor = autoWrapLine(beforeCursor);
+				const newCursorPos = wrappedBeforeCursor.length;
+				
+				// Set cursor position
+				editorElement.setSelectionRange(newCursorPos, newCursorPos);
+			} else {
+				// No wrapping needed
+				editorContent = pastedContent;
+			}
+			
+			// Update lines array and cursor position
+			lines = editorContent.split('\n');
+			updateCursorPosition();
+			updateLineNumbers();
+			adjustTextareaHeight();
+		}, 0);
+	}
+	
+	// Add this function to measure column width
+	function getCharacterWidth(): number {
+		// This function creates a temporary span to measure character width
+		// We're using a monospace font, so all characters have the same width
+		const span = document.createElement('span');
+		span.style.visibility = 'hidden';
+		span.style.position = 'absolute';
+		span.style.whiteSpace = 'nowrap';
+		span.style.font = window.getComputedStyle(editorElement).font;
+		span.innerHTML = 'X'.repeat(10); // Use 10 characters for more precise measurement
+		
+		document.body.appendChild(span);
+		const width = span.getBoundingClientRect().width / 10;
+		document.body.removeChild(span);
+		
+		return width;
+	}
+	
+	// Calculate the max column width based on the editor width
+	function calculateMaxColumnWidth(): number {
+		if (!editorElement) return MAX_COLUMN_WIDTH;
+		
+		const charWidth = getCharacterWidth();
+		const editorWidth = editorElement.clientWidth;
+		const padding = parseInt(window.getComputedStyle(editorElement).paddingLeft) + 
+					   parseInt(window.getComputedStyle(editorElement).paddingRight);
+		
+		// Calculate how many characters fit in the editor width
+		const maxChars = Math.floor((editorWidth - padding) / charWidth);
+		
+		// Return the calculated value, or default if calculation fails
+		return maxChars > 0 ? maxChars : MAX_COLUMN_WIDTH;
+	}
+	
+	// Update onMount to calculate max column width when editor loads
+	onMount(async () => {
+		// Load document data and profile image in parallel
+		try {
+			const [docResult, userResult] = await Promise.all([
+				loadDocumentData(),
+				loadUserProfile()
+			]);
+			
+			// Calculate max column width once the editor is loaded
+			setTimeout(() => {
+				if (editorElement) {
+					const calculatedWidth = calculateMaxColumnWidth();
+					// Only update if the calculation seems reasonable
+					if (calculatedWidth > 20 && calculatedWidth < 200) {
+						// We don't actually change MAX_COLUMN_WIDTH as it's a const
+						// But we could use this value in a non-const variable if needed
+						console.log(`Calculated max column width: ${calculatedWidth}`);
+					}
+				}
+			}, 100);
+			
+		} catch (e) {
+			console.error('Error during initialization:', e);
+			error = true;
+		} finally {
+			loading = false;
+		}
+	});
 
 	// Update the updateLineNumbers function to use cursor position directly
 	function updateLineNumbers() {
@@ -1038,17 +1218,6 @@
 		if (mode === 'NORMAL' && editorElement) {
 			editorElement.focus();
 		}
-	}
-
-	// Add this to your script section
-	function handlePaste(event: ClipboardEvent) {
-		// Let the paste happen normally
-		setTimeout(() => {
-			// After paste completes, update the line numbers
-			editorContent = editorElement.value;
-			updateLineNumbers();
-			adjustTextareaHeight();
-		}, 0);
 	}
 
 	// Add handler for account page navigation
