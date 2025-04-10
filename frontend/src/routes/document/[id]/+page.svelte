@@ -346,17 +346,33 @@
 		}
 	}
 
-	// Function to navigate through search results with n/N
+	// Function to navigate through search results with n/m
 	function navigateSearchResults(forward: boolean) {
 		if (searchResults.length === 0) return;
 
-		if (forward) {
+		// Get search direction (whether we're in a forward or backward search)
+		const isBackwardSearch = commandPrefix === '?';
+		
+		// Determine which direction to move based on search direction and key pressed
+		// For '/' searches: 'n' moves forward, 'm' moves backward
+		// For '?' searches: 'n' moves backward, 'm' moves forward
+		let moveForward = forward;
+		
+		// If we're in a backward search ('?'), invert the direction
+		if (isBackwardSearch) {
+			moveForward = !moveForward;
+		}
+		
+		if (moveForward) {
 			currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
 		} else {
 			currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
 		}
 
 		navigateToSearchResult();
+		
+		// Show feedback about current match position
+		showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 	}
 
 	// Function to handle colon commands
@@ -687,10 +703,12 @@
 				'End',
 				'PageUp',
 				'PageDown',
-				'Tab'
+				'Tab',
+				'n',
+				'm'
 			];
 
-			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd'];
+			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd', 'n', 'm'];
 
 			if (!event.ctrlKey && !allowedKeys.includes(event.key) && !commandKeys.includes(event.key)) {
 				event.preventDefault();
@@ -719,6 +737,16 @@
 				return;
 			} else if (event.key === 'p') {
 				pasteText();
+				event.preventDefault();
+				return;
+			} else if (event.key === 'n' && searchResults.length > 0) {
+				// Navigate to next match (direction depends on search command used)
+				navigateSearchResults(true);
+				event.preventDefault();
+				return;
+			} else if (event.key === 'm' && searchResults.length > 0) {
+				// Navigate to previous match (direction depends on search command used)
+				navigateSearchResults(false);
 				event.preventDefault();
 				return;
 			} else if (event.key === 'd' || event.key === 'y') {
@@ -1221,6 +1249,9 @@
 		
 		// Navigate to the found position
 		navigateToSearchResult();
+		
+		// Show feedback about matches
+		showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 	}
 
 	// Update the executeCommand function to handle both / and ? commands
@@ -1564,9 +1595,9 @@
 				<h6>Search & Replace</h6>
 				<ul>
 					<li><span class="key">/</span> Search relative forward</li>
-					<li><span class="key">?</span> Search relativebackward</li>
+					<li><span class="key">?</span> Search relative backward</li>
 					<li><span class="key">n</span> Next match</li>
-					<li><span class="key">N</span> Previous match</li>
+					<li><span class="key">m</span> Previous match</li>
 					<li><span class="key">:%s/old/new/g</span> Replace all</li>
 				</ul>
 			</div>
