@@ -470,6 +470,7 @@ pub async fn api_search_users(
 
 /// GET handler for retrieving the current logged-in user's information.
 /// Accessible via: GET /api/users/current
+/// Test: test_users.rs/test_get_current_user()
 /// Frontend: user.ts/get_current_user()
 pub async fn api_get_current_user(
     cookies: Cookies,
