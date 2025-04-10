@@ -86,7 +86,7 @@
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
 			// Allow only specific browser shortcuts we want to keep
-			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'f'];
+			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'f', '/'];
 			if (!allowedKeys.includes(event.key.toLowerCase())) {
 				event.preventDefault();
 			}
@@ -167,7 +167,7 @@
 					documentData.project_name = projectInfo.project_name;
 				}
 
-				// Wait for animation to complete
+				// Wait for animation to complete before resetting animation state
 				setTimeout(() => {
 					isAnimating = false;
 					slideDirection = '';
@@ -176,7 +176,7 @@
 					animationHeight = 0;
 					// Adjust textarea height
 					setTimeout(adjustTextareaHeight, 0);
-				}, 300); // Match this with CSS transition duration
+				}, 400); // Match this with the CSS animation duration (400ms now)
 
 				return;
 			}
@@ -623,6 +623,13 @@
 		// First prevent any OS bindings
 		preventBrowserDefaults(event);
 
+		// Handle Ctrl+/ to toggle command cheat sheet in any mode
+		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+			event.preventDefault();
+			showCommands = !showCommands;
+			return;
+		}
+
 		// Handle document switching with Ctrl+number in any mode
 		if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
 			const numKey = parseInt(event.key);
@@ -819,7 +826,7 @@
 		}
 	}
 
-	// Update the onMount function to set documentReady and navbarReady
+	// Update the onMount function for quicker loading
 	onMount(async () => {
 		// Load document data and profile image in parallel
 		try {
@@ -827,6 +834,26 @@
 				loadDocumentData(),
 				loadUserProfile()
 			]);
+			
+			// Calculate max column width once the editor is loaded
+			setTimeout(() => {
+				if (editorElement) {
+					const calculatedWidth = calculateMaxColumnWidth();
+					// Only update if the calculation seems reasonable
+					if (calculatedWidth > 20 && calculatedWidth < 200) {
+						console.log(`Calculated max column width: ${calculatedWidth}`);
+					}
+				}
+			}, 100);
+			
+			// Set navbar ready first
+			navbarReady = true;
+			
+			// Then set document ready with a shorter delay
+			setTimeout(() => {
+				documentReady = true;
+			}, 150);
+			
 		} catch (e) {
 			console.error('Error during initialization:', e);
 			error = true;
@@ -864,14 +891,6 @@
 						update_document(documentData);
 					}
 				});
-
-				// Set documentReady to true after everything is loaded
-				documentReady = true;
-
-				// Set navbarReady after a delay to create staggered animation
-				setTimeout(() => {
-					navbarReady = true;
-				}, 400); // Delay navbar animation to happen after document picker
 
 				// Add this line to update line numbers when document loads
 				updateLineNumbers();
@@ -1128,36 +1147,6 @@
 		return maxChars > 0 ? maxChars : MAX_COLUMN_WIDTH;
 	}
 	
-	// Update onMount to calculate max column width when editor loads
-	onMount(async () => {
-		// Load document data and profile image in parallel
-		try {
-			const [docResult, userResult] = await Promise.all([
-				loadDocumentData(),
-				loadUserProfile()
-			]);
-			
-			// Calculate max column width once the editor is loaded
-			setTimeout(() => {
-				if (editorElement) {
-					const calculatedWidth = calculateMaxColumnWidth();
-					// Only update if the calculation seems reasonable
-					if (calculatedWidth > 20 && calculatedWidth < 200) {
-						// We don't actually change MAX_COLUMN_WIDTH as it's a const
-						// But we could use this value in a non-const variable if needed
-						console.log(`Calculated max column width: ${calculatedWidth}`);
-					}
-				}
-			}, 100);
-			
-		} catch (e) {
-			console.error('Error during initialization:', e);
-			error = true;
-		} finally {
-			loading = false;
-		}
-	});
-
 	// Update the updateLineNumbers function to use cursor position directly
 	function updateLineNumbers() {
 		// Split content by newlines to get lines
@@ -1352,7 +1341,7 @@
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
 
 	<!-- Minimal Navbar with fade-in animation -->
-	<div class="navbar-container" class:fade-in={navbarReady}>
+	<div class="navbar-container" class:fade-in-first={navbarReady}>
 		<nav class="navbar">
 			<a href="/drive" class="logo-link" aria-label="Go to Drive">
 				<div class="logo-container">
@@ -1388,7 +1377,7 @@
 						on:error={() => userProfileImage = profileDefault}
 					/>
 				</button>
-				<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+				<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark profile-dropdown">
 					<li>
 						<button class="dropdown-item" on:click={goToAccount}>
 							<i class="bi bi-person me-2"></i> My Account
@@ -1407,7 +1396,7 @@
 
 	<!-- Project Document Switcher -->
 	{#if projectDocumentsLoaded}
-		<div class="document-switcher fade-in">
+		<div class="document-switcher fade-in-second">
 			{#if projectDocuments.length > 0}
 				{#each projectDocuments as doc, index}
 					<button
@@ -1431,7 +1420,7 @@
 	{/if}
 
 	<!-- Editor Container with animation -->
-	<div class="editor-container" class:fade-in={documentReady}>
+	<div class="editor-container" class:fade-in-third={documentReady}>
 		{#if loading}
 			<div class="loading">Loading document...</div>
 	{:else if error}
@@ -1483,7 +1472,7 @@
 	</div>
 
 	<!-- Fixed Status Bar - moved outside the editor wrapper -->
-	<div class="status-bar">
+	<div class="status-bar" class:fade-in-fourth={documentReady}>
 		<div class="mode-indicator">
 			<span class="mode {editorMode.toLowerCase()}">{editorMode}</span>
 			{#if editorMode === 'COMMAND'}
@@ -1574,6 +1563,14 @@
 					<li><span class="key">n</span> Next match</li>
 					<li><span class="key">N</span> Previous match</li>
 					<li><span class="key">:%s/old/new/g</span> Replace all</li>
+				</ul>
+			</div>
+
+			<div class="commands-section">
+				<h6>Editor Shortcuts</h6>
+				<ul>
+					<li><span class="key">Ctrl+/</span> Toggle this cheat sheet</li>
+					<li><span class="key">Ctrl+[1-9]</span> Switch to document number</li>
 				</ul>
 			</div>
 		</div>
@@ -1712,35 +1709,86 @@
     backdrop-filter: blur(5px);
 }
 
-/* Animation classes */
-.fade-in {
+.mode-indicator {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 150px;
+}
+
+.document-name {
+    flex: 2;
+    text-align: center;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40%;
+    font-weight: 500;
+}
+
+.cursor-position {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-width: 150px;
+}
+
+/* Animation classes with smoother transitions */
+.fade-in-first {
     opacity: 0;
-    animation: fadeIn 0.3s ease-in forwards;
+    animation: fadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.fade-in-second {
+    opacity: 0;
+    animation: fadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards 0.15s;
+}
+
+.fade-in-third {
+    opacity: 0;
+    animation: fadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards 0.3s;
+}
+
+.fade-in-fourth {
+    opacity: 0;
+    animation: fadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards 0.45s;
 }
 
 @keyframes fadeIn {
     from { 
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translateY(-15px) scale(0.98);
+        filter: blur(2px);
     }
     to { 
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
+        filter: blur(0);
     }
 }
 
-/* Document switcher styles */
+/* For compatibility with older animations */
+.fade-in {
+    opacity: 0;
+    animation: fadeIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
 .document-switcher {
     display: flex;
     justify-content: center;
     gap: 0.5rem;
     padding: 0.5rem;
     margin-top: 2rem;
-	margin-bottom: -.5rem;
+    margin-bottom: -.5rem;
     background-color: rgba(var(--color-background-rgb), 0.95);
     backdrop-filter: blur(5px);
-    opacity: 0;
-    animation: fadeIn 0.3s ease-in forwards 0.2s;
+    /* Remove opacity and animation from here since it's handled by the new classes */
+    /* opacity: 0; */
+    /* animation: fadeIn 0.3s ease-in forwards 0.2s; */
 }
 
 .doc-button {
@@ -1893,5 +1941,81 @@
 .cursor-position {
     display: flex;
     align-items: center;
+}
+
+.profile-dropdown {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(33, 37, 41, 0.98) !important;
+    font-weight: 500;
+}
+
+/* Add CSS for smoother document switching animation */
+.editor-wrapper.previous.left-exit {
+    animation: slideLeftExit 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
+}
+
+.editor-wrapper.current.left-enter {
+    animation: slideLeftEnter 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
+}
+
+.editor-wrapper.previous.right-exit {
+    animation: slideRightExit 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
+}
+
+.editor-wrapper.current.right-enter {
+    animation: slideRightEnter 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
+}
+
+@keyframes slideLeftExit {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+        filter: blur(0);
+    }
+    to {
+        transform: translateX(-50px);
+        opacity: 0;
+        filter: blur(2px);
+    }
+}
+
+@keyframes slideLeftEnter {
+    from {
+        transform: translateX(50px);
+        opacity: 0;
+        filter: blur(2px);
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+@keyframes slideRightExit {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+        filter: blur(0);
+    }
+    to {
+        transform: translateX(50px);
+        opacity: 0;
+        filter: blur(2px);
+    }
+}
+
+@keyframes slideRightEnter {
+    from {
+        transform: translateX(-50px);
+        opacity: 0;
+        filter: blur(2px);
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+        filter: blur(0);
+    }
 }
 </style>
