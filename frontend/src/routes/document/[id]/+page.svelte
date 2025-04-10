@@ -488,34 +488,69 @@
 		const end = editorElement.selectionEnd;
 
 		// Insert the clipboard text
-		editorContent = editorContent.substring(0, start) + clipboardText + editorContent.substring(end);
+		const beforePaste = editorContent.substring(0, start);
+		const afterPaste = editorContent.substring(end);
+		const newContent = beforePaste + clipboardText + afterPaste;
+		
+		// Process line wrapping if needed
+		let finalContent = newContent;
+		let newCursorPos = start + clipboardText.length;
+		
+		// Check if any line needs wrapping
+		const contentLines = newContent.split('\n');
+		let needsWrapping = false;
+		
+		for (const line of contentLines) {
+			if (line.length > MAX_COLUMN_WIDTH) {
+				needsWrapping = true;
+				break;
+			}
+		}
+		
+		// Apply wrapping if needed
+		if (needsWrapping) {
+			// Calculate text before cursor for position tracking
+			const beforeCursor = newContent.substring(0, start + clipboardText.length);
+			
+			// Apply wrapping
+			finalContent = autoWrapLine(newContent);
+			
+			// Recalculate cursor position
+			const wrappedBeforeCursor = autoWrapLine(beforeCursor);
+			newCursorPos = wrappedBeforeCursor.length;
+		}
 
 		// Update the editor
-		editorElement.value = editorContent;
-		editorElement.setSelectionRange(start + clipboardText.length, start + clipboardText.length);
+		editorContent = finalContent;
+		editorElement.value = finalContent;
+		editorElement.setSelectionRange(newCursorPos, newCursorPos);
 
 		// Update lines array for line numbers
-		lines = editorContent.split('\n');
+		lines = finalContent.split('\n');
 
-		// Update cursor position
+		// Force a complete refresh of the cursor position
+		const textBeforeCursor = finalContent.substring(0, newCursorPos);
+		const newlineMatches = textBeforeCursor.match(/\n/g);
+		cursorLine = newlineMatches ? newlineMatches.length + 1 : 1;
+		activeLineIndex = cursorLine - 1;
+
+		// Update line numbers and adjust height
+		updateLineNumbers();
 		updateCursorPosition();
-
-		// Adjust textarea height to accommodate new content
 		adjustTextareaHeight();
 
 		// Ensure the cursor is visible by scrolling if needed
 		setTimeout(() => {
 			// Calculate which line the cursor is on
-			const textBeforeCursor = editorContent.substring(0, start + clipboardText.length);
-			const linesBeforeCursor = textBeforeCursor.split('\n');
-			const cursorLineIndex = linesBeforeCursor.length - 1;
+			const cursorLineIndex = activeLineIndex;
 
 			// Scroll to make the cursor visible
 			const lineHeight = LINE_HEIGHT; // Using your defined line height constant
 			const scrollTop = cursorLineIndex * lineHeight;
 
 			if (editorElement) {
-				editorElement.scrollTop = scrollTop;
+				// Ensure we're in view
+				editorElement.scrollTop = scrollTop - editorElement.clientHeight / 2;
 			}
 		}, 0);
 	}
@@ -998,7 +1033,7 @@
 		}
 	}
 	
-	// Update the paste handler to ensure consistent line handling
+	// Update the paste handler to correctly process content and line numbers
 	function handlePaste(event: ClipboardEvent) {
 		// Let the paste happen normally
 		setTimeout(() => {
@@ -1006,16 +1041,20 @@
 			const pastedContent = editorElement.value;
 			const cursorPos = editorElement.selectionStart;
 			
-			// Check if any line needs wrapping
+			// First process line wrapping
 			const contentLines = pastedContent.split('\n');
 			let needsWrapping = false;
 			
+			// Check if any line needs wrapping
 			for (const line of contentLines) {
 				if (line.length > MAX_COLUMN_WIDTH) {
 					needsWrapping = true;
 					break;
 				}
 			}
+			
+			let finalContent = pastedContent;
+			let finalCursorPos = cursorPos;
 			
 			// Apply wrapping if needed
 			if (needsWrapping) {
@@ -1024,26 +1063,33 @@
 				
 				// Apply wrapping
 				const wrappedContent = autoWrapLine(pastedContent);
-				
-				// Update content
-				editorContent = wrappedContent;
-				editorElement.value = wrappedContent;
+				finalContent = wrappedContent;
 				
 				// Calculate new cursor position
 				const wrappedBeforeCursor = autoWrapLine(beforeCursor);
-				const newCursorPos = wrappedBeforeCursor.length;
-				
-				// Set cursor position
-				editorElement.setSelectionRange(newCursorPos, newCursorPos);
-			} else {
-				// No wrapping needed
-				editorContent = pastedContent;
+				finalCursorPos = wrappedBeforeCursor.length;
 			}
 			
-			// Update lines array and cursor position
+			// Update content
+			editorContent = finalContent;
+			editorElement.value = finalContent;
+			
+			// Set cursor position
+			editorElement.setSelectionRange(finalCursorPos, finalCursorPos);
+			
+			// Update line arrays and cursor position
 			lines = editorContent.split('\n');
-			updateCursorPosition();
+			
+			// Force a complete refresh of all line-related state
+			// This is crucial for proper line number display
+			const textBeforeCursor = editorContent.substring(0, finalCursorPos);
+			const newlineMatches = textBeforeCursor.match(/\n/g);
+			cursorLine = newlineMatches ? newlineMatches.length + 1 : 1;
+			activeLineIndex = cursorLine - 1;
+			
+			// Complete refresh of line numbers display
 			updateLineNumbers();
+			updateCursorPosition();
 			adjustTextareaHeight();
 		}, 0);
 	}
@@ -1496,7 +1542,10 @@
 			<div class="commands-section">
 				<h6>Navigation</h6>
 				<ul>
-					<li><span class="key">h j k l</span> Move left, down, up, right</li>
+					<li><span class="key">h</span> Move left</li>
+					<li><span class="key">j</span> Move up</li>
+					<li><span class="key">k</span> Move right</li>
+					<li><span class="key">l</span> Move down</li>
 					<li><span class="key">0</span> Start of line</li>
 					<li><span class="key">$</span> End of line</li>
 					<li><span class="key">gg</span> Start of document</li>
@@ -1507,7 +1556,7 @@
 			<div class="commands-section">
 				<h6>Editing</h6>
 				<ul>
-					<li><span class="key">x</span> Delete character</li>
+					<li><span class="key">x</span> Delete selected</li>
 					<li><span class="key">dd</span> Delete line</li>
 					<li><span class="key">yy</span> Copy line</li>
 					<li><span class="key">p</span> Paste after cursor</li>
@@ -1520,8 +1569,8 @@
 			<div class="commands-section">
 				<h6>Search & Replace</h6>
 				<ul>
-					<li><span class="key">/pattern</span> Search forward</li>
-					<li><span class="key">?pattern</span> Search backward</li>
+					<li><span class="key">/</span> Search relative forward</li>
+					<li><span class="key">?</span> Search relativebackward</li>
 					<li><span class="key">n</span> Next match</li>
 					<li><span class="key">N</span> Previous match</li>
 					<li><span class="key">:%s/old/new/g</span> Replace all</li>
@@ -1718,10 +1767,10 @@
     cursor: not-allowed;
 }
 
-/* Add these styles for the commands overlay */
+/* Updated styles for the commands overlay */
 .commands-overlay {
     position: fixed;
-    top: 100px;
+    top: 200px;
     right: 20px;
     width: 300px;
     background-color: rgba(18, 18, 18, 0.9);
@@ -1737,8 +1786,15 @@
     transform: translateX(20px);
     pointer-events: none;
     transition: all 0.3s ease;
-    max-height: 70vh;
+    max-height: 68vh;
     overflow-y: auto;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.commands-overlay::-webkit-scrollbar {
+    display: none;
 }
 
 .commands-overlay.show-commands {
@@ -1748,11 +1804,15 @@
 }
 
 .commands-header {
+    position: sticky;
+    top: 0;
     padding: 10px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background-color: rgba(18, 18, 18, 0.95);
+    z-index: 2;
 }
 
 .commands-header h5 {
@@ -1777,6 +1837,7 @@
 
 .commands-body {
     padding: 10px 15px;
+    padding-bottom: 20px;
 }
 
 .commands-section {
