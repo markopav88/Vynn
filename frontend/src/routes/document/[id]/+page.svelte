@@ -435,6 +435,11 @@
 			deleteCurrentLine();
 			normalModeBuffer = ''; // Clear buffer after command
 			return true;
+		} else if (normalModeBuffer === 'gg') {
+			// Move to the beginning of the document
+			moveToStartOfDocument();
+			normalModeBuffer = ''; // Clear buffer after command
+			return true;
 		}
 
 		return false;
@@ -705,13 +710,24 @@
 				'PageDown',
 				'Tab',
 				'n',
-				'm'
+				'm',
+				'0',
+				'$',
+				'g',
+				'G'
 			];
 
-			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd', 'n', 'm'];
+			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd', 'n', 'm', 'u', '0', '$', 'g', 'G'];
 
 			if (!event.ctrlKey && !allowedKeys.includes(event.key) && !commandKeys.includes(event.key)) {
 				event.preventDefault();
+			}
+
+			// Handle Ctrl+r for redo
+			if (event.ctrlKey && event.key === 'r') {
+				event.preventDefault();
+				performRedo();
+				return;
 			}
 
 			// Handle mode switches and commands
@@ -749,6 +765,33 @@
 				navigateSearchResults(false);
 				event.preventDefault();
 				return;
+			} else if (event.key === 'u') {
+				// Perform undo operation
+				performUndo();
+				event.preventDefault();
+				return;
+			} else if (event.key === '0') {
+				// Move to the start of the current line
+				moveToStartOfLine();
+				event.preventDefault();
+				return;
+			} else if (event.key === '$') {
+				// Move to the end of the current line
+				moveToEndOfLine();
+				event.preventDefault();
+				return;
+			} else if (event.key === 'G') {
+				// Move to the end of the document
+				moveToEndOfDocument();
+				event.preventDefault();
+				return;
+			} else if (event.key === 'g') {
+				// 'g' could be the start of 'gg' command
+				const handled = handleNormalModeSequence(event.key);
+				if (handled) {
+					event.preventDefault();
+					return;
+				}
 			} else if (event.key === 'd' || event.key === 'y') {
 				const handled = handleNormalModeSequence(event.key);
 				if (handled) {
@@ -1367,6 +1410,144 @@
 			alert('Failed to export PDF. Please try again.');
 		}
 	}
+
+	// Function to move to the start of the current line (0 in vim)
+	function moveToStartOfLine() {
+		if (!editorElement) return;
+		
+		// Get the current line
+		const currentPosition = editorElement.selectionStart;
+		const textBeforeCursor = editorContent.substring(0, currentPosition);
+		const lastNewlinePos = textBeforeCursor.lastIndexOf('\n');
+		
+		// Calculate the position at the start of the line
+		const startOfLinePos = lastNewlinePos === -1 ? 0 : lastNewlinePos + 1;
+		
+		// Set cursor position to the start of the line
+		editorElement.setSelectionRange(startOfLinePos, startOfLinePos);
+		
+		// Update cursor position
+		updateCursorPosition();
+		updateLineNumbers();
+		
+		// Ensure cursor is visible
+		ensureCursorVisible();
+	}
+	
+	// Function to move to the end of the current line ($ in vim)
+	function moveToEndOfLine() {
+		if (!editorElement) return;
+		
+		// Get the current line
+		const currentPosition = editorElement.selectionStart;
+		const textBeforeCursor = editorContent.substring(0, currentPosition);
+		const lastNewlinePos = textBeforeCursor.lastIndexOf('\n');
+		
+		// Find the end of the current line
+		const textAfterCursor = editorContent.substring(currentPosition);
+		const nextNewlinePos = textAfterCursor.indexOf('\n');
+		
+		// Calculate the position at the end of the line
+		let endOfLinePos;
+		if (nextNewlinePos === -1) {
+			// We're on the last line
+			endOfLinePos = editorContent.length;
+		} else {
+			// We're on an intermediate line
+			endOfLinePos = currentPosition + nextNewlinePos;
+		}
+		
+		// Set cursor position to the end of the line
+		editorElement.setSelectionRange(endOfLinePos, endOfLinePos);
+		
+		// Update cursor position
+		updateCursorPosition();
+		updateLineNumbers();
+		
+		// Ensure cursor is visible
+		ensureCursorVisible();
+	}
+	
+	// Function to move to the start of the document (gg in vim)
+	function moveToStartOfDocument() {
+		if (!editorElement) return;
+		
+		// Set cursor position to the start of the document
+		editorElement.setSelectionRange(0, 0);
+		
+		// Update cursor position
+		cursorLine = 1;
+		cursorColumn = 1;
+		activeLineIndex = 0;
+		
+		// Update UI
+		updateLineNumbers();
+		
+		// Ensure cursor is visible
+		ensureCursorVisible();
+	}
+	
+	// Function to move to the end of the document (G in vim)
+	function moveToEndOfDocument() {
+		if (!editorElement) return;
+		
+		// Set cursor position to the end of the document
+		const endPosition = editorContent.length;
+		editorElement.setSelectionRange(endPosition, endPosition);
+		
+		// Update cursor position
+		const lines = editorContent.split('\n');
+		cursorLine = lines.length;
+		activeLineIndex = lines.length - 1;
+		
+		if (lines.length > 0) {
+			cursorColumn = lines[lines.length - 1].length + 1;
+		} else {
+			cursorColumn = 1;
+		}
+		
+		// Update UI
+		updateLineNumbers();
+		
+		// Ensure cursor is visible
+		ensureCursorVisible();
+	}
+	
+	// Helper function to ensure the cursor is visible by scrolling if needed
+	function ensureCursorVisible() {
+		setTimeout(() => {
+			if (!editorElement) return;
+			
+			// Get current line
+			const cursorLineIdx = activeLineIndex;
+			
+			// Calculate scroll position
+			const targetScrollTop = cursorLineIdx * LINE_HEIGHT;
+			
+			// Scroll to ensure line is visible
+			const visibleHeight = editorElement.clientHeight;
+			
+			// If the target line is above the visible area, scroll up
+			if (targetScrollTop < editorElement.scrollTop) {
+				editorElement.scrollTop = targetScrollTop;
+			}
+			// If the target line is below the visible area, scroll down
+			else if (targetScrollTop > editorElement.scrollTop + visibleHeight - LINE_HEIGHT * 2) {
+				editorElement.scrollTop = targetScrollTop - visibleHeight + LINE_HEIGHT * 2;
+			}
+		}, 0);
+	}
+	
+	// Add undo/redo functions
+	function performUndo() {
+		// This would be implemented for undo functionality
+		showCommandError('Undo not implemented yet');
+	}
+	
+	function performRedo() {
+		// This would be implemented for redo functionality
+		showCommandError('Redo not implemented yet');
+	}
 </script>
 
 <svelte:head>
@@ -1586,7 +1767,6 @@
 					<li><span class="key">yy</span> Copy line</li>
 					<li><span class="key">p</span> Paste after cursor</li>
 					<li><span class="key">P</span> Paste before cursor</li>
-					<li><span class="key">u</span> Undo</li>
 					<li><span class="key">Ctrl+r</span> Redo</li>
 				</ul>
 			</div>
