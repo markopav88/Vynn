@@ -552,74 +552,72 @@
 	<div class="container-fluid flex-grow-1 d-flex">
 		<div class="row flex-grow-1 w-100 m-0">
 			<!-- Left Sidebar -->
-			<div class="col-md-2 bg-dark p-0 border-end border-dark min-vh-100">
-				<div class="d-flex flex-column h-100 sticky-top">
-
+			<div class="col-md-2 p-0 sidebar-column">
+				<div class="sidebar bg-dark border-end border-dark">
 					<!-- Navigation Categories -->
 					<div class="p-2">
 						<ul class="nav flex-column">
 							<li class="nav-item">
-                                <button class="nav-link text-white {activeCategory === 'all' ? 'active bg-black' : ''}" 
-                                       on:click={() => setActiveCategory('all')}>
+								<button class="nav-link text-white {activeCategory === 'all' ? 'active bg-black' : ''}" 
+									   on:click={() => setActiveCategory('all')}>
 									<i class="bi bi-grid me-2"></i> All Items
 								</button>
 							</li>
 							<li class="nav-item">
-                                <button class="nav-link text-white {activeCategory === 'recent' ? 'active bg-black' : ''}" 
-                                       on:click={() => setActiveCategory('recent')}>
+								<button class="nav-link text-white {activeCategory === 'recent' ? 'active bg-black' : ''}" 
+									   on:click={() => setActiveCategory('recent')}>
 									<i class="bi bi-clock-history me-2"></i> Recent
 								</button>
 							</li>
 							<li class="nav-item">
-                                <button class="nav-link text-white {activeCategory === 'shared' ? 'active bg-black' : ''}" 
-                                       on:click={() => setActiveCategory('shared')}>
+								<button class="nav-link text-white {activeCategory === 'shared' ? 'active bg-black' : ''}" 
+									   on:click={() => setActiveCategory('shared')}>
 									<i class="bi bi-people me-2"></i> Shared with me
 								</button>
 							</li>
 							<li class="nav-item">
-                                <button class="nav-link text-white {activeCategory === 'starred' ? 'active bg-black' : ''}" 
-                                       on:click={() => setActiveCategory('starred')}>
+								<button class="nav-link text-white {activeCategory === 'starred' ? 'active bg-black' : ''}" 
+									   on:click={() => setActiveCategory('starred')}>
 									<i class="bi bi-star me-2"></i> Starred
 								</button>
 							</li>
 							<li class="nav-item">
-                                <button class="nav-link text-white {activeCategory === 'trash' ? 'active bg-black' : ''}" 
-                                       on:click={() => setActiveCategory('trash')}>
+								<button class="nav-link text-white {activeCategory === 'trash' ? 'active bg-black' : ''}" 
+									   on:click={() => setActiveCategory('trash')}>
 									<i class="bi bi-trash me-2"></i> Trash
 								</button>
 							</li>
-                            <li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
-                                <button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
-                                    <span><i class="bi bi-hdd me-2"></i> Storage</span>
-                                    <span class="text-white-50">25%</span>
-                                </button>
-                            </li>
-                            <li class="px-2">
-                                <div class="progress mb-2 mt-1" style="height: 6px;">
-                                    <div class="progress-bar bg-green" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                                <small class="text-white-50 ps-1">2.5 GB of 10 GB used</small>
+							<li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
+								<button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
+									<span><i class="bi bi-hdd me-2"></i> Storage</span>
+									<span class="text-white-50">25%</span>
+								</button>
+							</li>
+							<li class="px-2">
+								<div class="progress mb-2 mt-1" style="height: 6px;">
+									<div class="progress-bar bg-green" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+								</div>
+								<small class="text-white-50 ps-1">2.5 GB of 10 GB used</small>
 							</li>
 						</ul>
 					</div>
 
-                    <!-- Spacer to push buttons down but not all the way -->
-                    <div style="min-height: 440px;"></div>
-                    
-                    <!-- Create buttons at bottom -->
-                    <div class="p-3 border-top border-dark">
-                        <button class="btn btn-green w-100 mb-2" on:click={() => showNewProjectModal = true}>
-                            <i class="bi bi-folder-plus me-2"></i> New Project
-                        </button>
-                        <button class="btn btn-outline-light w-100" on:click={() => showNewDocumentModal = true}>
-                            <i class="bi bi-file-earmark-plus me-2"></i> New Document
-                        </button>
+					<div class="sidebar-bottom">
+						<!-- Create buttons at bottom -->
+						<div class="p-3 border-top border-dark">
+							<button class="btn btn-green w-100 mb-2" on:click={() => showNewProjectModal = true}>
+								<i class="bi bi-folder-plus me-2"></i> New Project
+							</button>
+							<button class="btn btn-outline-light w-100" on:click={() => showNewDocumentModal = true}>
+								<i class="bi bi-file-earmark-plus me-2"></i> New Document
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
 
 			<!-- Main Content Area -->
-			<div class="col-md-10 bg-black p-4">
+			<div class="col-md-10 bg-black p-4 content-column">
 				<h1 class="mb-4">My Drive</h1>
                 
                 <!-- Add breadcrumb navigation with custom styling -->
@@ -648,7 +646,7 @@
 					</div>
 				{:else}
 					<!-- Unified Items Section -->
-                    <div class="mt-7">
+                    <div class="mt-11 mb-4">
 						<div class="d-flex justify-content-between align-items-center mb-4">
 							<h2>All Items</h2>
 							<div>
@@ -1018,6 +1016,73 @@
 
 <!-- Add these styles -->
 <style>
+    /* Navbar fixed positioning */
+    :global(nav.navbar) {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1100;
+    }
+    
+    /* Add padding to account for fixed navbar */
+    .container-fluid {
+        padding-top: 70px; /* Height of navbar */
+    }
+
+    /* Sidebar fixed positioning */
+    .sidebar-column {
+        position: relative;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        position: fixed;
+        width: inherit;
+        max-width: 16.666%; /* Same as col-md-2 */
+        height: calc(100vh - 70px); /* Subtract navbar height */
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        z-index: 1000;
+        top: 70px; /* Position below navbar */
+    }
+
+    .sidebar-bottom {
+        margin-top: auto;
+    }
+
+    /* Content column styling */
+    .content-column {
+        height: calc(100vh - 70px); /* Subtract navbar height */
+        overflow-y: auto;
+        margin-top: 70px; /* Add top margin to account for navbar */
+    }
+
+    /* Active nav styling */
+    .nav-link.active {
+        font-weight: 500;
+    }
+
+    /* Progress bar color */
+    .bg-green {
+        background-color: #198754;
+    }
+
+    /* Custom button styles */
+    .btn-green {
+        background-color: #198754;
+        border-color: #198754;
+        color: white;
+    }
+
+    .btn-green:hover {
+        background-color: #157347;
+        border-color: #146c43;
+        color: white;
+    }
+
     .card {
         position: relative;
         overflow: visible;
