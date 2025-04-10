@@ -5,7 +5,7 @@
 	import { jsPDF } from 'jspdf';
 
 	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
-	import { logout } from '$lib/ts/user'
+	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user'
 	import { get_project_documents } from '$lib/ts/project';
 	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
 
@@ -74,6 +74,10 @@
 
 	// Add state for commands overlay
 	let showCommands = false;
+
+	// User profile data
+	let userId: number | null = null;
+	let userProfileImage = profileDefault;
 
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
@@ -375,7 +379,7 @@
 					goto('/drive');
 				});
 			}
-		} else {
+			} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
 			return false;
@@ -779,66 +783,96 @@
 	}
 
 	// Update the onMount function to set documentReady and navbarReady
-	onMount(() => {
-		const loadData = async () => {
-			try {
-				// Load the document
-				documentData = await get_document(parseInt(documentId));
-
-				if (documentData) {
-					editorContent = documentData.content || '';
-					lines = editorContent.split('\n');
-
-					// Check if document is part of a project
-					if (!documentData.project_id) {
-						// If project_id is not in document data, try to get it from the API
-						const projectData = await get_project_from_document(parseInt(documentId));
-						if (projectData && projectData.project_id) {
-							// Add project_id to document data
-							documentData.project_id = projectData.project_id;
-						}
-					}
-
-					// Now autoSaveCleanup is defined when this assignment happens
-					autoSaveCleanup = setup_auto_save(documentData, () => {
-						if (documentData) {
-							documentData.content = editorContent;
-							update_document(documentData);
-						}
-					});
-
-					// Load project documents if this document is part of a project
-					await loadProjectDocuments();
-
-					// Set documentReady to true after everything is loaded
-					documentReady = true;
-
-					// Set navbarReady after a delay to create staggered animation
-					setTimeout(() => {
-						navbarReady = true;
-					}, 400); // Delay navbar animation to happen after document picker
-
-					// Add this line to update line numbers when document loads
-					updateLineNumbers();
-				} else {
-					error = true;
-				}
-			} catch (e) {
-				console.error('Error loading document:', e);
-				error = true;
-			} finally {
-				loading = false;
-			}
-		};
-
-		loadData();
-
-		return () => {
-			if (autoSaveCleanup) {
-				autoSaveCleanup();
-			}
-		};
+	onMount(async () => {
+		// Load document data and profile image in parallel
+		try {
+			const [docResult, userResult] = await Promise.all([
+				loadDocumentData(),
+				loadUserProfile()
+			]);
+		} catch (e) {
+			console.error('Error during initialization:', e);
+			error = true;
+		} finally {
+			loading = false;
+		}
 	});
+
+	// Function to load document data
+	async function loadDocumentData() {
+		try {
+			documentData = await get_document(parseInt(documentId));
+
+			if (documentData) {
+				editorContent = documentData.content || '';
+				lines = editorContent.split('\n');
+
+				// Check if document is part of a project
+				if (!documentData.project_id) {
+					// If project_id is not in document data, try to get it from the API
+					const projectData = await get_project_from_document(parseInt(documentId));
+					if (projectData && projectData.project_id) {
+						// Add project_id to document data
+						documentData.project_id = projectData.project_id;
+					}
+				}
+
+				// Load project documents if this document is part of a project
+				await loadProjectDocuments();
+
+				// Set up auto-save
+				autoSaveCleanup = setup_auto_save(documentData, () => {
+					if (documentData) {
+						documentData.content = editorContent;
+						update_document(documentData);
+					}
+				});
+
+				// Set documentReady to true after everything is loaded
+				documentReady = true;
+
+				// Set navbarReady after a delay to create staggered animation
+				setTimeout(() => {
+					navbarReady = true;
+				}, 400); // Delay navbar animation to happen after document picker
+
+				// Add this line to update line numbers when document loads
+				updateLineNumbers();
+
+				// Initial height adjustment
+				setTimeout(adjustTextareaHeight, 0);
+			} else {
+				error = true;
+			}
+		} catch (e) {
+			console.error('Error loading document:', e);
+			error = true;
+			throw e;
+		}
+	}
+
+	// Function to load user profile data
+	async function loadUserProfile() {
+		try {
+			// Get current user data
+			const user = await get_current_user();
+			if (user && user.id) {
+				userId = user.id;
+				
+				// Try to load profile image with timestamp to prevent caching
+				const timestamp = new Date().getTime();
+				const imageUrl = `${get_profile_image_url(user.id)}?t=${timestamp}`;
+				
+				// Check if the image exists
+				const response = await fetch(imageUrl, { method: 'HEAD' });
+				if (response.ok) {
+					userProfileImage = imageUrl;
+				}
+			}
+		} catch (error) {
+			console.error('Error loading user profile:', error);
+		}
+	}
 
 	// Update the handleInput function to handle Enter key presses correctly
 	function handleInput(event: Event) {
@@ -926,8 +960,8 @@
 
 	// Handle cleanup in onDestroy instead
 	onDestroy(() => {
-		if (documentData) {
-			if (autoSaveCleanup) autoSaveCleanup();
+		if (autoSaveCleanup) {
+			autoSaveCleanup();
 		}
 	});
 
@@ -1109,7 +1143,7 @@
 				<div class="logo-container">
 					<img src={logo} alt="Vynn Logo" class="logo" />
 					<span class="logo-text">Vynn</span>
-				</div>
+			</div>
 			</a>
 			<div class="spacer"></div>
 			
@@ -1132,10 +1166,11 @@
 					aria-label="Profile menu"
 				>
 					<img 
-						src={profileDefault} 
+						src={userProfileImage} 
 						alt="Profile" 
 						class="rounded-circle profile-img"
-						style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px;"
+						style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px; object-fit: cover;"
+						on:error={() => userProfileImage = profileDefault}
 					/>
 				</button>
 				<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
@@ -1151,7 +1186,7 @@
 						</button>
 					</li>
 				</ul>
-			</div>
+		</div>
 		</nav>
 	</div>
 
@@ -1184,7 +1219,7 @@
 	<div class="editor-container" class:fade-in={documentReady}>
 		{#if loading}
 			<div class="loading">Loading document...</div>
-		{:else if error}
+	{:else if error}
 			<div class="error">Error loading document</div>
 		{:else}
 			<!-- Previous document (for animation) -->
@@ -1198,11 +1233,11 @@
 							{#each previousDocumentLines as line, i}
 								<div class="line-number {i === previousActiveLineIndex ? 'active' : ''}">{i + 1}</div>
 							{/each}
-						</div>
-						<div class="editor-textarea-static">{previousDocumentContent}</div>
-					</div>
 				</div>
-			{/if}
+						<div class="editor-textarea-static">{previousDocumentContent}</div>
+			</div>
+		</div>
+	{/if}
 
 			<!-- Current document -->
 			<div

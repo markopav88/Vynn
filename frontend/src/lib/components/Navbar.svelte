@@ -1,10 +1,36 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { logout } from '$lib/ts/user';
+    import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
     import logo from '$lib/assets/logo.png';
     import profileDefault from '$lib/assets/profile-image.png';
     
     export let isLoggedIn = false;
+    let userId: number | null = null;
+    let profileImage = profileDefault;
+    
+    onMount(async () => {
+        if (isLoggedIn) {
+            try {
+                // Get current user data
+                const user = await get_current_user();
+                if (user && user.id) {
+                    userId = user.id;
+                    
+                    // Try to load profile image with timestamp to prevent caching
+                    const timestamp = new Date().getTime();
+                    const imageUrl = `${get_profile_image_url(user.id)}?t=${timestamp}`;
+                    
+                    // Check if the image exists
+                    const response = await fetch(imageUrl, { method: 'HEAD' });
+                    if (response.ok) {
+                        profileImage = imageUrl;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+            }
+        }
+    });
     
     async function handleLogout() {
         try {
@@ -67,10 +93,11 @@
                         aria-label="Profile menu"
                     >
                         <img 
-                            src={profileDefault} 
+                            src={profileImage} 
                             alt="Profile" 
                             class="rounded-circle profile-img"
-                            style="width: 40px; height: 40px; border: 2px solid var(--color-primary);"
+                            style="width: 40px; height: 40px; border: 2px solid var(--color-primary); object-fit: cover;"
+                            on:error={() => profileImage = profileDefault}
                         />
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">

@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+	import { onMount } from 'svelte';
     import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, type Document } from "$lib/ts/document";
     import { get_all_projects, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects, create_project } from "$lib/ts/drive";
     import { add_document_to_project, get_project_documents } from "$lib/ts/project";
-    import type { Project } from '$lib/ts/drive';
+	import type { Project } from '$lib/ts/drive';
 
     import Navbar from '$lib/components/Navbar.svelte';
 
@@ -12,16 +12,16 @@
     import Toast from '$lib/components/Toast.svelte';
     
     import ShareModal from '$lib/components/ShareModal.svelte';
-    
-    let isLoggedIn = true;
-    let documents: Document[] = [];
-    let projects: Project[] = [];
+
+	let isLoggedIn = true;
+	let documents: Document[] = [];
+	let projects: Project[] = [];
     let starredDocuments: Document[] = [];
     let starredProjects: Project[] = [];
     let trashedDocuments: Document[] = [];
     let trashedProjects: Project[] = [];
-    let isLoading = true;
-    let activeCategory = 'all';
+	let isLoading = true;
+	let activeCategory = 'all';
     let showNewProjectModal = false;
     let showNewDocumentModal = false;
     let showProjectDocsModal = false;
@@ -54,9 +54,9 @@
     let shareModalType: 'document' | 'project' = 'document';
     let shareModalId: number = 0;
     let shareModalTitle = '';
-    
-    onMount(async () => {
-        try {
+
+	onMount(async () => {
+		try {
             // Fetch all data in parallel
             const [docsResult, projectsResult, starredDocsResult, starredProjsResult, trashedDocsResult, trashedProjsResult] = await Promise.all([
                 get_all_documents(),
@@ -66,9 +66,9 @@
                 get_trashed_documents(),
                 get_trashed_projects()
             ]);
-            
-            documents = docsResult || [];
-            projects = projectsResult || [];
+
+			documents = docsResult || [];
+			projects = projectsResult || [];
             starredDocuments = starredDocsResult || [];
             starredProjects = starredProjsResult || [];
             trashedDocuments = trashedDocsResult || [];
@@ -79,13 +79,13 @@
             
             console.log("Documents loaded:", documents);
             console.log("Projects loaded:", projects);
-        } catch (error) {
+		} catch (error) {
             console.error("Error loading drive content:", error);
-        } finally {
-            isLoading = false;
-        }
-    });
-    
+		} finally {
+			isLoading = false;
+		}
+	});
+
     // Add this function to update displayed documents based on current view and filters
     function updateDisplayedDocuments() {
         if (currentProject && currentProject.id) {
@@ -116,7 +116,7 @@
     }
     
     async function setActiveCategory(category: string) {
-        activeCategory = category;
+		activeCategory = category;
         currentProject = null;
         currentView = 'drive';
         
@@ -535,7 +535,7 @@
 
     function closeShareModal() {
         shareModalOpen = false;
-    }
+	}
 </script>
 
 {#each toasts as toast, i}
@@ -547,47 +547,47 @@
 {/each}
 
 <div class="bg-black min-vh-100 d-flex flex-column">
-    <Navbar {isLoggedIn} />
-    
-    <div class="container-fluid flex-grow-1 d-flex">
-        <div class="row flex-grow-1 w-100 m-0">
-            <!-- Left Sidebar -->
-            <div class="col-md-2 bg-dark p-0 border-end border-dark min-vh-100">
-                <div class="d-flex flex-column h-100 sticky-top">
-                    
-                    <!-- Navigation Categories -->
-                    <div class="p-2">
-                        <ul class="nav flex-column">
-                            <li class="nav-item">
+	<Navbar {isLoggedIn} />
+
+	<div class="container-fluid flex-grow-1 d-flex">
+		<div class="row flex-grow-1 w-100 m-0">
+			<!-- Left Sidebar -->
+			<div class="col-md-2 bg-dark p-0 border-end border-dark min-vh-100">
+				<div class="d-flex flex-column h-100 sticky-top">
+
+					<!-- Navigation Categories -->
+					<div class="p-2">
+						<ul class="nav flex-column">
+							<li class="nav-item">
                                 <button class="nav-link text-white {activeCategory === 'all' ? 'active bg-black' : ''}" 
                                        on:click={() => setActiveCategory('all')}>
-                                    <i class="bi bi-grid me-2"></i> All Items
-                                </button>
-                            </li>
-                            <li class="nav-item">
+									<i class="bi bi-grid me-2"></i> All Items
+								</button>
+							</li>
+							<li class="nav-item">
                                 <button class="nav-link text-white {activeCategory === 'recent' ? 'active bg-black' : ''}" 
                                        on:click={() => setActiveCategory('recent')}>
-                                    <i class="bi bi-clock-history me-2"></i> Recent
-                                </button>
-                            </li>
-                            <li class="nav-item">
+									<i class="bi bi-clock-history me-2"></i> Recent
+								</button>
+							</li>
+							<li class="nav-item">
                                 <button class="nav-link text-white {activeCategory === 'shared' ? 'active bg-black' : ''}" 
                                        on:click={() => setActiveCategory('shared')}>
-                                    <i class="bi bi-people me-2"></i> Shared with me
-                                </button>
-                            </li>
-                            <li class="nav-item">
+									<i class="bi bi-people me-2"></i> Shared with me
+								</button>
+							</li>
+							<li class="nav-item">
                                 <button class="nav-link text-white {activeCategory === 'starred' ? 'active bg-black' : ''}" 
                                        on:click={() => setActiveCategory('starred')}>
-                                    <i class="bi bi-star me-2"></i> Starred
-                                </button>
-                            </li>
-                            <li class="nav-item">
+									<i class="bi bi-star me-2"></i> Starred
+								</button>
+							</li>
+							<li class="nav-item">
                                 <button class="nav-link text-white {activeCategory === 'trash' ? 'active bg-black' : ''}" 
                                        on:click={() => setActiveCategory('trash')}>
-                                    <i class="bi bi-trash me-2"></i> Trash
-                                </button>
-                            </li>
+									<i class="bi bi-trash me-2"></i> Trash
+								</button>
+							</li>
                             <li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
                                 <button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
                                     <span><i class="bi bi-hdd me-2"></i> Storage</span>
@@ -599,10 +599,10 @@
                                     <div class="progress-bar bg-green" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
                                 <small class="text-white-50 ps-1">2.5 GB of 10 GB used</small>
-                            </li>
-                        </ul>
-                    </div>
-                    
+							</li>
+						</ul>
+					</div>
+
                     <!-- Spacer to push buttons down but not all the way -->
                     <div style="min-height: 440px;"></div>
                     
@@ -614,13 +614,13 @@
                         <button class="btn btn-outline-light w-100" on:click={() => showNewDocumentModal = true}>
                             <i class="bi bi-file-earmark-plus me-2"></i> New Document
                         </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Main Content Area -->
-            <div class="col-md-10 bg-black p-4">
-                <h1 class="mb-4">My Drive</h1>
+					</div>
+				</div>
+			</div>
+
+			<!-- Main Content Area -->
+			<div class="col-md-10 bg-black p-4">
+				<h1 class="mb-4">My Drive</h1>
                 
                 <!-- Add breadcrumb navigation with custom styling -->
                 <nav aria-label="breadcrumb" class="mb-4">
@@ -639,40 +639,40 @@
                         {/if}
                     </ol>
                 </nav>
-                
-                {#if isLoading}
-                    <div class="d-flex justify-content-center my-5">
-                        <div class="spinner-border text-green" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                {:else}
-                    <!-- Unified Items Section -->
+
+				{#if isLoading}
+					<div class="d-flex justify-content-center my-5">
+						<div class="spinner-border text-green" role="status">
+							<span class="visually-hidden">Loading...</span>
+						</div>
+					</div>
+				{:else}
+					<!-- Unified Items Section -->
                     <div class="mt-7">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h2>All Items</h2>
-                            <div>
+						<div class="d-flex justify-content-between align-items-center mb-4">
+							<h2>All Items</h2>
+							<div>
                                 <button class="btn btn-sm btn-outline-green me-2" on:click={() => showNewProjectModal = true}>
-                                    <i class="bi bi-folder-plus me-1"></i> New Project
-                                </button>
+									<i class="bi bi-folder-plus me-1"></i> New Project
+								</button>
                                 <button class="btn btn-sm btn-outline-light" on:click={() => showNewDocumentModal = true}>
-                                    <i class="bi bi-file-earmark-plus me-1"></i> New Document
-                                </button>
-                            </div>
-                        </div>
-                        
-                        {#if projects.length === 0 && documents.length === 0}
-                            <div class="text-white-50 p-5 text-center border border-dark rounded">
-                                <i class="bi bi-inbox display-4 d-block mb-3"></i>
-                                <p>No items found</p>
-                                <div class="mt-3">
+									<i class="bi bi-file-earmark-plus me-1"></i> New Document
+								</button>
+							</div>
+						</div>
+
+						{#if projects.length === 0 && documents.length === 0}
+							<div class="text-white-50 p-5 text-center border border-dark rounded">
+								<i class="bi bi-inbox display-4 d-block mb-3"></i>
+								<p>No items found</p>
+								<div class="mt-3">
                                     <button class="btn btn-sm btn-outline-green me-2" on:click={() => showNewProjectModal = true}>Create Project</button>
                                     <button class="btn btn-sm btn-outline-light" on:click={() => showNewDocumentModal = true}>Create Document</button>
-                                </div>
-                            </div>
-                        {:else}
-                            <div class="row row-cols-1 row-cols-md-4 g-4">
-                                <!-- Projects First -->
+								</div>
+							</div>
+						{:else}
+							<div class="row row-cols-1 row-cols-md-4 g-4">
+								<!-- Projects First -->
                                 {#if !currentProject && activeCategory === 'trash'}
                                     {#each trashedProjects as project}
                                         <div class="col">
@@ -753,8 +753,8 @@
                                         </div>
                                     {/each}
                                 {:else if !currentProject && activeCategory !== 'trash' && activeCategory !== 'starred'}
-                                    {#each projects as project}
-                                        <div class="col">
+								{#each projects as project}
+									<div class="col">
                                             <div 
                                                 class="card bg-dark border-0 h-100 project-card" 
                                                 role="button"
@@ -764,16 +764,16 @@
                                                 on:dragover={(e) => handleDragOver(e, project)}
                                                 on:dragleave={handleDragLeave}
                                                 on:drop={(e) => handleDrop(e, project)}>
-                                                <div class="card-body p-3">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <i class="bi bi-folder-fill text-green fs-4 me-2"></i>
-                                                        <h5 class="card-title mb-0 text-truncate">{project.name}</h5>
-                                                    </div>
-                                                    <p class="card-text text-white-50 small mb-1">Project</p>
-                                                    <p class="card-text text-white-50 small">
-                                                        Updated: {new Date(project.updated_at).toLocaleDateString()}
-                                                    </p>
-                                                </div>
+											<div class="card-body p-3">
+												<div class="d-flex align-items-center mb-2">
+													<i class="bi bi-folder-fill text-green fs-4 me-2"></i>
+													<h5 class="card-title mb-0 text-truncate">{project.name}</h5>
+												</div>
+												<p class="card-text text-white-50 small mb-1">Project</p>
+												<p class="card-text text-white-50 small">
+													Updated: {new Date(project.updated_at).toLocaleDateString()}
+												</p>
+											</div>
                                                 
                                                 <!-- Action icons for projects -->
                                                 <div class="card-actions">
@@ -804,15 +804,15 @@
                                                             <i class="bi bi-trash"></i>
                                                         </button>
                                                     {/if}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    {/each}
+											</div>
+										</div>
+									</div>
+								{/each}
                                 {/if}
-                                
-                                <!-- Documents After Projects -->
+
+								<!-- Documents After Projects -->
                                 {#each displayedDocuments as document}
-                                    <div class="col">
+									<div class="col">
                                         <div 
                                             class="card bg-dark border-0 h-100 document-card" 
                                             role="button"
@@ -821,16 +821,16 @@
                                             on:keydown={(e) => e.key === 'Enter' && handleDocumentClick(document)}
                                             draggable={!currentProject}
                                             on:dragstart={(e) => handleDragStart(e, document)}>
-                                            <div class="card-body p-3">
-                                                <div class="d-flex align-items-center mb-2">
+											<div class="card-body p-3">
+												<div class="d-flex align-items-center mb-2">
                                                     <i class="bi bi-file-earmark-text text-green fs-4 me-2"></i>
                                                     <h5 class="card-title mb-0 text-truncate text-green">{document.name}</h5>
-                                                </div>
-                                                <p class="card-text text-white-50 small mb-1">Document</p>
-                                                <p class="card-text text-white-50 small">
-                                                    Updated: {new Date(document.updated_at).toLocaleDateString()}
-                                                </p>
-                                            </div>
+												</div>
+												<p class="card-text text-white-50 small mb-1">Document</p>
+												<p class="card-text text-white-50 small">
+													Updated: {new Date(document.updated_at).toLocaleDateString()}
+												</p>
+											</div>
                                             
                                             <!-- Action icons for documents -->
                                             <div class="card-actions">
@@ -861,17 +861,17 @@
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 {/if}
-                                            </div>
-                                        </div>
-                                    </div>
-                                {/each}
-                            </div>
-                        {/if}
-                    </div>
-                {/if}
-            </div>
-        </div>
-    </div>
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
 </div>
 
 <!-- New Project Modal -->
@@ -1050,7 +1050,7 @@
         background: none;
         border: none;
         padding: 0.25rem;
-        cursor: pointer;
+		cursor: pointer;
         color: var(--color-text-secondary);
         transition: color 0.2s ease;
         font-size: 1rem;
@@ -1079,5 +1079,5 @@
     .card-body {
         position: relative;
         z-index: 1;
-    }
+	}
 </style>
