@@ -468,6 +468,32 @@ pub async fn api_search_users(
     Ok(Json(users))
 }
 
+/// GET handler for retrieving the current logged-in user's information.
+/// Accessible via: GET /api/users/current
+/// Frontend: user.ts/get_current_user()
+pub async fn api_get_current_user(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<User>> {
+    println!("->> {:<12} - get_current_user", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::UserIdUpdateError)?;
+
+    let result = sqlx::query_as!(
+        User,
+        r#"SELECT id, name, email FROM users WHERE id = $1"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await;
+
+    match result {
+        Ok(user) => Ok(Json(user)),
+        Err(_) => Err(Error::UserNotFoundError),
+    }
+}
+
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
@@ -480,4 +506,5 @@ pub fn user_routes() -> Router {
         .route("/profile-image", post(api_upload_profile_image))
         .route("/:id/profile-image", get(api_get_profile_image))
         .route("/search", get(api_search_users))
+        .route("/current", get(api_get_current_user))
 }

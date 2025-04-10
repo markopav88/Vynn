@@ -281,11 +281,11 @@ async fn api_add_permissions(
         project_id,
         payload.user_id,
         payload.role
-    )
-    .fetch_one(&pool)
-    .await;
+            )
+            .fetch_one(&pool)
+            .await;
 
-    match result {
+            match result {
         Ok(permission) => {
             // Get all documents in the project
             let documents = sqlx::query!(
@@ -877,12 +877,12 @@ async fn api_toggle_star_project(
     .map_err(|_| Error::DatabaseError)?;
 
     Ok(Json(json!({
-        "result": {
-            "success": true,
+                "result": {
+                        "success": true,
             "message": "Project star status updated",
             "is_starred": new_status
-        }
-    })))
+                    }
+            })))
 }
 
 /// PUT handler for moving a project to trash.
