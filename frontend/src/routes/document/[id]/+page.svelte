@@ -381,6 +381,9 @@
 					goto('/drive');
 				});
 			}
+		} else if (cmd === 'export') {
+			// Export document to PDF
+			exportToPDF();
 		} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
@@ -1231,8 +1234,10 @@
 			} else if (commandPrefix === '?') {
 				// Backward search from cursor
 				searchDocument(commandInput, true);
+			} else if (commandPrefix === ':') {
+				// Execute colon command
+				handleColonCommand(commandInput);
 			}
-			// Handle other commands...
 			
 			// Exit command mode
 			setEditorMode('NORMAL');
@@ -1347,19 +1352,9 @@
 				<div class="logo-container">
 					<img src={logo} alt="Vynn Logo" class="logo" />
 					<span class="logo-text">Vynn</span>
-			</div>
+				</div>
 			</a>
 			<div class="spacer"></div>
-			
-			<!-- Export to PDF button -->
-			<button 
-				class="btn btn-outline-light btn-sm me-3" 
-				on:click={exportToPDF}
-				title="Export to PDF"
-				disabled={loading || error}
-			>
-				<i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
-			</button>
 			
 			<div class="dropdown">
 				<button 
@@ -1390,7 +1385,7 @@
 						</button>
 					</li>
 				</ul>
-		</div>
+			</div>
 		</nav>
 	</div>
 
@@ -1415,7 +1410,7 @@
 				>
 					1
 				</button>
-			{/if}
+	{/if}
 		</div>
 	{/if}
 
@@ -1525,6 +1520,16 @@
 					<li><span class="key">i</span> Enter Insert mode</li>
 					<li><span class="key">Esc</span> Return to Normal mode</li>
 					<li><span class="key">:</span> Enter Command mode</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Commands</h6>
+				<ul>
+					<li><span class="key">:q</span> Quit document</li>
+					<li><span class="key">:w</span> Save document</li>
+					<li><span class="key">:wq</span> Save and quit</li>
+					<li><span class="key">:export</span> Export to PDF</li>
 				</ul>
 			</div>
 			
