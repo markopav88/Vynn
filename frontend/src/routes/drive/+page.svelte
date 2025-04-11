@@ -55,6 +55,18 @@
     let shareModalId: number = 0;
     let shareModalTitle = '';
 
+    let newProjectNameInput: HTMLInputElement;
+    let newDocumentNameInput: HTMLInputElement;
+    
+    // Add these new functions
+    $: if (showNewProjectModal) {
+        setTimeout(() => newProjectNameInput?.focus(), 0);
+    }
+    
+    $: if (showNewDocumentModal) {
+        setTimeout(() => newDocumentNameInput?.focus(), 0);
+    }
+
 	onMount(async () => {
 		try {
             // Fetch all data in parallel
@@ -555,7 +567,7 @@
 			<div class="col-md-2 p-0 sidebar-column">
 				<div class="sidebar bg-dark border-end border-dark">
 					<!-- Navigation Categories -->
-					<div class="p-2">
+					<div class="p-2" style="margin-top: 20px">
 						<ul class="nav flex-column">
 							<li class="nav-item">
 								<button class="nav-link text-white {activeCategory === 'all' ? 'active bg-black' : ''}" 
@@ -617,7 +629,7 @@
 			</div>
 
 			<!-- Main Content Area -->
-			<div class="col-md-10 bg-black p-4 content-column">
+			<div class="col-md-10 bg-black p-4 content-column " style="margin-top: -12px">
 				<h1 class="mb-4">My Drive</h1>
                 
                 <!-- Add breadcrumb navigation with custom styling -->
@@ -646,7 +658,7 @@
 					</div>
 				{:else}
 					<!-- Unified Items Section -->
-                    <div class="mt-11 mb-4">
+                    <div class="mb-4">
 						<div class="d-flex justify-content-between align-items-center mb-4">
 							<h2>All Items</h2>
 							<div>
@@ -887,7 +899,8 @@
                         <label for="projectName" class="form-label">Project Name</label>
                         <input type="text" class="form-control bg-dark text-white border-secondary" 
                                id="projectName" bind:value={newProjectName} 
-                               placeholder="Enter project name" required>
+                               placeholder="Enter project name" required
+                               bind:this={newProjectNameInput}>
                     </div>
                 </form>
             </div>
@@ -916,7 +929,8 @@
                         <label for="documentName" class="form-label">Document Name</label>
                         <input type="text" class="form-control bg-dark text-white border-secondary" 
                                id="documentName" bind:value={newDocumentName} 
-                               placeholder="Enter document name" required>
+                               placeholder="Enter document name" required
+                               bind:this={newDocumentNameInput}>
                     </div>
                 </form>
             </div>
@@ -1025,6 +1039,12 @@
         z-index: 1100;
     }
     
+    /* Remove focus outline */
+    .form-control:focus {
+        box-shadow: none;
+        border-color: #2f2f2f;
+    }
+
     /* Add padding to account for fixed navbar */
     .container-fluid {
         padding-top: 70px; /* Height of navbar */
