@@ -633,22 +633,33 @@
 				<h1 class="mb-4">My Drive</h1>
                 
                 <!-- Add breadcrumb navigation with custom styling -->
-                <nav aria-label="breadcrumb" class="mb-4">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item">
-                            <button 
-                                class="btn btn-link p-0 {!currentProject ? 'text-green' : 'text-white'}" 
-                                on:click={returnToDrive}>
-                                Drive
-                            </button>
-                        </li>
-                        {#if currentProject}
-                            <li class="breadcrumb-item active text-green" aria-current="page">
-                                {currentProject.name}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <button 
+                                    class="btn btn-link p-0 {!currentProject ? 'text-green' : 'text-white'}" 
+                                    on:click={returnToDrive}>
+                                    Drive
+                                </button>
                             </li>
-                        {/if}
-                    </ol>
-                </nav>
+                            {#if currentProject}
+                                <li class="breadcrumb-item active text-green" aria-current="page">
+                                    {currentProject.name}
+                                </li>
+                            {/if}
+                        </ol>
+                    </nav>
+                    
+                    <div>
+                        <button class="btn btn-sm btn-outline-green me-2" on:click={() => showNewProjectModal = true}>
+                            <i class="bi bi-folder-plus me-1"></i> New Project
+                        </button>
+                        <button class="btn btn-sm btn-outline-light" on:click={() => showNewDocumentModal = true}>
+                            <i class="bi bi-file-earmark-plus me-1"></i> New Document
+                        </button>
+                    </div>
+                </div>
 
 				{#if isLoading}
 					<div class="d-flex justify-content-center my-5">
@@ -659,18 +670,6 @@
 				{:else}
 					<!-- Unified Items Section -->
                     <div class="mb-4">
-						<div class="d-flex justify-content-between align-items-center mb-4">
-							<h2>All Items</h2>
-							<div>
-                                <button class="btn btn-sm btn-outline-green me-2" on:click={() => showNewProjectModal = true}>
-									<i class="bi bi-folder-plus me-1"></i> New Project
-								</button>
-                                <button class="btn btn-sm btn-outline-light" on:click={() => showNewDocumentModal = true}>
-									<i class="bi bi-file-earmark-plus me-1"></i> New Document
-								</button>
-							</div>
-						</div>
-
 						{#if projects.length === 0 && documents.length === 0}
 							<div class="text-white-50 p-5 text-center border border-dark rounded">
 								<i class="bi bi-inbox display-4 d-block mb-3"></i>
