@@ -111,6 +111,16 @@
         } else if (activeCategory === 'trash') {
             // Show only trashed documents
             displayedDocuments = trashedDocuments;
+        } else if (activeCategory === 'recent') {
+            // Show all non-trashed items sorted by date
+            displayedDocuments = [...documents]
+                .filter(doc => !doc.is_trashed)
+                .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+            
+            // Update projects list with sorted projects
+            projects = [...projects]
+                .filter(proj => !proj.is_trashed)
+                .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         } else {
             // Default view - show only documents that are not in any project and not trashed
             displayedDocuments = documents.filter(doc => {
@@ -142,6 +152,19 @@
                 
                 starredDocuments = starredDocsResult || [];
                 starredProjects = starredProjsResult || [];
+            } else if (category === 'recent') {
+                // Refresh and sort all items by date when switching to recent view
+                const [docsResult, projectsResult] = await Promise.all([
+                    get_all_documents(),
+                    get_all_projects()
+                ]);
+                
+                documents = (docsResult || []).sort((a, b) => 
+                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                );
+                projects = (projectsResult || []).sort((a, b) => 
+                    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                );
             } else if (category === 'all') {
                 // Refresh all items when switching to main view
                 const [docsResult, projectsResult, starredDocsResult, starredProjsResult] = await Promise.all([
