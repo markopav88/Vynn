@@ -400,6 +400,42 @@
 		} else if (cmd === 'export') {
 			// Export document to PDF
 			exportToPDF();
+		} else if (cmd.startsWith('%s/')) {
+			// Handle find and replace command
+			const parts = cmd.split('/');
+			if (parts.length >= 3) {
+				const searchText = parts[1];
+				const replaceText = parts[2];
+				const flags = parts.length > 3 ? parts[3] : '';
+				const isGlobal = flags.includes('g');
+				const isCaseInsensitive = flags.includes('i');
+
+				if (searchText && replaceText) {
+					// Create a regular expression for the search with proper flags
+					const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
+					const searchRegex = new RegExp(searchText, regexFlags);
+					
+					// Perform the replacement
+					const newContent = editorContent.replace(searchRegex, replaceText);
+					
+					// Update the editor content
+					editorContent = newContent;
+					
+					// Update the document data
+					if (documentData) {
+						documentData.content = newContent;
+						update_document(documentData);
+					}
+					
+					// Show success message
+					const replacementCount = (editorContent.match(searchRegex) || []).length;
+					showCommandError(`Replaced ${replacementCount} occurrence${replacementCount !== 1 ? 's' : ''} of "${searchText}" with "${replaceText}"`);
+				} else {
+					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
+				}
+			} else {
+				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
+			}
 		} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
@@ -646,6 +682,19 @@
 	function handleKeyDown(event: KeyboardEvent) {
 		// First prevent any OS bindings
 		preventBrowserDefaults(event);
+
+		// Handle Escape key to exit command mode
+		if (event.key === 'Escape') {
+			editorMode = 'NORMAL';
+			commandInput = '';
+			commandPrefix = '';
+			// Return focus to editor
+			if (editorElement) {
+				editorElement.focus();
+			}
+			event.preventDefault();
+			return;
+		}
 
 		// Handle Ctrl+/ to toggle command cheat sheet in any mode
 		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
@@ -1765,8 +1814,7 @@
 					<li><span class="key">x</span> Delete selected</li>
 					<li><span class="key">dd</span> Delete line</li>
 					<li><span class="key">yy</span> Copy line</li>
-					<li><span class="key">p</span> Paste after cursor</li>
-					<li><span class="key">P</span> Paste before cursor</li>
+					<li><span class="key">p</span> Paste from yank</li>
 				</ul>
 			</div>
 			
@@ -1785,7 +1833,7 @@
 				<h6>Editor Shortcuts</h6>
 				<ul>
 					<li><span class="key">Ctrl+/</span> Toggle this cheat sheet</li>
-					<li><span class="key">Ctrl+[1-9]</span> Switch to document number</li>
+					<li><span class="key">Ctrl+1-9</span> Switch to document number</li>
 				</ul>
 			</div>
 		</div>
