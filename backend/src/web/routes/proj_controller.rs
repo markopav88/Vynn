@@ -1023,6 +1023,37 @@ async fn api_get_trashed_projects(
     }
 }
 
+/// GET handler for retrieving all shared projects for a user (where user is not owner but has viewer/editor permissions).
+/// Accessible via: GET /api/project/shared
+async fn api_get_shared_projects(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Project>>> {
+    println!("->> {:<12} - api_get_shared_projects", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all projects where the user has editor/viewer permissions but is not the owner
+    let result = sqlx::query_as!(
+        Project,
+        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at, is_trashed, is_starred
+           FROM projects p
+           JOIN project_permissions pp ON p.id = pp.project_id
+           WHERE pp.user_id = $1 
+           AND pp.role IN ('editor', 'viewer')
+           AND COALESCE(p.is_trashed, false) = false"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await;
+
+    match result {
+        Ok(projects) => Ok(Json(projects)),
+        Err(_) => Err(Error::ProjectNotFoundError),
+    }
+}
+
 pub fn project_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_projects))
@@ -1043,4 +1074,5 @@ pub fn project_routes() -> Router {
         .route("/:id/restore", put(api_restore_project))
         .route("/starred", get(api_get_starred_projects))
         .route("/trash", get(api_get_trashed_projects))
+        .route("/shared", get(api_get_shared_projects))
 }

@@ -636,3 +636,30 @@ export async function get_trashed_documents(): Promise<Document[] | null> {
 		return null;
 	}
 }
+
+export async function get_shared_documents(): Promise<Document[] | null> {
+	const apiUrl = `http://localhost:3001/api/document/shared`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			credentials: 'include',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+
+		if (!response.ok) {
+			console.error('Get shared documents failed with status:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
+			return null;
+		}
+
+		const documents = await response.json();
+		return documents;
+	} catch (error) {
+		console.error('Get shared documents error:', error);
+		return null;
+	}
+}

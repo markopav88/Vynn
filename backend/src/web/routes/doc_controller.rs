@@ -52,8 +52,8 @@ pub async fn api_get_document(
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
 
     if has_permission {
-        let result = sqlx::query_as!(
-            Document,
+    let result = sqlx::query_as!(
+        Document,
             r#"SELECT 
                 id, 
                 name, 
@@ -64,15 +64,15 @@ pub async fn api_get_document(
                 is_starred,
                 is_trashed
             FROM documents WHERE id = $1"#,
-            document_id
-        )
-        .fetch_one(&pool)
-        .await;
+        document_id
+    )
+    .fetch_one(&pool)
+    .await;
 
-        match result {
-            Ok(document) => Ok(Json(document)),
-            Err(_) => Err(Error::UserNotFoundError),
-        }
+    match result {
+        Ok(document) => Ok(Json(document)),
+        Err(_) => Err(Error::UserNotFoundError),
+    }
     } else {
         Err(Error::PermissionError)
     }
@@ -117,7 +117,7 @@ pub async fn api_create_document(
     Json(payload): Json<CreateDocumentPayload>,
 ) -> Result<Json<Document>> {
     println!("->> {:<12} - create_document", "HANDLER");
-
+    
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
@@ -732,6 +732,37 @@ pub async fn api_get_trashed_documents(
     Ok(Json(documents))
 }
 
+/// GET handler for retrieving all shared documents for a user (where user is not owner but has viewer/editor permissions).
+/// Accessible via: GET /api/document/shared
+pub async fn api_get_shared_documents(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Document>>> {
+    println!("->> {:<12} - api_get_shared_documents", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all documents where user has viewer/editor permissions but is not the owner
+    let result = sqlx::query_as!(
+        Document,
+        r#"SELECT DISTINCT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id, d.is_starred, d.is_trashed
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1 
+           AND dp.role IN ('viewer', 'editor')
+           AND d.user_id != $1"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await;
+
+    match result {
+        Ok(documents) => Ok(Json(documents)),
+        Err(_) => Err(Error::DocumentNotFoundError),
+    }
+}
+
 pub fn doc_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_documents))
@@ -749,4 +780,5 @@ pub fn doc_routes() -> Router {
         .route("/:id/restore", put(api_restore_document))
         .route("/starred", get(api_get_starred_documents))
         .route("/trash", get(api_get_trashed_documents))
+        .route("/shared", get(api_get_shared_documents))
 }

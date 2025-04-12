@@ -1,0 +1,5 @@
+'''
+    write backed api in @proj_controller.rs and @doc_controller.rs  
+    to return a vec<Project> for proj and a vec<Document> for doc by quering database 
+    select all project or documents where logged in user is viewer or editor but not owner
+'''

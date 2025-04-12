@@ -383,3 +383,30 @@ export async function get_trashed_projects(): Promise<Project[] | null> {
 		return null;
 	}
 }
+
+export async function get_shared_projects(): Promise<Project[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/shared`;
+
+	try {
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			credentials: 'include',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+
+		if (!response.ok) {
+			console.error('Get shared projects failed with status:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
+			return null;
+		}
+
+		const projects = await response.json();
+		return projects;
+	} catch (error) {
+		console.error('Get shared projects error:', error);
+		return null;
+	}
+}

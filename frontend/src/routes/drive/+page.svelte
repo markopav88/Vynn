@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, delete_document, type Document } from "$lib/ts/document";
-    import { get_all_projects, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects, create_project, delete_project } from "$lib/ts/drive";
+    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, delete_document, get_shared_documents, type Document } from "$lib/ts/document";
+    import { get_all_projects, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects, create_project, delete_project, get_shared_projects } from "$lib/ts/drive";
     import { add_document_to_project, get_project_documents } from "$lib/ts/project";
 	import type { Project } from '$lib/ts/drive';
 
@@ -20,6 +20,8 @@
     let starredProjects: Project[] = [];
     let trashedDocuments: Document[] = [];
     let trashedProjects: Project[] = [];
+    let sharedDocuments: Document[] = [];
+    let sharedProjects: Project[] = [];
 	let isLoading = true;
 	let activeCategory = 'all';
     let showNewProjectModal = false;
@@ -70,13 +72,15 @@
 	onMount(async () => {
 		try {
             // Fetch all data in parallel
-            const [docsResult, projectsResult, starredDocsResult, starredProjsResult, trashedDocsResult, trashedProjsResult] = await Promise.all([
+            const [docsResult, projectsResult, starredDocsResult, starredProjsResult, trashedDocsResult, trashedProjsResult, sharedDocsResult, sharedProjsResult] = await Promise.all([
                 get_all_documents(),
                 get_all_projects(),
                 get_starred_documents(),
                 get_starred_projects(),
                 get_trashed_documents(),
-                get_trashed_projects()
+                get_trashed_projects(),
+                get_shared_documents(),
+                get_shared_projects()
             ]);
 
 			documents = docsResult || [];
@@ -85,6 +89,8 @@
             starredProjects = starredProjsResult || [];
             trashedDocuments = trashedDocsResult || [];
             trashedProjects = trashedProjsResult || [];
+            sharedDocuments = sharedDocsResult || [];
+            sharedProjects = sharedProjsResult || [];
             
             // Initialize displayed documents
             updateDisplayedDocuments();
@@ -121,6 +127,10 @@
             projects = [...projects]
                 .filter(proj => !proj.is_trashed)
                 .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        } else if (activeCategory === 'shared') {
+            // Show only shared documents and projects
+            displayedDocuments = sharedDocuments.filter(doc => !doc.is_trashed);
+            projects = sharedProjects.filter(proj => !proj.is_trashed);
         } else {
             // Default view - show only documents that are not in any project and not trashed
             displayedDocuments = documents.filter(doc => {
@@ -165,19 +175,32 @@
                 projects = (projectsResult || []).sort((a, b) => 
                     new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
                 );
+            } else if (category === 'shared') {
+                // Refresh shared items when switching to shared view
+                const [sharedDocsResult, sharedProjsResult] = await Promise.all([
+                    get_shared_documents(),
+                    get_shared_projects()
+                ]);
+                
+                sharedDocuments = sharedDocsResult || [];
+                sharedProjects = sharedProjsResult || [];
             } else if (category === 'all') {
                 // Refresh all items when switching to main view
-                const [docsResult, projectsResult, starredDocsResult, starredProjsResult] = await Promise.all([
+                const [docsResult, projectsResult, starredDocsResult, starredProjsResult, sharedDocsResult, sharedProjsResult] = await Promise.all([
                     get_all_documents(),
                     get_all_projects(),
                     get_starred_documents(),
-                    get_starred_projects()
+                    get_starred_projects(),
+                    get_shared_documents(),
+                    get_shared_projects()
                 ]);
                 
                 documents = docsResult || [];
                 projects = projectsResult || [];
                 starredDocuments = starredDocsResult || [];
                 starredProjects = starredProjsResult || [];
+                sharedDocuments = sharedDocsResult || [];
+                sharedProjects = sharedProjsResult || [];
             }
         } catch (error) {
             console.error("Error refreshing items:", error);
