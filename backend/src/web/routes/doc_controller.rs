@@ -606,8 +606,8 @@ pub async fn api_trash_document(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Check if user has at least editor permission
-    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+    // Check if user has owner permission (changed from editor)
+    let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
         return Err(Error::PermissionError);
@@ -646,8 +646,8 @@ pub async fn api_restore_document(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Check if user has at least editor permission
-    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+    // Check if user has owner permission (changed from editor for consistency)
+    let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
         return Err(Error::PermissionError);

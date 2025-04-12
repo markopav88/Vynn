@@ -172,8 +172,10 @@ export async function get_all_projects(): Promise<Project[] | null> {
 		}
 
 		const projects = await response.json();
-		console.log('Projects received:', projects);
-		return projects;
+		// Filter out trashed projects
+		const nonTrashedProjects = projects.filter((project: Project) => !project.is_trashed);
+		console.log('Projects received:', nonTrashedProjects);
+		return nonTrashedProjects;
 	} catch (error) {
 		console.error('Get all projects error:', error);
 		return null;
@@ -213,23 +215,26 @@ export async function update_project(project_id: number, name: string): Promise<
  * Function to delete a project
  * Calls: DELETE /api/project/:id
  */
-export async function delete_project(project_id: number): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
-
+export async function delete_project(project_id: number, force: boolean = false): Promise<boolean> {
 	try {
+		const apiUrl = force 
+			? `http://localhost:3001/api/project/${project_id}/force`
+			: `http://localhost:3001/api/project/${project_id}`;
+		
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
 		});
 
-		if (response.ok) {
-			return true;
-		} else {
+		if (!response.ok) {
 			console.error('Delete project failed with status:', response.status);
+			const errorText = await response.text();
+			console.error('Error response:', errorText);
 			return false;
 		}
+		return true;
 	} catch (error) {
-		console.error('Delete project error:', error);
+		console.error('Error deleting project:', error);
 		return false;
 	}
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, type Document } from "$lib/ts/document";
-    import { get_all_projects, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects, create_project } from "$lib/ts/drive";
+    import { get_all_documents, create_document, toggle_star_document, trash_document, restore_document, get_starred_documents, get_trashed_documents, delete_document, type Document } from "$lib/ts/document";
+    import { get_all_projects, toggle_star_project, trash_project, restore_project, get_starred_projects, get_trashed_projects, create_project, delete_project } from "$lib/ts/drive";
     import { add_document_to_project, get_project_documents } from "$lib/ts/project";
 	import type { Project } from '$lib/ts/drive';
 
@@ -548,6 +548,103 @@
     function closeShareModal() {
         shareModalOpen = false;
 	}
+
+    // Add delete handlers
+    async function handleDeleteDocument(event: Event, document: Document) {
+        event.stopPropagation();
+        
+        const confirmed = confirm(`Are you sure you want to permanently delete "${document.name}"?`);
+        if (confirmed) {
+            showToast(`Deleting document "${document.name}"...`, 'warning');
+            const success = await delete_document(document.id);
+            if (success) {
+                trashedDocuments = trashedDocuments.filter(d => d.id !== document.id);
+                displayedDocuments = displayedDocuments.filter(d => d.id !== document.id);
+                showToast(`Document "${document.name}" has been permanently deleted`, 'success');
+            } else {
+                showToast(`Failed to delete document "${document.name}"`, 'error');
+            }
+        }
+    }
+
+    async function handleDeleteProject(event: Event, project: Project) {
+        event.stopPropagation();
+        
+        const result = await new Promise<'cancel' | 'delete' | 'force_delete'>((resolve) => {
+            const dialog = document.createElement('div');
+            dialog.innerHTML = `
+                <div class="modal fade show d-block" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark text-white">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title">Delete Project</h5>
+                                <button type="button" class="btn-close btn-close-white" data-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Are you sure you want to permanently delete "${project.name}"?</p>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="deleteContents">
+                                    <label class="form-check-label" for="deleteContents">
+                                        Also delete all contents (documents) within this project
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-secondary">
+                                <button type="button" class="btn btn-outline-light" data-action="cancel">Cancel</button>
+                                <button type="button" class="btn btn-danger" data-action="delete">Delete Project</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-backdrop fade show"></div>
+            `;
+            
+            document.body.appendChild(dialog);
+            
+            // Add event listeners
+            const deleteContentsCheckbox = dialog.querySelector('#deleteContents') as HTMLInputElement;
+            dialog.querySelectorAll('button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const action = button.dataset.action;
+                    if (action === 'delete') {
+                        resolve(deleteContentsCheckbox.checked ? 'force_delete' : 'delete');
+                    } else {
+                        resolve('cancel');
+                    }
+                    document.body.removeChild(dialog);
+                });
+            });
+        });
+        
+        if (result !== 'cancel') {
+            const isForceDelete = result === 'force_delete';
+            showToast(
+                `Deleting project "${project.name}"${isForceDelete ? ' and its contents' : ''}...`,
+                'warning'
+            );
+            
+            const success = await delete_project(parseInt(project.id), isForceDelete);
+            if (success) {
+                trashedProjects = trashedProjects.filter(p => p.id !== project.id);
+                displayedDocuments = displayedDocuments.filter(d => d.id.toString() !== project.id);
+                
+                if (isForceDelete) {
+                    const projectDocs = projectDocumentsMap.get(project.id) || [];
+                    trashedDocuments = trashedDocuments.filter(d => !projectDocs.includes(d.id));
+                }
+                
+                showToast(
+                    `Project "${project.name}" has been permanently deleted${isForceDelete ? ' along with its contents' : ''}`,
+                    'success'
+                );
+            } else {
+                showToast(
+                    `Failed to delete project "${project.name}"${isForceDelete ? ' and its contents' : ''}`,
+                    'error'
+                );
+            }
+        }
+    }
 </script>
 
 {#each toasts as toast, i}
@@ -704,7 +801,16 @@
                                                 
                                                 <!-- Action icons for trashed projects -->
                                                 <div class="card-actions">
-                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore" aria-label="Restore project from trash">
+                                                    <button class="action-icon delete-icon me-2" 
+                                                            on:click={(e) => handleDeleteProject(e, project)} 
+                                                            title="Delete permanently"
+                                                            aria-label="Delete project permanently">
+                                                        <i class="bi bi-trash-fill text-danger"></i>
+                                                    </button>
+                                                    <button class="action-icon restore-icon" 
+                                                            on:click={(e) => handleRestoreProject(e, project)} 
+                                                            title="Restore"
+                                                            aria-label="Restore project">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 </div>
@@ -751,11 +857,12 @@
                                                         <i class="bi bi-share"></i>
                                                     </button>
                                                     <button 
-                                                        class="action-icon trash-icon" 
-                                                        on:click={(e) => handleTrashProject(e, project)} 
-                                                        aria-label="Move project to trash"
+                                                        class="action-icon delete-icon" 
+                                                        on:click={(e) => handleDeleteProject(e, project)} 
+                                                        title="Delete permanently"
+                                                        aria-label="Delete project permanently"
                                                     >
-                                                        <i class="bi bi-trash"></i>
+                                                        <i class="bi bi-trash-fill text-danger"></i>
                                                     </button>
                                                 </div>
                                             </div>
@@ -787,28 +894,32 @@
                                                 <!-- Action icons for projects -->
                                                 <div class="card-actions">
                                                     {#if activeCategory === 'trash'}
-                                                        <button class="action-icon restore-icon" on:click={(e) => handleRestoreProject(e, project)} title="Restore" aria-label="Restore project from trash">
-                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        <button class="action-icon delete-icon" 
+                                                                on:click={(e) => handleDeleteProject(e, project)} 
+                                                                title="Delete permanently"
+                                                                aria-label={`Delete project ${project.name} permanently`}>
+                                                            <i class="bi bi-trash-fill text-danger"></i>
                                                         </button>
                                                     {:else}
                                                         <button 
                                                             class="action-icon star-icon" 
                                                             on:click={(e) => handleToggleStarProject(e, project)} 
-                                                            aria-label={project.is_starred ? "Unstar project" : "Star project"}
+                                                            aria-label={project.is_starred ? `Unstar project ${project.name}` : `Star project ${project.name}`}
                                                         >
                                                             <i class="bi {project.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
                                                         </button>
                                                         <button 
                                                             class="action-icon share-icon" 
                                                             on:click={(e) => { e.stopPropagation(); openShareModal('project', parseInt(project.id), project.name); }}
-                                                            aria-label="Share project"
+                                                            aria-label={`Share project ${project.name}`}
                                                         >
                                                             <i class="bi bi-share"></i>
                                                         </button>
                                                         <button 
-                                                            class="action-icon trash-icon" 
+                                                            class="action-icon delete-icon" 
                                                             on:click={(e) => handleTrashProject(e, project)} 
-                                                            aria-label="Move project to trash"
+                                                            title="Move to trash"
+                                                            aria-label={`Move project ${project.name} to trash`}
                                                         >
                                                             <i class="bi bi-trash"></i>
                                                         </button>
@@ -844,28 +955,38 @@
                                             <!-- Action icons for documents -->
                                             <div class="card-actions">
                                                 {#if activeCategory === 'trash'}
-                                                    <button class="action-icon restore-icon" on:click={(e) => handleRestoreDocument(e, document)} title="Restore" aria-label="Restore document from trash">
+                                                    <button class="action-icon delete-icon" 
+                                                            on:click={(e) => handleDeleteDocument(e, document)} 
+                                                            title="Delete permanently"
+                                                            aria-label="Delete document permanently">
+                                                        <i class="bi bi-trash-fill text-danger"></i>
+                                                    </button>
+                                                    <button class="action-icon restore-icon" 
+                                                            on:click={(e) => handleRestoreDocument(e, document)} 
+                                                            title="Restore"
+                                                            aria-label="Restore document">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                     </button>
                                                 {:else}
                                                     <button 
                                                         class="action-icon star-icon" 
                                                         on:click={(e) => handleToggleStarDocument(e, document)} 
-                                                        aria-label={document.is_starred ? "Unstar document" : "Star document"}
+                                                        aria-label={document.is_starred ? `Unstar document ${document.name}` : `Star document ${document.name}`}
                                                     >
                                                         <i class="bi {document.is_starred ? 'bi-star-fill text-warning' : 'bi-star'}"></i>
                                                     </button>
                                                     <button 
                                                         class="action-icon share-icon" 
                                                         on:click={(e) => { e.stopPropagation(); openShareModal('document', document.id, document.name); }}
-                                                        aria-label="Share document"
+                                                        aria-label={`Share document ${document.name}`}
                                                     >
                                                         <i class="bi bi-share"></i>
                                                     </button>
                                                     <button 
-                                                        class="action-icon trash-icon" 
+                                                        class="action-icon delete-icon" 
                                                         on:click={(e) => handleTrashDocument(e, document)} 
-                                                        aria-label="Move document to trash"
+                                                        title="Move to trash"
+                                                        aria-label={`Move document ${document.name} to trash`}
                                                     >
                                                         <i class="bi bi-trash"></i>
                                                     </button>
@@ -1151,10 +1272,6 @@
         background: rgba(255, 255, 255, 0.1);
     }
 
-    .trash-icon:hover {
-        color: var(--color-error);
-    }
-
     .share-icon:hover {
         color: var(--color-primary);
     }
@@ -1164,4 +1281,9 @@
         position: relative;
         z-index: 1;
 	}
+
+    .delete-icon:hover {
+        color: var(--bs-danger) !important;
+        background: rgba(220, 53, 69, 0.1);
+    }
 </style>
