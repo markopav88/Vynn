@@ -294,6 +294,7 @@
     function formatKeybinding(keybinding: string): string {
         return keybinding.split('+').join(' + ');
     }
+    
     // Handle a keydown event in the keybinding input
     function handleKeybindingKeydown(event: KeyboardEvent) {
         event.preventDefault();
@@ -328,6 +329,7 @@
     
     <div class="container py-5">
         <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
                 <!-- Tabs navigation -->
                 <ul class="nav nav-tabs mb-4">
                     <li class="nav-item">
@@ -347,6 +349,7 @@
                         </button>
                     </li>
                 </ul>
+                
                 {#if activeTab === 'profile'}
                     <!-- Profile Tab Content -->
                     <div class="card bg-dark text-white border-0 shadow">
@@ -401,6 +404,42 @@
                                             on:change={handleFileSelect}
                                         />
                                     </div>
+                                    
+                                    <!-- Name -->
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label">Name</label>
+                                        <input 
+                                            type="text" 
+                                            class="form-control bg-black text-white border-secondary" 
+                                            id="name" 
+                                            bind:value={name} 
+                                            required
+                                        />
+                                    </div>
+                                    
+                                    <!-- Email -->
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email</label>
+                                        <input 
+                                            type="email" 
+                                            class="form-control bg-black text-white border-secondary" 
+                                            id="email" 
+                                            bind:value={email} 
+                                            required
+                                        />
+                                    </div>
+                                    
+                                    <!-- Password -->
+                                    <div class="mb-3">
+                                        <label for="password" class="form-label">New Password (leave blank to keep current)</label>
+                                        <input 
+                                            type="password" 
+                                            class="form-control bg-black text-white border-secondary" 
+                                            id="password" 
+                                            bind:value={password} 
+                                        />
+                                    </div>
+                                    
                                     <!-- Confirm Password -->
                                     <div class="mb-3">
                                         <label for="confirmPassword" class="form-label">Confirm New Password</label>
@@ -411,6 +450,7 @@
                                             bind:value={confirmPassword} 
                                         />
                                     </div>
+                                    
                                     <!-- Submit Button -->
                                     <button 
                                         type="submit" 
@@ -425,6 +465,43 @@
                                         {/if}
                                     </button>
                                 </form>
+                            {/if}
+                        </div>
+                    </div>
+                {:else if activeTab === 'keybindings'}
+                    <!-- Keybindings Tab Content -->
+                    <div class="card bg-dark text-white border-0 shadow">
+                        <div class="card-body p-4">
+                            <h2 class="card-title text-center mb-4">Customize Keybindings</h2>
+                            
+                            <p class="text-white-50 mb-4">
+                                Customize keybindings for various commands to match your preferences. 
+                                To change a keybinding, click the edit button, press the desired key combination, and save.
+                            </p>
+                            
+                            {#if isLoadingKeybindings}
+                                <div class="text-center p-4">
+                                    <div class="spinner-border text-green" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            {:else}
+                                <!-- Success message -->
+                                {#if keybindingsSuccessMessage}
+                                    <div class="alert alert-success mb-4 alert-dismissible fade show" role="alert">
+                                        {keybindingsSuccessMessage}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                {/if}
+                                
+                                <!-- Error message -->
+                                {#if keybindingsErrorMessage}
+                                    <div class="alert alert-danger mb-4 alert-dismissible fade show" role="alert">
+                                        {keybindingsErrorMessage}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                {/if}
+                                
                                 <!-- Keybindings table -->
                                 <div class="table-responsive">
                                     <table class="table table-dark table-hover">
@@ -502,6 +579,10 @@
                                         </tbody>
                                     </table>
                                 </div>
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
                 
                 <!-- Account Links -->
                 <div class="card bg-dark text-white border-0 shadow mt-4">
@@ -553,5 +634,33 @@
     
     .list-group-item:hover {
         background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    /* Nav tabs styling */
+    .nav-tabs {
+        border-bottom-color: #343a40;
+    }
+    
+    .nav-tabs .nav-link {
+        border: 1px solid transparent;
+        border-top-left-radius: 0.25rem;
+        border-top-right-radius: 0.25rem;
+        color: #6c757d;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        border-color: #343a40 #343a40 #343a40;
+        color: var(--color-primary);
+    }
+    
+    .nav-tabs .nav-link.active {
+        color: var(--color-primary);
+        background-color: #212529;
+        border-color: #343a40 #343a40 #212529;
+    }
+    
+    /* Badge styling */
+    .bg-green {
+        background-color: var(--color-primary) !important;
     }
 </style> 
