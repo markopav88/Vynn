@@ -388,6 +388,20 @@
                                             bind:value={confirmPassword} 
                                         />
                                     </div>
+                                    <!-- Submit Button -->
+                                    <button 
+                                        type="submit" 
+                                        class="btn btn-green w-100" 
+                                        disabled={isSaving}
+                                    >
+                                        {#if isSaving}
+                                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Saving...
+                                        {:else}
+                                            Save Changes
+                                        {/if}
+                                    </button>
+                                </form>
                 
                 <!-- Account Links -->
                 <div class="card bg-dark text-white border-0 shadow mt-4">
