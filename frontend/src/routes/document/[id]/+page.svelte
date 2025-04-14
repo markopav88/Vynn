@@ -32,7 +32,7 @@
 
 	// Editor state
 	let editorContent = '';
-	let editorMode: 'NORMAL' | 'INSERT' | 'COMMAND' | 'VISUAL' = 'INSERT'; // Add VISUAL mode
+	let editorMode: 'NORMAL' | 'INSERT' | 'COMMAND' | 'INSERT'; 
 	let cursorLine = 1; // for indicator in bottom right
 	let cursorColumn = 1; // for indicator in bottom right
 	let editorElement: EditorElement;
@@ -89,8 +89,6 @@
 	let useRichTextEditor = true;
 
 	let commandMode = false;
-	let visualSelectionStart = 0;
-	let visualSelectionEnd = 0;
 
 	// Add at the top of the script where the other variable declarations are
 	let lastColumnPerLine: number[] = [];
@@ -959,11 +957,6 @@
 					editorMode = 'INSERT';
 					event.preventDefault();
 					return;
-			} else if (event.key === 'v') {
-				// Enter visual mode
-				enterVisualMode();
-				event.preventDefault();
-				return;
 			} else if (event.key === ':') {
 				enterCommandMode(':');
 				event.preventDefault();
@@ -2191,31 +2184,77 @@
 	function moveToEndOfLine() {
 		if (!editorElement) return;
 		
-		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return;
-		
-		const range = selection.getRangeAt(0);
-		const textNode = range.startContainer;
-		
-		// Get text up to cursor
-		const textBeforeCursor = getTextBeforeCursor(textNode, range.startOffset);
-		const lines = textBeforeCursor.split('\n');
-		
-		// Find the end of the current line
-		const currentLineIndex = lines.length - 1;
-		const allLines = editorContent.split('\n');
-		
-		if (currentLineIndex < allLines.length) {
-			// Calculate position of end of line
-			let endOfLinePosition = 0;
-			for (let i = 0; i < currentLineIndex; i++) {
-				endOfLinePosition += allLines[i].length + 1; // +1 for newline
-			}
-			endOfLinePosition += allLines[currentLineIndex].length;
+		if (useRichTextEditor) {
+			// For contenteditable divs, use DOM approach
+			const selection = window.getSelection();
+			if (!selection || !selection.rangeCount) return;
 			
-			// Set cursor to end of line
-			setRange(editorElement, endOfLinePosition, endOfLinePosition);
-			updateCursorPosition();
+			const range = selection.getRangeAt(0);
+			
+			// Find the current div element
+			let currentDiv: Node | null = range.startContainer;
+			
+			// If the startContainer is a text node, get its parent
+			if (currentDiv.nodeType === Node.TEXT_NODE) {
+				currentDiv = currentDiv.parentNode;
+			}
+			
+			// Traverse up the DOM until we find a div that's a direct child of the editor
+			while (currentDiv && currentDiv !== editorElement && currentDiv.parentNode !== editorElement) {
+				currentDiv = currentDiv.parentNode;
+			}
+			
+			// Make sure we found a div
+			if (currentDiv && currentDiv !== editorElement) {
+				// Create a new range at the end of the div
+				const newRange = document.createRange();
+				
+				// If the div has content, position at the end of the last text node
+				if (currentDiv.lastChild && currentDiv.lastChild.nodeType === Node.TEXT_NODE) {
+					const textNode = currentDiv.lastChild;
+					const length = textNode.textContent?.length || 0;
+					newRange.setStart(textNode, length);
+				} else {
+					// If the div is empty, position at the start of the div
+					newRange.setStart(currentDiv, 0);
+				}
+				newRange.collapse(true);
+				
+				// Apply the range
+				selection.removeAllRanges();
+				selection.addRange(newRange);
+				
+				// Update cursor position
+				updateCursorPosition();
+			}
+		} else {
+			// Original implementation for textarea mode
+			const selection = window.getSelection();
+			if (!selection || !selection.rangeCount) return;
+			
+			const range = selection.getRangeAt(0);
+			const textNode = range.startContainer;
+			
+			// Get text up to cursor
+			const textBeforeCursor = getTextBeforeCursor(textNode, range.startOffset);
+			const lines = textBeforeCursor.split('\n');
+			
+			// Find the end of the current line
+			const currentLineIndex = lines.length - 1;
+			const allLines = editorContent.split('\n');
+			
+			if (currentLineIndex < allLines.length) {
+				// Calculate position of end of line
+				let endOfLinePosition = 0;
+				for (let i = 0; i < currentLineIndex; i++) {
+					endOfLinePosition += allLines[i].length + 1; // +1 for newline
+				}
+				endOfLinePosition += allLines[currentLineIndex].length;
+				
+				// Set cursor to end of line
+				setRange(editorElement, endOfLinePosition, endOfLinePosition);
+				updateCursorPosition();
+			}
 		}
 	}
 	
@@ -2340,145 +2379,6 @@
 		const maxChars = Math.floor(editorWidth / charWidth);
 		
 		return Math.max(60, Math.min(maxChars, 120)); // Keep between 60-120 chars
-	}
-
-	// Function to handle 'v' key press to enter visual mode
-	function enterVisualMode() {
-		editorMode = 'VISUAL';
-		const selection = window.getSelection();
-		if (selection && selection.rangeCount > 0) {
-			const range = selection.getRangeAt(0);
-			visualSelectionStart = getTextOffset(range.startContainer, range.startOffset);
-			visualSelectionEnd = visualSelectionStart;
-			// Set initial selection point
-			setRange(editorElement, visualSelectionStart, visualSelectionEnd);
-		}
-		showCommandError('-- VISUAL --');
-	}
-
-	// Function to extend visual selection
-	function extendVisualSelection(direction: 'up' | 'down' | 'left' | 'right') {
-		if (editorMode !== 'VISUAL' || !editorElement) return;
-		
-		const lines = editorContent.split('\n');
-		
-		// Find current line and column
-		let currentLine = 0;
-		let currentCol = 0;
-		let charCount = 0;
-		
-		for (let i = 0; i < lines.length; i++) {
-			const lineLength = lines[i].length;
-			
-			if (charCount + lineLength + 1 > visualSelectionEnd) {
-				// End position is on this line
-				currentLine = i;
-				currentCol = visualSelectionEnd - charCount;
-				break;
-			}
-			
-			charCount += lineLength + 1; // +1 for newline
-		}
-		
-		// Calculate new selection end based on direction
-		let newEnd = visualSelectionEnd;
-		
-		if (direction === 'down' && currentLine < lines.length - 1) {
-			// Move selection end down one line
-			const targetLine = lines[currentLine + 1];
-			const targetCol = Math.min(currentCol, targetLine.length);
-			
-			// Calculate new position
-			newEnd = 0;
-			for (let i = 0; i <= currentLine; i++) {
-				newEnd += lines[i].length + 1; // +1 for newline
-			}
-			newEnd += targetCol;
-		}
-		else if (direction === 'up' && currentLine > 0) {
-			// Move selection end up one line
-			const targetLine = lines[currentLine - 1];
-			const targetCol = Math.min(currentCol, targetLine.length);
-			
-			// Calculate new position
-			newEnd = 0;
-			for (let i = 0; i < currentLine - 1; i++) {
-				newEnd += lines[i].length + 1; // +1 for newline
-			}
-			newEnd += targetCol;
-		}
-		else if (direction === 'left' && visualSelectionEnd > 0) {
-			newEnd--;
-		}
-		else if (direction === 'right' && visualSelectionEnd < editorContent.length) {
-			newEnd++;
-		}
-		
-		// Update selection
-		visualSelectionEnd = newEnd;
-		
-		// Apply selection - ensure start is always before end
-		const selStart = Math.min(visualSelectionStart, visualSelectionEnd);
-		const selEnd = Math.max(visualSelectionStart, visualSelectionEnd);
-		setRange(editorElement, selStart, selEnd);
-	}
-
-	// Function to handle actions in visual mode
-	function handleVisualModeAction(action: string) {
-		if (editorMode !== 'VISUAL' || !editorElement) return;
-		
-		// Ensure selection range is valid
-		const selStart = Math.min(visualSelectionStart, visualSelectionEnd);
-		const selEnd = Math.max(visualSelectionStart, visualSelectionEnd);
-		
-		switch (action) {
-			case 'delete':
-				// Delete the selected text
-				editorContent = editorContent.substring(0, selStart) + editorContent.substring(selEnd);
-				// Use our safe method instead of innerText
-				safelySetEditorContent(editorContent);
-				
-				// Clean up empty divs
-				const currentDivs = Array.from(editorElement.querySelectorAll('div'));
-				let emptyDivs = currentDivs.filter(div => (div.textContent || '').trim() === '');
-				
-				if (emptyDivs.length > 0 && emptyDivs.length < currentDivs.length) {
-					emptyDivs.forEach(div => {
-						div.remove();
-					});
-				}
-				
-				// Get updated content
-				editorContent = getEditorContent();
-				
-				// Set cursor position
-				setRange(editorElement, selStart, selStart);
-				break;
-			case 'yank':
-				// Copy the selected text
-				const selectedText = editorContent.substring(selStart, selEnd);
-				clipboardText = selectedText;
-				
-				// Try to copy to system clipboard
-				try {
-					navigator.clipboard.writeText(selectedText).then(() => {
-						showCommandError('Text copied to clipboard');
-					});
-				} catch (e) {
-					// Fallback
-					showCommandError('Text copied');
-				}
-				break;
-		}
-		
-		// Exit visual mode and return to normal mode
-		editorMode = 'NORMAL';
-		
-		// Update UI
-		lines = editorContent.split('\n');
-		updateCursorPosition();
-		updateLineNumbers();
-		adjustEditorHeight();
 	}
 
 	// Helper function to get node offset within a specific parent
@@ -2791,7 +2691,7 @@
 	<!-- Fixed Status Bar - moved outside the editor wrapper -->
 	<div class="status-bar" class:fade-in-fourth={documentReady}>
 		<div class="mode-indicator">
-			<span class="mode {editorMode.toLowerCase()}">{editorMode}</span>
+			<span class="mode {editorMode ? editorMode.toLowerCase() : 'normal'}">{editorMode || 'NORMAL'}</span>
 			{#if editorMode === 'COMMAND'}
 				<div class="command-container">
 					<span class="command-prefix">{commandPrefix}</span>
