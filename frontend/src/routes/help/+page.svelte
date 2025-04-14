@@ -181,3 +181,125 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Right column: Support Form -->
+            <div class="col-lg-7">
+                <div class="card bg-dark text-white border-0 shadow">
+                    <div class="card-body p-4">
+                        <h2 class="card-title mb-4">Contact Support</h2>
+                        
+                        {#if successMessage}
+                            <div class="alert alert-success mb-4" role="alert">
+                                {successMessage}
+                            </div>
+                        {/if}
+                        
+                        {#if errorMessage}
+                            <div class="alert alert-danger mb-4" role="alert">
+                                {errorMessage}
+                            </div>
+                        {/if}
+                        
+                        <form on:submit|preventDefault={handleSubmit}>
+                            <!-- Name -->
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                                <input 
+                                    type="text" 
+                                    class="form-control bg-black text-white border-secondary" 
+                                    id="name" 
+                                    bind:value={name} 
+                                    required
+                                    placeholder="Your name"
+                                />
+                            </div>
+                            
+                            <!-- Email -->
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input 
+                                    type="email" 
+                                    class="form-control bg-black text-white border-secondary" 
+                                    id="email" 
+                                    bind:value={email} 
+                                    required
+                                    placeholder="Your email address"
+                                />
+                            </div>
+                            
+                            <!-- Subject -->
+                            <div class="mb-3">
+                                <label for="subject" class="form-label">Subject</label>
+                                <input 
+                                    type="text" 
+                                    class="form-control bg-black text-white border-secondary" 
+                                    id="subject" 
+                                    bind:value={subject} 
+                                    placeholder="What is your question about?"
+                                />
+                            </div>
+                            
+                            <!-- Message -->
+                            <div class="mb-4">
+                                <label for="message" class="form-label">Message <span class="text-danger">*</span></label>
+                                <textarea 
+                                    class="form-control bg-black text-white border-secondary" 
+                                    id="message" 
+                                    bind:value={message} 
+                                    rows="6" 
+                                    required
+                                    placeholder="Please describe your issue or question in detail"
+                                ></textarea>
+                            </div>
+                            
+                            <!-- Submit Button -->
+                            <button 
+                                type="submit" 
+                                class="btn btn-green btn-lg w-100" 
+                                disabled={isSubmitting}
+                            >
+                                {#if isSubmitting}
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Submitting...
+                                {:else}
+                                    Submit Support Request
+                                {/if}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <Footer />
+</div>
+
+<style>
+    /* Customize accordion styles */
+    :global(.accordion-button:not(.collapsed)) {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        color: var(--color-primary) !important;
+        box-shadow: none !important;
+    }
+    
+    :global(.accordion-button:focus) {
+        box-shadow: none !important;
+        border-color: rgba(16, 185, 129, 0.5) !important;
+    }
+    
+    :global(.accordion-button::after) {
+        filter: invert(1);
+    }
+    
+    /* Style for keyboard keys */
+    kbd {
+        background-color: #333;
+        border: 1px solid #666;
+        border-radius: 3px;
+        color: #fff;
+        display: inline-block;
+        font-size: 0.9em;
+        padding: 2px 5px;
+    }
+</style> 
