@@ -294,6 +294,29 @@
     function formatKeybinding(keybinding: string): string {
         return keybinding.split('+').join(' + ');
     }
+    // Handle a keydown event in the keybinding input
+    function handleKeybindingKeydown(event: KeyboardEvent) {
+        event.preventDefault();
+        
+        const keys: string[] = [];
+        
+        if (event.ctrlKey) keys.push('Ctrl');
+        if (event.shiftKey) keys.push('Shift');
+        if (event.altKey) keys.push('Alt');
+        if (event.metaKey) keys.push('Meta');
+        
+        // Add the key if it's not a modifier key
+        if (!['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
+            // Format the key nicely
+            const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+            keys.push(key);
+        }
+        
+        // Only set the value if there's at least one modifier and one regular key
+        if (keys.length > 1) {
+            newKeybindingValue = keys.join('+');
+        }
+    }
 </script>
 
 <svelte:head>
