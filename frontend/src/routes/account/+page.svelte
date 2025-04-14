@@ -352,6 +352,29 @@
                     <div class="card bg-dark text-white border-0 shadow">
                         <div class="card-body p-4">
                             <h2 class="card-title text-center mb-4">Profile Information</h2>
+                            
+                            {#if isLoading}
+                                <div class="text-center p-4">
+                                    <div class="spinner-border text-green" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            {:else}
+                                <!-- Success message -->
+                                {#if successMessage}
+                                    <div class="alert alert-success mb-4" role="alert">
+                                        {successMessage}
+                                    </div>
+                                {/if}
+                                
+                                <!-- Error message -->
+                                {#if errorMessage}
+                                    <div class="alert alert-danger mb-4" role="alert">
+                                        {errorMessage}
+                                    </div>
+                                {/if}
+                                
+                                <form on:submit|preventDefault={handleSubmit}>
                                     <!-- Profile Image -->
                                     <div class="text-center mb-4">
                                         <div class="position-relative mx-auto" style="width: 150px; height: 150px;">
