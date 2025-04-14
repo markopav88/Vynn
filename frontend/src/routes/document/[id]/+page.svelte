@@ -154,9 +154,9 @@
 			if (isAnimating) return;
 
 			// Save current document before switching
-			if (documentData) {
+			if (documentData && editorElement) {
 				console.log('Saving current document before switching');
-				documentData.content = editorContent;
+				documentData.content = editorElement.innerHTML;
 				await update_document(documentData);
 			}
 
@@ -196,8 +196,19 @@
 				// Load the preloaded document data
 				documentData = projectDocumentsMap.get(docId);
 				editorContent = documentData.content || '';
-				lines = editorContent.split('\n');
-
+				
+				// Set the HTML content in the editor element
+				if (editorElement) {
+					editorElement.innerHTML = editorContent;
+					
+					// Update line numbers and cursor position
+					setTimeout(() => {
+						updateLineNumbers();
+						updateCursorPosition();
+						adjustEditorHeight();
+					}, 10);
+				}
+				
 				// Update current document index
 				currentDocumentIndex = projectDocuments.findIndex((doc) => doc.id === docId);
 
@@ -223,6 +234,7 @@
 
 			// If document not preloaded, navigate to it the traditional way
 			console.log(`Document not preloaded, navigating to /document/${docId}`);
+			
 			window.location.href = `/document/${docId}`;
 		} catch (error) {
 			console.error('Error switching document:', error);
@@ -1493,23 +1505,41 @@
 			documentData = await get_document(parseInt(documentId));
 
 			if (documentData) {
-				// Initialize with document content
-				editorContent = documentData.content || '';
+				// Get the HTML content from the document
+				let htmlContent = documentData.content || '';
 				
-				// Ensure there's at least one line
-				if (editorContent.trim() === '') {
-					editorContent = '';
+				// If the content is empty, create a default empty div
+				if (htmlContent.trim() === '') {
+					htmlContent = '<div><br></div>';
 				}
 				
-				// Initialize lines array from content
-				lines = editorContent.split('\n');
-				if (lines.length === 0) {
-					lines = [''];
+				// If content doesn't have div tags, convert it to HTML format
+				if (!htmlContent.includes('<div')) {
+					// Convert plain text lines to HTML with divs
+					const lines = htmlContent.split('\n');
+					htmlContent = lines.map((line: string) => {
+						// If line is empty, add a <br> tag to preserve it
+						return line.trim() === '' ? '<div><br></div>' : `<div>${line}</div>`;
+					}).join('');
 				}
-
-				// Update contenteditable div if available
+				
+				// If content doesn't have div tags, convert it to HTML format
+				if (!htmlContent.includes('<div')) {
+					// Convert plain text lines to HTML with divs
+					const lines = htmlContent.split('\n');
+					htmlContent = lines.map((line: string) => {
+						// If line is empty, add a <br> tag to preserve it
+						return line.trim() === '' ? '<div><br></div>' : `<div>${line}</div>`;
+					}).join('');
+				}
+				
+				// Store the HTML content
+				editorContent = htmlContent;
+				
+				// Set the content in the editor
 				if (editorElement) {
-					setEditorContent(editorContent);
+					// Directly set innerHTML to render the HTML structure
+					editorElement.innerHTML = htmlContent;
 				}
 
 				// Check if document is part of a project
@@ -1527,8 +1557,10 @@
 
 				// Set up auto-save
 				autoSaveCleanup = setup_auto_save(documentData, () => {
-					if (documentData) {
-						documentData.content = editorContent;
+					if (documentData && editorElement) {
+						// Save the inner HTML of the editor element
+						documentData.content = editorElement.innerHTML;
+						console.log(editorElement.innerHTML)
 						update_document(documentData);
 					}
 				});
