@@ -402,6 +402,83 @@
                                         {/if}
                                     </button>
                                 </form>
+                                <!-- Keybindings table -->
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Command</th>
+                                                <th>Description</th>
+                                                <th>Keybinding</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each commands as command}
+                                                <tr>
+                                                    <td>{command.command_name}</td>
+                                                    <td>{command.command_description}</td>
+                                                    <td>
+                                                        {#if editingKeybinding === command.command_id}
+                                                            <input 
+                                                                type="text" 
+                                                                class="form-control bg-black text-white border-secondary" 
+                                                                bind:value={newKeybindingValue}
+                                                                placeholder="Press keys..."
+                                                                on:keydown={handleKeybindingKeydown}
+                                                                readonly
+                                                            />
+                                                        {:else}
+                                                            <span class="{hasCustomKeybinding(command.command_id) ? 'text-green' : ''}">
+                                                                {formatKeybinding(getKeybinding(command.command_id))}
+                                                            </span>
+                                                            {#if hasCustomKeybinding(command.command_id)}
+                                                                <span class="badge rounded-pill bg-green ms-2">Custom</span>
+                                                            {/if}
+                                                        {/if}
+                                                    </td>
+                                                    <td>
+                                                        {#if editingKeybinding === command.command_id}
+                                                            <div class="btn-group btn-group-sm">
+                                                                <button 
+                                                                    class="btn btn-success" 
+                                                                    on:click={() => saveKeybinding(command.command_id)}
+                                                                >
+                                                                    <i class="bi bi-check"></i>
+                                                                </button>
+                                                                <button 
+                                                                    class="btn btn-danger" 
+                                                                    on:click={cancelEditKeybinding}
+                                                                >
+                                                                    <i class="bi bi-x"></i>
+                                                                </button>
+                                                            </div>
+                                                        {:else}
+                                                            <div class="btn-group btn-group-sm">
+                                                                <button 
+                                                                    class="btn btn-outline-light" 
+                                                                    title="Edit keybinding"
+                                                                    on:click={() => startEditKeybinding(command.command_id)}
+                                                                >
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                {#if hasCustomKeybinding(command.command_id)}
+                                                                    <button 
+                                                                        class="btn btn-outline-danger" 
+                                                                        title="Reset to default"
+                                                                        on:click={() => resetKeybinding(command.command_id)}
+                                                                    >
+                                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                                    </button>
+                                                                {/if}
+                                                            </div>
+                                                        {/if}
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
                 
                 <!-- Account Links -->
                 <div class="card bg-dark text-white border-0 shadow mt-4">
