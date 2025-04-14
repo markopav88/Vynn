@@ -1,0 +1,127 @@
+/* Custom styles for the drive page */
+.nav-link {
+    border-radius: 5px;
+    margin-bottom: 5px;
+    transition: all 0.2s;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-link.active {
+    font-weight: 500;
+    color: var(--color-primary) !important;
+}
+
+.project-card:hover {
+    border-left: 3px solid var(--color-primary);
+}
+
+.document-card:hover {
+    border-left: 3px solid #6c757d;
+}
+
+/* Green glow for project cards */
+.project-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 8px;
+    padding: 1px;
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.2), transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Card actions styles */
+.card-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.action-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-icon:hover {
+    transform: scale(1.1);
+}
+
+.star-icon:hover {
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+.trash-icon:hover {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.restore-icon:hover {
+    color: #10B981;
+    border-color: #10B981;
+}
+
+/* Green text for document titles */
+.text-green {
+    color: #10B981 !important;
+}
+
+.card-title {
+    color: white;
+    max-width: 80%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    z-index: 1;
+}
+
+.card-actions {
+    z-index: 10;
+}
+
+/* Show card actions on hover */
+.project-card:hover .card-actions,
+.document-card:hover .card-actions {
+    opacity: 1;
+}
+
+/* Add these breadcrumb styles to the end of the file */
+
+/* Breadcrumb styling */
+.breadcrumb-item + .breadcrumb-item::before {
+    color: #6c757d; /* Subdued color for the separator */
+}
+
+.breadcrumb-item.active {
+    color: #10B981 !important; /* Green color for active breadcrumb */
+}
+
+.breadcrumb-item a {
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    text-decoration: underline;
+}

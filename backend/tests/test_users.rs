@@ -9,6 +9,8 @@
 #![allow(unused)]
 
 use std::any;
+use std::fs;
+use std::path::Path;
 
 use anyhow::Result;
 use axum::http::response;
@@ -28,6 +30,7 @@ async fn test_users() -> Result<()> {
     let bad_login_result = test_bad_login(&hc).await;
     let update_user_result = test_update_user(&hc).await;
     let get_user_result = test_get_user(&hc).await;
+    let get_current_user_result = test_get_current_user(&hc).await;
     let logout_result = test_logout(&hc).await;
     let reset_db_result = backend::test_reset_db(&hc).await;
 
@@ -38,6 +41,7 @@ async fn test_users() -> Result<()> {
     println!("Bad Login:\t{}", result_to_string(&bad_login_result));
     println!("Update User:\t{}", result_to_string(&update_user_result));
     println!("Get User:\t{}", result_to_string(&get_user_result));
+    println!("Get Current User:\t{}", result_to_string(&get_current_user_result));
     println!("Logout:\t\t{}", result_to_string(&logout_result));
     println!("Reset Database:\t{}", result_to_string(&reset_db_result));
     println!("======================\n");
@@ -168,6 +172,38 @@ async fn test_logout(hc: &Client) -> Result<()> {
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(
             "Logout failed with status: {}",
+            response.status()
+        ));
+    }
+
+    Ok(())
+}
+
+async fn test_get_current_user(hc: &Client) -> Result<()> {
+    println!("TEST - Get Current User");
+    
+    // First, ensure we're logged in
+    let login_response = hc
+        .do_post(
+            "/api/users/login",
+            json!({
+                "email": "testcreate@example.com",
+                "password": "password123"
+            }),
+        )
+        .await?;
+    
+    if !login_response.status().is_success() {
+        return Err(anyhow::anyhow!("Could not login for current user test"));
+    }
+    
+    // Now try to get current user
+    let response = hc.do_get("/api/users/current").await?;
+    response.print().await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Get Current User failed with status: {}",
             response.status()
         ));
     }

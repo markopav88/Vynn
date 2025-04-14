@@ -21,6 +21,8 @@
 /
 */
 
+import type { Document } from './document';
+
 export class Project {
 	id: number;
 	name: string;
@@ -96,36 +98,6 @@ export async function get_all_projects(): Promise<Project[] | null> {
 		return projects;
 	} catch (error) {
 		console.error('Get all projects error:', error);
-		return null;
-	}
-}
-
-/**
- * Function to create a new project
- * Calls: POST /api/project
- */
-export async function create_project(name: string): Promise<Project | null> {
-	const apiUrl = `http://localhost:3001/api/project/`;
-
-	try {
-		const response = await fetch(apiUrl, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ _name: name }),
-			credentials: 'include'
-		});
-
-		if (!response.ok) {
-			console.error('Create project failed with status:', response.status);
-			return null;
-		}
-
-		const project = await response.json();
-		return project;
-	} catch (error) {
-		console.error('Create project error:', error);
 		return null;
 	}
 }
@@ -256,7 +228,7 @@ export async function get_project_permissions(projectId: number): Promise<Projec
 		}
 
 		const data = await response.json();
-		return data.users || null;
+		return data || null;
 	} catch (error) {
 		console.error('Error fetching project permissions:', error);
 		return null;
@@ -285,10 +257,15 @@ export async function update_project_permission(projectId: number, userId: numbe
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(errorText || 'Failed to update project permissions');
+		}
+
+		return true;
 	} catch (error) {
 		console.error('Error updating project permission:', error);
-		return false;
+		throw error;
 	}
 }
 
@@ -302,13 +279,21 @@ export async function remove_project_permissions(projectId: number, userId: numb
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
+			headers: {
+				'Content-Type': 'application/json'
+			},
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(errorText || 'Failed to remove user from project');
+		}
+
+		return true;
 	} catch (error) {
 		console.error('Error removing project permissions:', error);
-		return false;
+		throw error;
 	}
 }
 
@@ -316,10 +301,10 @@ export async function remove_project_permissions(projectId: number, userId: numb
  * Function to get all documents in a project
  * Calls: GET /api/project/:id/documents
  */
-export async function get_project_documents(projectId: number): Promise<Document[] | null> {
-	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents`;
+export async function get_project_documents(project_id: number): Promise<Document[] | null> {
+	const apiUrl = `http://localhost:3001/api/project/${project_id}/documents`;
 
+	try {
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
@@ -332,7 +317,6 @@ export async function get_project_documents(projectId: number): Promise<Document
 		const data = await response.json();
 		console.log('Project documents received:', data);
 
-		// The API is returning the documents directly, not in a "documents" property
 		return data || [];
 	} catch (error) {
 		console.error('Error fetching project documents:', error);

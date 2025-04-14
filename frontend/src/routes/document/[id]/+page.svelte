@@ -1,12 +1,23 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { jsPDF } from 'jspdf';
+	import { browser } from '$app/environment';
+
 	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
+	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user'
 	import { get_project_documents } from '$lib/ts/project';
 	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
-	import { goto } from '$app/navigation';
+
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
+	import profileDefault from '$lib/assets/profile-image.png';
+
+	import '$lib/assets/style/document.css'
+
+	// Define a type that can be either HTMLDivElement or HTMLTextAreaElement
+	type EditorElement = HTMLDivElement | HTMLTextAreaElement;
 
 	// Document state
 	let documentId = $page.params.id;
@@ -21,10 +32,10 @@
 
 	// Editor state
 	let editorContent = '';
-	let editorMode = 'NORMAL';
-	let cursorLine = 1;
-	let cursorColumn = 1;
-	let editorElement: HTMLTextAreaElement;
+	let editorMode: 'NORMAL' | 'INSERT' | 'COMMAND' | 'VISUAL' = 'INSERT'; // Add VISUAL mode
+	let cursorLine = 1; // for indicator in bottom right
+	let cursorColumn = 1; // for indicator in bottom right
+	let editorElement: EditorElement;
 
 	// Add this for line numbers
 	let lines: string[] = [''];
@@ -38,15 +49,12 @@
 	let previousActiveLineIndex = 0;
 	let animationHeight = 0; // Store the height for consistent animation
 
-	// Add a constant for line height and minimum lines
+	// Constants for editor configuration
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
-	const MIN_LINES = 30;
-
-	// Add a variable to track when the document is ready to display
-	let documentReady = false;
-
-	// Add a variable to track when project documents are loaded
-	let projectDocumentsLoaded = false;
+	const MIN_LINES = 30; // minimum lines to display
+	const MAX_COLUMN_WIDTH = 111; // maximum characters per line
+	let documentReady = false;	// to track when the document is ready to display
+	let projectDocumentsLoaded = false; // to track when project documents are loaded
 
 	// Add a variable to track when navbar should fade in
 	let navbarReady = false;
@@ -70,12 +78,56 @@
 	let normalModeBuffer = '';
 	let normalModeBufferTimeout: ReturnType<typeof setTimeout> | null = null;
 
+	// Add state for commands overlay
+	let showCommands = false;
+
+	// User profile data
+	let userId: number | null = null;
+	let userProfileImage = profileDefault;
+
+	// Add this flag to control which editor type is used
+	let useRichTextEditor = true;
+
+	let commandMode = false;
+	let visualSelectionStart = 0;
+	let visualSelectionEnd = 0;
+
+	// Add at the top of the script where the other variable declarations are
+	let lastColumnPerLine: number[] = [];
+
+	// Add these two helper functions
+	function updateLastColumnForCurrentLine() {
+		// Ensure the array has enough entries
+		while (lastColumnPerLine.length < lines.length) {
+			lastColumnPerLine.push(0);
+		}
+		
+		// Get current cursor position
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		const currentOffset = getTextOffset(range.startContainer, range.startOffset);
+		const textBeforeCursor = editorContent.substring(0, currentOffset);
+		const linesBeforeCursor = textBeforeCursor.split('\n');
+		const currentColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length;
+		
+		// Save current column for this line
+		lastColumnPerLine[activeLineIndex] = currentColumn;
+	}
+
+	function getSavedColumnForLine(lineIndex: number): number {
+		if (lineIndex >= 0 && lineIndex < lastColumnPerLine.length) {
+			return lastColumnPerLine[lineIndex];
+		}
+		return 0;
+	}
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
 			// Allow only specific browser shortcuts we want to keep
-			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'f'];
+			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'f', '/'];
 			if (!allowedKeys.includes(event.key.toLowerCase())) {
 				event.preventDefault();
 			}
@@ -90,6 +142,8 @@
 
 	// Function to switch to another document with animation
 	async function switchDocument(docId: number) {
+		if (!browser) return;
+		
 		try {
 			// Don't switch if already on this document
 			if (docId.toString() === documentId) {
@@ -150,7 +204,13 @@
 				// Update current document index
 				currentDocumentIndex = projectDocuments.findIndex((doc) => doc.id === docId);
 
-				// Wait for animation to complete
+				// Get project info for the new document to ensure project name is correct
+				const projectInfo = await get_project_from_document(docId);
+				if (projectInfo && projectInfo.project_id) {
+					documentData.project_name = projectInfo.project_name;
+				}
+
+				// Wait for animation to complete before resetting animation state
 				setTimeout(() => {
 					isAnimating = false;
 					slideDirection = '';
@@ -158,8 +218,8 @@
 					previousDocumentLines = [];
 					animationHeight = 0;
 					// Adjust textarea height
-					setTimeout(adjustTextareaHeight, 0);
-				}, 300); // Match this with CSS transition duration
+					setTimeout(adjustEditorHeight, 0);
+				}, 400); // Match this with the CSS animation duration (400ms now)
 
 				return;
 			}
@@ -194,12 +254,16 @@
 						projectDocumentsMap.set(doc.id, doc);
 					});
 
-					// Set projectDocumentsLoaded to true
-					projectDocumentsLoaded = true;
+					// Set the project name in documentData
+					documentData.project_name = projectInfo.project_name;
 				}
 			}
+			// Set projectDocumentsLoaded to true regardless of whether document is in a project
+			projectDocumentsLoaded = true;
 		} catch (error) {
 			console.error('Error loading project documents:', error);
+			// Still set projectDocumentsLoaded to true even if there's an error
+			projectDocumentsLoaded = true;
 		}
 	}
 
@@ -249,54 +313,6 @@
 		commandErrorTimeout = setTimeout(() => {
 			commandError = '';
 		}, 3000);
-	}
-
-	// Function to handle command execution
-	function executeCommand(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
-			// Exit command mode on Escape
-			exitCommandMode();
-			event.preventDefault();
-			return;
-		}
-
-		if (event.key === 'Enter') {
-			// Execute the command on Enter
-			let success = true;
-
-			if (commandPrefix === ':') {
-				// Handle command execution
-				success = handleColonCommand(commandInput);
-			} else if (commandPrefix === '/' || commandPrefix === '?') {
-				// Handle search navigation
-				if (searchResults.length > 0) {
-					navigateToSearchResult();
-				} else {
-					success = false;
-				}
-			}
-
-			// Exit command mode after executing only if successful
-			if (success) {
-				exitCommandMode();
-			}
-
-			event.preventDefault();
-			return;
-		}
-
-		// Handle search navigation with n/N keys
-		if (
-			(commandPrefix === '/' || commandPrefix === '?') &&
-			(event.key === 'n' || event.key === 'N') &&
-			searchResults.length > 0
-		) {
-			const forward = (event.key === 'n' && commandPrefix === '/') || (event.key === 'N' && commandPrefix === '?');
-
-			navigateSearchResults(forward);
-			event.preventDefault();
-			return;
-		}
 	}
 
 	// Function to perform search based on command input
@@ -359,7 +375,7 @@
 			// Set cursor position to the search result
 			if (editorElement) {
 				editorElement.focus();
-				editorElement.setSelectionRange(position, position + commandInput.length);
+				setRange(editorElement, position, position + commandInput.length);
 
 				// Ensure the cursor is visible
 				const textBeforeCursor = editorContent.substring(0, position);
@@ -369,21 +385,40 @@
 				// Update cursor position
 				cursorLine = lines.length;
 				cursorColumn = lines[lines.length - 1].length + 1;
+				
+				// Make sure the cursor is visible by scrolling
+				ensureCursorVisible();
 			}
 		}
 	}
 
-	// Function to navigate through search results with n/N
+	// Function to navigate through search results with n/m
 	function navigateSearchResults(forward: boolean) {
 		if (searchResults.length === 0) return;
 
-		if (forward) {
+		// Get search direction (whether we're in a forward or backward search)
+		const isBackwardSearch = commandPrefix === '?';
+		
+		// Determine which direction to move based on search direction and key pressed
+		// For '/' searches: 'n' moves forward, 'm' moves backward
+		// For '?' searches: 'n' moves backward, 'm' moves forward
+		let moveForward = forward;
+		
+		// If we're in a backward search ('?'), invert the direction
+		if (isBackwardSearch) {
+			moveForward = !moveForward;
+		}
+		
+		if (moveForward) {
 			currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
 		} else {
 			currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
 		}
 
 		navigateToSearchResult();
+		
+		// Show feedback about current match position
+		showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 	}
 
 	// Function to handle colon commands
@@ -408,6 +443,45 @@
 					goto('/drive');
 				});
 			}
+		} else if (cmd === 'export') {
+			// Export document to PDF
+			exportToPDF();
+		} else if (cmd.startsWith('%s/')) {
+			// Handle find and replace command
+			const parts = cmd.split('/');
+			if (parts.length >= 3) {
+				const searchText = parts[1];
+				const replaceText = parts[2];
+				const flags = parts.length > 3 ? parts[3] : '';
+				const isGlobal = flags.includes('g');
+				const isCaseInsensitive = flags.includes('i');
+
+				if (searchText && replaceText) {
+					// Create a regular expression for the search with proper flags
+					const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
+					const searchRegex = new RegExp(searchText, regexFlags);
+					
+					// Perform the replacement
+					const newContent = editorContent.replace(searchRegex, replaceText);
+					
+					// Update the editor content
+					editorContent = newContent;
+					
+					// Update the document data
+					if (documentData) {
+						documentData.content = newContent;
+						update_document(documentData);
+					}
+					
+					// Show success message
+					const replacementCount = (editorContent.match(searchRegex) || []).length;
+					showCommandError(`Replaced ${replacementCount} occurrence${replacementCount !== 1 ? 's' : ''} of "${searchText}" with "${replaceText}"`);
+				} else {
+					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
+				}
+			} else {
+				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
+			}
 		} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
@@ -421,6 +495,7 @@
 	function handleNormalModeSequence(key: string) {
 		// Add the key to the buffer
 		normalModeBuffer += key;
+		console.log("Buffer:", normalModeBuffer);
 
 		// Clear any existing timeout
 		if (normalModeBufferTimeout) {
@@ -429,18 +504,79 @@
 
 		// Set a timeout to clear the buffer after a delay
 		normalModeBufferTimeout = setTimeout(() => {
+			// Important: make sure we don't trigger any content changes by the buffer clearing
+			const oldBuffer = normalModeBuffer;
 			normalModeBuffer = '';
+			console.log(`Buffer "${oldBuffer}" cleared by timeout without taking action`);
+			
+			// Update cursor position and line numbers to reflect current state
+			if (editorElement) {
+				// Safely update position without changing content
+				updateCursorPosition();
+				updateLineNumbers();
+			}
 		}, 800); // 800ms timeout for multi-key commands
 
-		// Check for sequences
+		// Explicitly log and return false for incomplete sequences
+		if (normalModeBuffer === 'g' || normalModeBuffer === 'd' || normalModeBuffer === 'y') {
+			console.log(`Incomplete command: '${normalModeBuffer}' - waiting for more input`);
+			return false;
+		}
+
+		// Only take action if we have a complete command sequence
+		// Check for complete sequences only - don't do anything for partial commands
 		if (normalModeBuffer === 'yy') {
 			// Copy the current line or selection
 			copyText();
 			normalModeBuffer = ''; // Clear buffer after command
 			return true;
 		} else if (normalModeBuffer === 'dd') {
-			// Delete the current line
+			console.log("Executing 'dd' command - deleting current line");
+			// Delete the current line where the cursor is
 			deleteCurrentLine();
+			normalModeBuffer = ''; // Clear buffer after command
+			return true;
+		} else if (normalModeBuffer === 'gg') {
+			// Move cursor to first line, first position without modifying structure
+			if (editorElement && editorContent) {
+				try {
+					// Get the first div or the editor itself
+					const firstDiv = editorElement.querySelector('div') || editorElement;
+					
+					// Create a range at the start of the first div
+					const range = document.createRange();
+					
+					// Set the range at position 0 properly
+					if (firstDiv.firstChild && firstDiv.firstChild.nodeType === Node.TEXT_NODE) {
+						range.setStart(firstDiv.firstChild, 0);
+					} else {
+						range.setStart(firstDiv, 0);
+					}
+					range.collapse(true);
+					
+					// Apply the range for cursor placement
+					const selection = window.getSelection();
+					if (selection) {
+						editorElement.focus(); // Make sure editor is focused
+						selection.removeAllRanges();
+						selection.addRange(range);
+					}
+					
+					// Update tracking variables
+					activeLineIndex = 0;
+					cursorLine = 1;
+					cursorColumn = 1;
+					
+					// Update UI without changing content or structure
+					updateCursorPosition();
+					updateLineNumbers();
+					
+					// Debug
+					console.log('gg command executed: cursor at first line without content changes');
+				} catch (error) {
+					console.error("Error in gg command:", error);
+				}
+			}
 			normalModeBuffer = ''; // Clear buffer after command
 			return true;
 		}
@@ -455,9 +591,14 @@
 		// Get the selection or current line
 		let textToCopy = '';
 
-		if (editorElement.selectionStart !== editorElement.selectionEnd) {
+		// Use Selection API instead of selectionStart/End
+		const selection = window.getSelection();
+		if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
 			// Copy selected text
-			textToCopy = editorContent.substring(editorElement.selectionStart, editorElement.selectionEnd);
+			const range = selection.getRangeAt(0);
+			const start = getTextOffset(range.startContainer, range.startOffset);
+			const end = getTextOffset(range.endContainer, range.endOffset);
+			textToCopy = editorContent.substring(start, end);
 		} else {
 			// Copy current line if no selection
 			const lines = editorContent.split('\n');
@@ -478,119 +619,208 @@
 		}
 	}
 
-	// Function to delete text - update to adjust height after deletion
+	// Function to delete text
 	function deleteText() {
 		if (!editorElement) return;
 
 		// Check if there's a selection
-		if (editorElement.selectionStart !== editorElement.selectionEnd) {
-			// Get the selection range
-			const start = editorElement.selectionStart;
-			const end = editorElement.selectionEnd;
-
-			// Delete the selected text
-			editorContent = editorContent.substring(0, start) + editorContent.substring(end);
-
-			// Update the editor
-			editorElement.value = editorContent;
-			editorElement.setSelectionRange(start, start);
-
-			// Update lines array for line numbers
-			lines = editorContent.split('\n');
-
-			// Update cursor position
-			updateCursorPosition();
-
-			// Adjust textarea height to shrink if needed
-			adjustTextareaHeight();
+		const selection = window.getSelection();
+		if (!selection || selection.rangeCount === 0) return;
+		
+		const range = selection.getRangeAt(0);
+		
+		// Handle normal text selection deletion (works across divs)
+		if (!range.collapsed) {
+			// Store the start position for cursor restoration
+			const start = getTextOffset(range.startContainer, range.startOffset);
+			
+			// Use execCommand for the actual deletion which properly handles multi-line cases
+			document.execCommand('delete', false);
+			
+			// After deleting, check for and remove empty divs
+			const currentDivs = Array.from(editorElement.querySelectorAll('div'));
+			let emptyDivs = currentDivs.filter(div => (div.textContent || '').trim() === '');
+			
+			// Only remove empty divs if they're not the only div
+			if (emptyDivs.length > 0 && emptyDivs.length < currentDivs.length) {
+				emptyDivs.forEach(div => {
+					div.remove();
+				});
+			}
+			
+			// Get updated content after removal
+			editorContent = getEditorContent();
+			
+			// Try to restore a reasonable cursor position
+			const newContentLength = editorContent.length;
+			const safePosition = Math.min(start, newContentLength);
+			setRange(editorElement, safePosition, safePosition);
 		}
+		else {
+			// If no selection but cursor is in a div, try to delete current character
+			const currentNode = range.startContainer;
+			const offset = range.startOffset;
+			const currentOffset = getTextOffset(currentNode, offset);
+			
+			// Only delete if we're not at the end of the document
+			if (currentOffset < editorContent.length) {
+				// Delete one character at cursor position
+				editorContent = editorContent.substring(0, currentOffset) + editorContent.substring(currentOffset + 1);
+				
+				// Update the editor using our safe method
+				safelySetEditorContent(editorContent);
+				
+				// Check for divs that became empty
+				const allDivs = Array.from(editorElement.querySelectorAll('div'));
+				const emptyDivs = allDivs.filter(div => (div.textContent || '').trim() === '');
+				
+				// Remove empty divs if there are other non-empty divs
+				if (emptyDivs.length > 0 && emptyDivs.length < allDivs.length) {
+					emptyDivs.forEach(div => {
+						div.remove();
+					});
+					
+					// Get updated content after removing empty divs
+					editorContent = getEditorContent();
+				}
+				
+				// Restore cursor position
+				setRange(editorElement, currentOffset, currentOffset);
+			}
+		}
+		
+		// Update lines array for line numbers
+		lines = editorContent.split('\n');
+		
+		// Update UI
+		updateCursorPosition();
+		updateLineNumbers();
+		adjustEditorHeight();
 	}
 
 	// Function to paste text
 	function pasteText() {
 		if (!editorElement || !clipboardText) return;
 
-		// Get the cursor position
-		const start = editorElement.selectionStart;
-		const end = editorElement.selectionEnd;
+		// Get the cursor position from selection
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		const start = getTextOffset(range.startContainer, range.startOffset);
+		const end = getTextOffset(range.endContainer, range.endOffset);
 
-		// Insert the clipboard text
-		editorContent = editorContent.substring(0, start) + clipboardText + editorContent.substring(end);
-
-		// Update the editor
-		editorElement.value = editorContent;
-		editorElement.setSelectionRange(start + clipboardText.length, start + clipboardText.length);
-
-		// Update lines array for line numbers
+		// Insert the clipboard text at the current cursor position
+		const beforePaste = editorContent.substring(0, start);
+		const afterPaste = editorContent.substring(end);
+		const newContent = beforePaste + clipboardText + afterPaste;
+		editorContent = newContent;
+		
+		// Update the editor content using our safe method
+		safelySetEditorContent(newContent);
+		
+		// Set cursor position after the pasted text
+		setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+		
+		// Update line numbers and other UI elements
 		lines = editorContent.split('\n');
-
-		// Update cursor position
 		updateCursorPosition();
-
-		// Adjust textarea height to accommodate new content
-		adjustTextareaHeight();
-
-		// Ensure the cursor is visible by scrolling if needed
-		setTimeout(() => {
-			// Calculate which line the cursor is on
-			const textBeforeCursor = editorContent.substring(0, start + clipboardText.length);
-			const linesBeforeCursor = textBeforeCursor.split('\n');
-			const cursorLineIndex = linesBeforeCursor.length - 1;
-
-			// Scroll to make the cursor visible
-			const lineHeight = LINE_HEIGHT; // Using your defined line height constant
-			const scrollTop = cursorLineIndex * lineHeight;
-
-			if (editorElement) {
-				editorElement.scrollTop = scrollTop;
-			}
-		}, 0);
+		adjustEditorHeight();
 	}
 
 	// Function to delete the current line - update to adjust height after deletion
 	function deleteCurrentLine() {
 		if (!editorElement) return;
 
-		// Get the lines
-		const lines = editorContent.split('\n');
+		console.log(`Deleting line at index ${activeLineIndex}`);
 
-		// Make sure we have a valid line index
-		if (activeLineIndex >= 0 && activeLineIndex < lines.length) {
-			// Remove the current line
-			lines.splice(activeLineIndex, 1);
-
-			// If we removed the last line and there are no lines left, add an empty line
-			if (lines.length === 0) {
-				lines.push('');
+		if (useRichTextEditor) {
+			// For contenteditable, get all divs and delete the one at the active index
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			
+			// Make sure we have a valid index
+			if (activeLineIndex >= 0 && activeLineIndex < allDivs.length) {
+				// Get the div to remove
+				const divToRemove = allDivs[activeLineIndex];
+				
+				// Remove the div directly from the DOM 
+				divToRemove.remove();
+				
+				// If we removed all divs, add an empty one to maintain editor structure
+				if (allDivs.length === 1) {
+					const emptyDiv = document.createElement('div');
+					emptyDiv.appendChild(document.createTextNode('\u200B')); // Zero-width space
+					editorElement.appendChild(emptyDiv);
+				}
+				
+				// Update editor content based on current DOM structure
+				editorContent = getEditorContent();
+				
+				// Calculate new cursor position - move to beginning of the same line, or line above if last line
+				const newLineIndex = Math.min(activeLineIndex, allDivs.length - 2);
+				activeLineIndex = Math.max(0, newLineIndex);
+				
+				// Position cursor at the beginning of the line
+				if (allDivs.length > 1) {
+					const targetDiv = editorElement.querySelectorAll('div')[activeLineIndex];
+					if (targetDiv) {
+						const range = document.createRange();
+						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+							range.setStart(targetDiv.firstChild, 0);
+						} else {
+							range.setStart(targetDiv, 0);
+						}
+						range.collapse(true);
+						
+						const selection = window.getSelection();
+						if (selection) {
+							selection.removeAllRanges();
+							selection.addRange(range);
+						}
+					}
+				}
 			}
-
-			// If we removed the last line, move cursor up
-			if (activeLineIndex >= lines.length) {
-				activeLineIndex = Math.max(0, lines.length - 1);
+		} else {
+			// For textarea, split content into lines and remove the active line
+			const lines = editorContent.split('\n');
+			
+			// Make sure we have a valid line index
+			if (activeLineIndex >= 0 && activeLineIndex < lines.length) {
+				// Remove the current line
+				lines.splice(activeLineIndex, 1);
+				
+				// If we removed the last line and there are no lines left, add an empty line
+				if (lines.length === 0) {
+					lines.push('');
+				}
+				
+				// If we removed the last line, move cursor up
+				if (activeLineIndex >= lines.length) {
+					activeLineIndex = Math.max(0, lines.length - 1);
+				}
+				
+				// Update editor content
+				editorContent = lines.join('\n');
+				
+				// Update the textarea value
+				(editorElement as HTMLTextAreaElement).value = editorContent;
+				
+				// Position cursor at the beginning of the line
+				const newPosition = getPositionFromLineIndex(activeLineIndex);
+				(editorElement as HTMLTextAreaElement).setSelectionRange(newPosition, newPosition);
 			}
-
-			// Update editor content
-			editorContent = lines.join('\n');
-
-			// Update the editor
-			editorElement.value = editorContent;
-
-			// Position cursor at the beginning of the line
-			const newPosition = getPositionFromLineIndex(activeLineIndex);
-			editorElement.setSelectionRange(newPosition, newPosition);
-
-			// Update lines array for line numbers
-			updateLines();
-
-			// Update cursor position
-			updateCursorPosition();
-
-			// Adjust textarea height to shrink if needed
-			adjustTextareaHeight();
-
-			// Show feedback
-			showCommandError('Line deleted');
 		}
+		
+		// Update lines array for line numbers
+		lines = editorContent.split('\n');
+		
+		// Update UI
+		updateCursorPosition();
+		updateLineNumbers();
+		adjustEditorHeight();
+		
+		// Show feedback
+		showCommandError('Line deleted');
 	}
 
 	// Helper function to update lines array
@@ -610,56 +840,128 @@
 		return position;
 	}
 
-	// Update handleKeyDown to support the new commands
+	// Special handler for Enter key to fix line counting issues
 	function handleKeyDown(event: KeyboardEvent) {
-		// First prevent any OS bindings
 		preventBrowserDefaults(event);
 
-		// Handle document switching with Ctrl+number in any mode
-		if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
-			// Check if the key is a number from 1-9
-			const numKey = parseInt(event.key);
-			if (!isNaN(numKey) && numKey >= 1 && numKey <= 9) {
-				// Check if we have a document at this index
-				if (projectDocuments.length >= numKey) {
-					// Get the document ID at index (numKey-1)
-					const docId = projectDocuments[numKey - 1].id;
-
-					// Switch to that document
-					switchDocument(docId);
-					event.preventDefault();
-					return;
-				}
-			}
+		// Don't handle keydown in command mode except for Escape and Enter
+		if (commandMode && event.key !== 'Escape' && event.key !== 'Enter') {
+			return;
 		}
 
-		// In NORMAL mode, prevent most key inputs
+		// Handle arrow keys in any mode - just update line highlighting
+		if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
+			event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+			// Let browser handle actual cursor movement
+			// Then update our position tracking
+			setTimeout(() => {
+				updateCursorPosition();
+				updateLineNumbers();
+			}, 0);
+			return;
+		}
+
+		// Normal mode specific handling
 		if (editorMode === 'NORMAL') {
-			// Always prevent default for most keys in NORMAL mode
 			const allowedKeys = [
 				'Escape',
-				'ArrowUp',
-				'ArrowDown',
-				'ArrowLeft',
-				'ArrowRight',
 				'Home',
 				'End',
 				'PageUp',
 				'PageDown',
-				'Tab'
+				'Tab',
+				'n',
+				'm',
+				'h',
+				'j',
+				'k',
+				'l',
+				'0',
+				'$',
+				'g',
+				'G'
 			];
 
-			// Also allow command keys
-			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd'];
+			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd', 'n', 'm', 'h', 'j', 'k', 'l', 'u', '0', '$', 'g', 'G'];
 
-			// Allow Ctrl combinations
 			if (!event.ctrlKey && !allowedKeys.includes(event.key) && !commandKeys.includes(event.key)) {
 				event.preventDefault();
 			}
 
-			// Handle mode switches
+			// Handle Ctrl+r for redo
+			if (event.ctrlKey && event.key === 'r') {
+				event.preventDefault();
+				performRedo();
+				return;
+			}
+
+			// Handle vim navigation keys
+			if (useRichTextEditor) {
+				if (event.key === 'h') {
+					// Move left using native Selection API
+					const selection = window.getSelection();
+					if (selection && selection.rangeCount > 0) {
+						const range = selection.getRangeAt(0);
+						const currentOffset = getTextOffset(range.startContainer, range.startOffset);
+						if (currentOffset > 0) {
+							setCursorPositionByOffset(currentOffset - 1);
+						}
+					}
+					// Update line numbers
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 0);
+					event.preventDefault();
+					return;
+				} else if (event.key === 'l') {
+					// Move right using native Selection API
+					const selection = window.getSelection();
+					if (selection && selection.rangeCount > 0) {
+						const range = selection.getRangeAt(0);
+						const currentOffset = getTextOffset(range.startContainer, range.startOffset);
+						if (currentOffset < editorContent.length) {
+							setCursorPositionByOffset(currentOffset + 1);
+						}
+					}
+					// Update line numbers
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 0);
+					event.preventDefault();
+					return;
+				} else if (event.key === 'k') {
+					// Move up one line
+					document.getSelection()?.modify("move", "backward", "line");
+					// Update line numbers
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 0);
+					event.preventDefault();
+					return;
+				} else if (event.key === 'j') {
+					// Move down one line
+					document.getSelection()?.modify("move", "forward", "line");
+					// Update line numbers
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 0);
+					event.preventDefault();
+					return;
+				}
+			}
+
+			// Handle mode switches and commands
 			if (event.key === 'i') {
-				editorMode = 'INSERT';
+					editorMode = 'INSERT';
+					event.preventDefault();
+					return;
+			} else if (event.key === 'v') {
+				// Enter visual mode
+				enterVisualMode();
 				event.preventDefault();
 				return;
 			} else if (event.key === ':') {
@@ -675,36 +977,78 @@
 				event.preventDefault();
 				return;
 			} else if (event.key === 'x') {
-				// Delete selected text
+				// In normal mode, delete character or selection
 				deleteText();
 				event.preventDefault();
 				return;
 			} else if (event.key === 'p') {
-				// Paste text
 				pasteText();
+				ensureCursorVisible(); // Make sure cursor is visible after pasting
 				event.preventDefault();
 				return;
-			} else if (event.key === 'd') {
-				// Check for 'dd' sequence
-				const handled = handleNormalModeSequence('d');
-				if (handled) {
-					event.preventDefault();
-					return;
-				}
-			} else if (event.key === 'y') {
-				// Check for 'yy' sequence
-				const handled = handleNormalModeSequence('y');
-				if (handled) {
-					event.preventDefault();
-					return;
-				}
+			} else if (event.key === 'n' && searchResults.length > 0) {
+				// Navigate to next match (direction depends on search command used)
+				navigateSearchResults(true);
+				ensureCursorVisible(); // Make sure cursor is visible after navigating to search result
+				event.preventDefault();
+				return;
+			} else if (event.key === 'm' && searchResults.length > 0) {
+				// Navigate to previous match (direction depends on search command used)
+				navigateSearchResults(false);
+				ensureCursorVisible(); // Make sure cursor is visible after navigating to search result
+				event.preventDefault();
+				return;
+			} else if (event.key === 'u') {
+				// Perform undo operation
+				performUndo();
+				ensureCursorVisible(); // Make sure cursor is visible after undo
+				event.preventDefault();
+				return;
+			} else if (event.key === '0') {
+				// Move to the start of the current line
+				moveToStartOfLine();
+				ensureCursorVisible(); // Make sure cursor is visible after moving
+				event.preventDefault();
+				return;
+			} else if (event.key === '$') {
+				// Move to the end of the current line
+				moveToEndOfLine();
+				ensureCursorVisible(); // Make sure cursor is visible after moving
+				event.preventDefault();
+				return;
+			} else if (event.key === 'G') {
+				// Move to the end of the document
+				moveToEndOfDocument();
+				ensureCursorVisible(); // Make sure cursor is visible after moving to end of document
+				event.preventDefault();
+				return;
+			} else if (event.key === 'g') {
+				// 'g' could be the start of 'gg' command - prevent any DOM updates for single 'g'
+				event.preventDefault(); // Always prevent default for 'g'
+				
+				// Only call handleNormalModeSequence to add to the buffer, don't do anything else
+				handleNormalModeSequence(event.key);
+				
+				// Important: Return immediately without triggering any DOM updates
+				// We'll handle everything in the handleNormalModeSequence function when 'gg' is completed
+				return;
+			} else if (event.key === 'd' || event.key === 'y') {
+				// For 'd' or 'y', just add to buffer without any other action
+				event.preventDefault(); // Prevent default for these keys
+				
+				// Only call handleNormalModeSequence to add to the buffer, don't do anything else
+				handleNormalModeSequence(event.key);
+				
+				// Important: Return immediately without triggering any DOM updates
+				// We'll handle everything in the handleNormalModeSequence function when 'dd' or 'yy' is completed
+				return;
 			}
 
-			// Use our normal mode handler for navigation
-			handleNormalModeKeydown(event, editorElement);
-		} else if (editorMode === 'INSERT') {
-			// In INSERT mode, we don't need to prevent most keys
-			// Just handle Escape to exit INSERT mode
+			// Only use handleNormalModeKeydown for textarea mode, not for contenteditable
+			if (!useRichTextEditor) {
+				handleNormalModeKeydown(event, editorElement as unknown as HTMLTextAreaElement);
+				ensureCursorVisible(); // Make sure cursor is visible after command
+			}
 		}
 
 		if (event.key === 'Escape') {
@@ -712,141 +1056,1589 @@
 			event.preventDefault();
 		}
 
-		// Always update cursor position
-		updateCursorPosition();
-	}
-
-	// Update the updateCursorPosition function to be more accurate
-	function updateCursorPosition() {
-		if (editorElement) {
-			const position = editorElement.selectionStart;
-			const text = editorElement.value;
-			const textBeforeCursor = text.substring(0, position);
-			const lines = textBeforeCursor.split('\n');
-
-			cursorLine = lines.length;
-			cursorColumn = lines[lines.length - 1].length + 1;
-			activeLineIndex = lines.length - 1;
+		// Update cursor position and line numbers for non-arrow key events
+		if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+			setTimeout(() => {
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible(); // Make sure cursor is visible after key presses
+			}, 0);
 		}
 	}
 
-	// Update the adjustTextareaHeight function to handle more lines
-	function adjustTextareaHeight() {
+	// Update the updateCursorPosition function to ensure all lines (including empty ones) are properly highlighted
+	function updateCursorPosition() {
+		if (!editorElement || !browser) return;
+		
+		try {
+			// For rich text editor
+			if (useRichTextEditor) {
+				const selection = window.getSelection();
+				if (!selection || selection.rangeCount === 0) {
+					// If no selection exists but editor has focus, we're probably on an empty editor
+					// Just use first line
+					activeLineIndex = 0;
+					cursorLine = 1;
+					cursorColumn = 1;
+					return;
+				}
+				
+				const range = selection.getRangeAt(0);
+				const textNode = range.startContainer;
+				const offset = range.startOffset;
+				
+				// Calculate line using textBeforeCursor
+				const textBeforeCursor = getTextBeforeCursor(textNode, offset);
+				const lines = textBeforeCursor.split('\n');
+				cursorLine = lines.length;
+				activeLineIndex = cursorLine - 1;
+				
+				// Calculate column based ONLY on current line's content
+				// This ensures the column is relative to the current line only
+				cursorColumn = lines[lines.length - 1].length + 1;
+				
+				// Handle empty lines better by looking at the actual node structure
+				let currentNode = textNode;
+				let foundDiv = false;
+				
+				// Special case: if we're inside the editor directly (not in a div or text node)
+				// This happens when the editor is completely empty or when on an empty line
+				if (textNode === editorElement || 
+					(textNode.nodeType === Node.TEXT_NODE && textNode.textContent === "" && textNode.parentNode === editorElement)) {
+					// Use the first child as the active div, or just use line 0 if totally empty
+					activeLineIndex = 0;
+					cursorLine = 1;
+					cursorColumn = 1; // On an empty line, cursor is at column 1
+					foundDiv = true;
+				} 
+				// Special case: if we're at the beginning of a div element (empty or not)
+				else if (textNode.nodeType === Node.ELEMENT_NODE && textNode.nodeName === 'DIV' && offset === 0) {
+					// Get all divs to find our index
+					const allDivs = Array.from(editorElement.querySelectorAll('div'));
+					const divIndex = allDivs.indexOf(textNode as HTMLDivElement);
+					if (divIndex !== -1) {
+						activeLineIndex = divIndex;
+						cursorLine = divIndex + 1;
+						cursorColumn = 1; // At the beginning of a div, column is 1
+						foundDiv = true;
+					}
+				}
+				// If we're inside a div element directly or its text child
+				else {
+					// Look for a parent div
+					let parentDiv = textNode;
+					while (parentDiv && parentDiv !== editorElement) {
+						if (parentDiv.nodeName === 'DIV') {
+							// Found the div containing the cursor
+							foundDiv = true;
+							break;
+						}
+						parentDiv = parentDiv.parentNode as HTMLElement;
+					}
+					
+					// If we found a div, count its position among other divs
+					if (foundDiv && parentDiv !== editorElement) {
+						const allDivs = Array.from(editorElement.querySelectorAll('div'));
+						const divIndex = allDivs.indexOf(parentDiv as HTMLDivElement);
+						
+						if (divIndex !== -1) {
+							// Set the active line index based on div position
+							activeLineIndex = divIndex;
+							cursorLine = divIndex + 1;
+							
+							// Calculate column based on offset within this specific div
+							const divContent = parentDiv.textContent || '';
+							const nodeOffset = getNodeOffsetWithinParent(textNode, parentDiv, offset);
+							cursorColumn = nodeOffset + 1; // +1 because columns are 1-based
+						}
+					}
+				}
+				
+				// If no div was found but we're in the contenteditable element,
+				// we might be in text directly in the editor (first line)
+				if (!foundDiv && editorElement.contains(textNode)) {
+					// Check if we're at the beginning with no divs yet
+					const hasNoContent = editorElement.innerText.trim() === '';
+					const hasNoDivs = editorElement.querySelectorAll('div').length === 0;
+					
+					if (hasNoContent || hasNoDivs) {
+						activeLineIndex = 0;
+						cursorLine = 1;
+						cursorColumn = offset + 1; // Direct text in editor, column is offset + 1
+					}
+				}
+				
+				// Handle the case when cursorLine is still not set correctly
+				// This happens sometimes after pressing Enter
+				if (cursorLine <= 0) {
+					// Check for divs again
+					const allDivs = editorElement.querySelectorAll('div');
+					
+					if (allDivs.length > 0) {
+						// If we have divs, we're at least on line 1
+						cursorLine = Math.max(1, cursorLine);
+						activeLineIndex = cursorLine - 1;
+					} else {
+						// No divs, fallback to line 1
+						cursorLine = 1;
+						activeLineIndex = 0;
+					}
+				}
+			} else {
+				// For textarea, use the selectionStart to determine line and column
+				const textarea = editorElement as HTMLTextAreaElement;
+				const cursorPos = textarea.selectionStart;
+				
+				// Get text up to cursor position
+				const textBeforeCursor = editorContent.substring(0, cursorPos);
+				const lines = textBeforeCursor.split('\n');
+				
+				// Calculate line
+				cursorLine = lines.length;
+				activeLineIndex = cursorLine - 1;
+				
+				// Calculate column based ONLY on the current line
+				cursorColumn = lines[lines.length - 1].length + 1;
+			}
+			
+			// Ensure bounds are valid
+			const totalLines = Math.max(1, editorContent.split('\n').length);
+			if (cursorLine > totalLines) {
+				cursorLine = totalLines;
+				activeLineIndex = totalLines - 1;
+			} else if (cursorLine < 1) {
+				cursorLine = 1;
+				activeLineIndex = 0;
+			}
+			
+			// Update line highlighting
+			updateLineNumbers();
+		} catch (error) {
+			// Fallback to first line if there's an error
+			activeLineIndex = 0;
+			cursorLine = 1;
+			updateLineNumbers();
+		}
+	}
+
+	// Helper function to get text before cursor in contenteditable
+	function getTextBeforeCursor(node: Node, offset: number): string {
+		if (!editorElement) return '';
+		
+		let text = '';
+		
+		// Handle text node
+		if (node.nodeType === Node.TEXT_NODE) {
+			text = (node.textContent || '').substring(0, offset);
+		}
+		
+		// Go up the tree and collect text from nodes before this one
+		let current = node;
+		while (current !== editorElement) {
+			const parent = current.parentNode;
+			if (!parent) break;
+			
+			// Get all previous siblings
+			let sibling = parent.firstChild;
+			while (sibling && sibling !== current) {
+				text = (sibling.textContent || '') + text;
+				sibling = sibling.nextSibling;
+			}
+			
+			// Move up the tree
+			current = parent;
+		}
+		
+		return text;
+	}
+
+	// Update the adjustTextareaHeight function to handle full page scrolling
+	function adjustEditorHeight() {
 		if (!editorElement) return;
 
-		// Reset height to auto to get the correct scrollHeight
-		editorElement.style.height = 'auto';
+		// Get the actual number of lines from DOM structure for more accuracy
+		let numberOfLines; 
 
-		// Set height to scrollHeight to fit all content
-		const newHeight = Math.max(
-			editorElement.scrollHeight,
-			LINE_HEIGHT * MIN_LINES // Ensure minimum height
-		);
+		if (useRichTextEditor) {
+			// Count actual div elements (each div is a line)
+			const divElements = editorElement.querySelectorAll('div');
+			numberOfLines = divElements.length;
+			
+			// If no divs but there's content, ensure at least one line
+			if (numberOfLines === 0 && editorElement.textContent && editorElement.textContent.trim().length > 0) {
+				numberOfLines = 1;
+			}
+			
+			// Ensure a minimum of 1 line
+			numberOfLines = Math.max(1, numberOfLines);
+			
+			// Check if we need to add an extra line for cursor at end of document
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				const range = selection.getRangeAt(0);
+				if (range.startContainer === editorElement && 
+					range.startOffset === editorElement.childNodes.length) {
+					// Cursor is after the last div, add an extra line
+					numberOfLines++;
+				}
+			}
+			
+			console.log(`Line count from DOM: ${numberOfLines} divs`);
+		} else {
+			// For textarea, count newlines + 1
+			numberOfLines = editorContent.split('\n').length;
+		}
+		
+		// Calculate the height based on number of lines
+		const contentHeight = numberOfLines * LINE_HEIGHT;
+		
+		// Calculate the minimum height based on MIN_LINES
+		const minHeight = LINE_HEIGHT * MIN_LINES;
 
+		// Set height to the larger of content height or minimum height, plus extra padding
+		const newHeight = Math.max(contentHeight, minHeight) + 48; // Add extra padding
+		
+		console.log(`Adjusting editor height: lines=${numberOfLines}, newHeight=${newHeight}px`);
+
+		// Apply the new height to editor without overflow
 		editorElement.style.height = `${newHeight}px`;
+		
+		// Remove overflow scrolling from editor element - we want page scrolling, not editor scrolling
+		editorElement.style.overflowY = 'visible';
+		editorElement.style.maxHeight = 'none'; // Remove max height constraint
 
-		// Also update the line numbers container height
+		// Update the line numbers container height
 		const lineNumbersContainer = document.querySelector('.line-numbers') as HTMLElement;
 		if (lineNumbersContainer) {
 			lineNumbersContainer.style.height = `${newHeight}px`;
+			lineNumbersContainer.style.overflowY = 'visible'; // Remove scrolling to match editor
 		}
 
-		// Make sure the editor container can grow to accommodate the content
-		const editorContainer = document.querySelector('.editor-container') as HTMLElement;
-		if (editorContainer) {
-			editorContainer.style.minHeight = `${newHeight + 100}px`; // Add some extra space
+		// Update the editor wrapper - this is the container with the transparent backdrop
+		const editorWrapper = document.querySelector('.editor-wrapper.current') as HTMLElement;
+		if (editorWrapper) {
+			editorWrapper.style.height = 'auto'; // Let it grow naturally with content
+			editorWrapper.style.minHeight = `${newHeight}px`; // Ensure minimum height
+		}
+
+		// Update the editor content container
+		const editorContentElement = document.querySelector('.editor-content') as HTMLElement;
+		if (editorContentElement) {
+			editorContentElement.style.minHeight = `${newHeight}px`;
 		}
 	}
 
-	// Update the onMount function to set documentReady and navbarReady
-	onMount(() => {
-		const loadData = async () => {
-			try {
-				// Load the document
-				documentData = await get_document(parseInt(documentId));
+	// Add this function to ensure cursor is visible
+	function ensureCursorVisible() {
+		if (!editorElement) return;
+		
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		const rect = range.getBoundingClientRect();
+		
+		// Check if cursor is visible in viewport
+		const isVisible = (
+			rect.top >= 0 &&
+			rect.left >= 0 &&
+			rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+			rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+		);
+		
+		if (!isVisible) {
+			// Scroll to make cursor visible
+			window.scrollTo({
+				top: window.scrollY + rect.top - window.innerHeight/2,
+				behavior: 'smooth'
+			});
+		}
+	}
 
-				if (documentData) {
-					editorContent = documentData.content || '';
-					lines = editorContent.split('\n');
-
-					// Check if document is part of a project
-					if (!documentData.project_id) {
-						// If project_id is not in document data, try to get it from the API
-						const projectData = await get_project_from_document(parseInt(documentId));
-						if (projectData && projectData.project_id) {
-							// Add project_id to document data
-							documentData.project_id = projectData.project_id;
+	// Update the onMount function for proper initialization
+	onMount(async () => {
+		// Check if we're in a browser environment first
+		if (!browser) return;
+		
+		// Load document data and profile image in parallel
+		try {
+			const [docResult, userResult] = await Promise.all([
+				loadDocumentData(),
+				loadUserProfile()
+			]);
+			
+			// Set navbar ready first
+			navbarReady = true;
+			
+			// Then set document ready with a shorter delay
+			setTimeout(() => {
+				documentReady = true;
+				
+				// Force refresh line numbers and layout after everything is loaded
+				setTimeout(() => {
+					// Set initial cursor and focus the editor
+					if (editorElement) {
+						editorElement.focus();
+						
+						// Set cursor at the beginning of the document
+						if (useRichTextEditor) {
+							const selection = window.getSelection();
+							const range = document.createRange();
+							
+							// Select the first text node or the editor element itself if empty
+							if (editorElement.firstChild) {
+								range.setStart(editorElement.firstChild, 0);
+							} else {
+								range.setStart(editorElement, 0);
+							}
+							range.collapse(true);
+							
+							selection?.removeAllRanges();
+							selection?.addRange(range);
+						} else {
+							(editorElement as HTMLTextAreaElement).setSelectionRange(0, 0);
 						}
+						
+						// Set active line to first line
+						activeLineIndex = 0;
+						cursorLine = 1;
+						cursorColumn = 1;
 					}
+					
+					updateLineNumbers();
+					updateCursorPosition();
+					adjustEditorHeight();
+					
+					// Set up a MutationObserver to watch for content changes
+					if (editorElement && useRichTextEditor) {
+						const observer = new MutationObserver((mutations) => {
+							// Content might have changed, ensure line numbers are updated
+							const content = getEditorContent();
+							if (content !== editorContent) {
+								console.log('MutationObserver detected content change');
+								editorContent = content;
+								updateLineNumbers();
+								updateCursorPosition();
+								adjustEditorHeight(); // Ensure height is updated when content changes
+							}
+						});
+						
+						// Watch for text and child node changes
+						observer.observe(editorElement, {
+							childList: true,
+							characterData: true,
+							subtree: true
+						});
+						
+						// Add additional observer specifically for line structure changes
+						const structureObserver = new MutationObserver(() => {
+							// If the DOM structure changes, make sure to adjust height
+							console.log('Structure observer detected changes');
+							setTimeout(() => {
+								// First update the editor content from the DOM state
+								const newContent = getEditorContent();
+								if (newContent !== editorContent) {
+									editorContent = newContent;
+									console.log(`Content updated: ${editorContent.split('\n').length} lines`);
+								}
+								
+								// Update line numbers based on DOM state, not string content
+								updateLineNumbers();
+								
+								// Update cursor position
+								updateCursorPosition();
+								
+								// Finally adjust height based on actual DOM structure
+								adjustEditorHeight();
+							}, 0);
+						});
+						
+						// Observe the editor element for structure changes
+						structureObserver.observe(editorElement, {
+							childList: true,
+							subtree: true
+						});
 
-					// Now autoSaveCleanup is defined when this assignment happens
-					autoSaveCleanup = setup_auto_save(documentData, () => {
-						if (documentData) {
-							documentData.content = editorContent;
-							update_document(documentData);
+						// Also add a resize observer to adjust height when container resizes
+						if (typeof ResizeObserver !== 'undefined') {
+							const resizeObserver = new ResizeObserver(() => {
+								console.log('Resize observer detected changes');
+								adjustEditorHeight();
+							});
+							
+							resizeObserver.observe(editorElement);
 						}
-					});
 
-					// Load project documents if this document is part of a project
-					await loadProjectDocuments();
+						// Add window scroll listener to keep status bar at bottom
+						window.addEventListener('scroll', () => {
+							const statusBar = document.querySelector('.status-bar') as HTMLElement;
+							if (statusBar) {
+								statusBar.style.bottom = '0';
+							}
+						});
 
-					// Set documentReady to true after everything is loaded
-					documentReady = true;
-
-					// Set navbarReady after a delay to create staggered animation
-					setTimeout(() => {
-						navbarReady = true;
-					}, 400); // Delay navbar animation to happen after document picker
-				} else {
-					error = true;
-				}
-			} catch (e) {
-				console.error('Error loading document:', e);
-				error = true;
-			} finally {
-				loading = false;
-			}
-		};
-
-		loadData();
-
-		return () => {
-			if (autoSaveCleanup) {
-				autoSaveCleanup();
-			}
-		};
+						// Add resize listener to adjust editor height when window size changes
+						window.addEventListener('resize', () => {
+							adjustEditorHeight();
+						});
+						
+						// Add a click handler to update cursor position when clicking in editor
+						editorElement.addEventListener('click', () => {
+							// Need a small delay to let the browser update selection
+							setTimeout(() => {
+								updateCursorPosition();
+								updateLineNumbers();
+							}, 0);
+						});
+					}
+				}, 100);
+			}, 150);
+			
+		} catch (e) {
+			console.error('Error during initialization:', e);
+			error = true;
+		} finally {
+			loading = false;
+		}
 	});
 
-	// Add a function to handle input events in the editor
-	function handleInput(event: Event) {
-		// If in NORMAL mode, prevent typing by reverting the content
-		if (editorMode === 'NORMAL') {
-			// Get the current selection
-			const selectionStart = editorElement.selectionStart;
-			const selectionEnd = editorElement.selectionEnd;
+	// Separate cleanup function for event listeners
+	onDestroy(() => {
+		if (!browser) return;
+		
+		// Remove scroll and resize event listeners
+		window.removeEventListener('scroll', () => {});
+		window.removeEventListener('resize', () => {});
+		
+		// Clean up auto-save if it exists
+		if (autoSaveCleanup) {
+			autoSaveCleanup();
+		}
+	});
 
-			// Revert to previous content
-			editorElement.value = editorContent;
+	// Function to load document data
+	async function loadDocumentData() {
+		try {
+			documentData = await get_document(parseInt(documentId));
 
-			// Restore selection
-			editorElement.setSelectionRange(selectionStart - 1, selectionEnd - 1);
+			if (documentData) {
+				// Initialize with document content
+				editorContent = documentData.content || '';
+				
+				// Ensure there's at least one line
+				if (editorContent.trim() === '') {
+					editorContent = '';
+				}
+				
+				// Initialize lines array from content
+				lines = editorContent.split('\n');
+				if (lines.length === 0) {
+					lines = [''];
+				}
 
-			// Prevent the input
-			event.preventDefault();
-		} else {
-			// In INSERT mode, update the content and line numbers
-			editorContent = editorElement.value;
-			lines = editorContent.split('\n');
-			adjustTextareaHeight();
+				// Update contenteditable div if available
+				if (editorElement) {
+					setEditorContent(editorContent);
+				}
+
+				// Check if document is part of a project
+				if (!documentData.project_id) {
+					// If project_id is not in document data, try to get it from the API
+					const projectData = await get_project_from_document(parseInt(documentId));
+					if (projectData && projectData.project_id) {
+						// Add project_id to document data
+						documentData.project_id = projectData.project_id;
+					}
+				}
+
+				// Load project documents if this document is part of a project
+				await loadProjectDocuments();
+
+				// Set up auto-save
+				autoSaveCleanup = setup_auto_save(documentData, () => {
+					if (documentData) {
+						documentData.content = editorContent;
+						update_document(documentData);
+					}
+				});
+
+				// Initialize line numbers when document loads
+				setTimeout(() => {
+					updateLineNumbers();
+					updateCursorPosition();
+					adjustEditorHeight();
+				}, 50);
+			} else {
+				error = true;
+			}
+		} catch (e) {
+			console.error('Error loading document:', e);
+			error = true;
+			throw e;
 		}
 	}
 
-	// Handle cleanup in onDestroy instead
-	onDestroy(() => {
-		if (documentData) {
-			if (autoSaveCleanup) autoSaveCleanup();
+	// Function to load user profile data
+	async function loadUserProfile() {
+		try {
+			// Get current user data
+			const user = await get_current_user();
+			if (user && user.id) {
+				userId = user.id;
+				
+				// Try to load profile image with timestamp to prevent caching
+				const timestamp = new Date().getTime();
+				const imageUrl = `${get_profile_image_url(user.id)}?t=${timestamp}`;
+				
+				// Check if the image exists
+				const response = await fetch(imageUrl, { method: 'HEAD' });
+				if (response.ok) {
+					userProfileImage = imageUrl;
+				}
+			}
+		} catch (error) {
+			console.error('Error loading user profile:', error);
 		}
-	});
+	}
+
+	// Function to handle automatic line wrapping - fixed to prevent premature wrapping
+	function autoWrapLine(text: string): string {
+		if (!text) return '';
+		
+		// Split into existing lines first
+		const lines = text.split('\n');
+		const wrappedLines = [];
+		
+		for (const line of lines) {
+			// If line is exactly at or under the limit, keep it as is
+			if (line.length <= MAX_COLUMN_WIDTH) {
+				wrappedLines.push(line);
+			} else {
+				// Line is too long and needs wrapping
+				let remainingText = line;
+				
+				while (remainingText.length > MAX_COLUMN_WIDTH) {
+					// Find the best place to break (prefer at spaces)
+					// Only look for spaces up to MAX_COLUMN_WIDTH (not MAX_COLUMN_WIDTH-1)
+					let breakIndex = remainingText.lastIndexOf(' ', MAX_COLUMN_WIDTH);
+					
+					// If no good break point or it's too far back, break exactly at the column limit
+					if (breakIndex === -1 || breakIndex < MAX_COLUMN_WIDTH - 20) {
+						breakIndex = MAX_COLUMN_WIDTH;
+					}
+					
+					// Add the segment up to the break point
+					wrappedLines.push(remainingText.substring(0, breakIndex));
+					
+					// Continue with the rest of the text, making sure to remove any leading spaces
+					remainingText = remainingText.substring(breakIndex).trimStart();
+				}
+				
+				// Add any remaining text as a new line (only if there's actually content)
+				if (remainingText.length > 0) {
+					wrappedLines.push(remainingText);
+				}
+			}
+		}
+		
+		return wrappedLines.join('\n');
+	}
+	
+	// Improved handleInput function to work in coordination with handleKeyDown
+	function handleInput(event: Event) {
+		if (editorMode === 'NORMAL') {
+			// In normal mode, prevent edits
+			setEditorContent(editorContent);
+			event.preventDefault();
+			return;
+		}
+		
+		// In INSERT mode
+		// Get the actual content directly from the element
+		const newContent = getEditorContent();
+		
+		// Only process if content actually changed
+		if (newContent !== editorContent) {
+			// Log for debugging the content change
+			console.log('Content changed via input event:', {
+				oldLines: editorContent.split('\n').length, 
+				newLines: newContent.split('\n').length
+			});
+			
+			// Update our content tracking
+			editorContent = newContent;
+			
+			// Always update line numbers first based on the new content
+			updateLineNumbers();
+			
+			// Check if wrapping is needed
+			const contentLines = editorContent.split('\n');
+			let needsWrapping = false;
+			
+			for (const line of contentLines) {
+				if (line.length > MAX_COLUMN_WIDTH) {
+					needsWrapping = true;
+					break;
+				}
+			}
+			
+			// Apply wrapping if needed
+			if (needsWrapping) {
+				const selection = window.getSelection();
+				const range = selection?.getRangeAt(0);
+				const cursorOffset = range ? getTextOffset(range.startContainer, range.startOffset) : 0;
+				
+				// Apply wrapping
+				const wrappedContent = autoWrapLine(editorContent);
+				
+				// Only update if wrapping actually changed something
+				if (wrappedContent !== editorContent) {
+					editorContent = wrappedContent;
+					setEditorContent(wrappedContent);
+					
+					// Attempt to restore cursor position
+					setCursorPositionByOffset(Math.min(cursorOffset, editorContent.length));
+				}
+			} else {
+				// If no wrapping needed, still update cursor position and height
+				updateCursorPosition();
+				adjustEditorHeight();
+			}
+		}
+	}
+	
+	// Improved getEditorContent function to handle newlines consistently
+	function getEditorContent(): string {
+		if (!editorElement) return '';
+		
+		let content = '';
+		
+		if (useRichTextEditor) {
+			// For contenteditable, use div structure to preserve empty lines accurately
+			const divElements = editorElement.querySelectorAll('div');
+			
+			if (divElements.length > 0) {
+				// Collect text from each div, preserving empty lines
+				const lines = Array.from(divElements).map(div => {
+					// Get text content, replacing zero-width spaces with nothing
+					let text = div.textContent || '';
+					text = text.replace(/\u200B/g, ''); // Remove zero-width spaces
+					return text;
+				});
+				
+				// Join with newlines to form content
+				content = lines.join('\n');
+				
+				// Check if we need an extra newline at the end
+				const selection = window.getSelection();
+				if (selection && selection.rangeCount > 0) {
+					const range = selection.getRangeAt(0);
+					if (range.startContainer === editorElement && 
+						range.startOffset === editorElement.childNodes.length) {
+						// Cursor is after the last div, add an extra newline
+						content += '\n';
+					}
+				}
+			} else {
+				// No divs, use innerText and normalize
+				content = editorElement.innerText || '';
+			}
+			
+			// Check if we need to normalize line breaks (some browsers use different conventions)
+			if (content.includes('\r\n')) {
+				// Convert Windows-style CRLF to just LF
+				content = content.replace(/\r\n/g, '\n');
+			}
+			
+			// Log for debugging
+			console.log(`getEditorContent: ${content.split('\n').length} lines (${content.split('\n').filter(l => l === '').length} empty)`);
+		} else {
+			// For textarea, get the value directly
+			content = (editorElement as HTMLTextAreaElement).value || '';
+		}
+		
+		return content;
+	}
+	
+	// Improved setEditorContent function to handle line counting correctly
+	function setEditorContent(content: string) {
+		if (!editorElement) return;
+		
+		// Normalize empty content
+		if (content.trim() === '' || content === '\n') {
+			content = '';
+		}
+		
+		// Set content based on editor type
+		if (useRichTextEditor) {
+			// Use our safe helper method
+			safelySetEditorContent(content);
+		} else {
+			(editorElement as HTMLTextAreaElement).value = content;
+		}
+		
+		// Force a complete update of line numbers and UI
+		setTimeout(() => {
+			// Log for debugging
+			console.log('Content set:', {
+				contentLines: content.split('\n').length,
+				charCount: content.length,
+				isEmpty: content === ''
+			});
+			
+			// Update line numbers and UI
+			updateLineNumbers();
+			updateCursorPosition();
+			adjustEditorHeight();
+		}, 0);
+	}
+	
+	// Helper function to get text offset in contenteditable div
+	function getTextOffset(node: Node, offset: number): number {
+		if (!editorElement) return 0;
+		
+		const treeWalker = document.createTreeWalker(
+			editorElement,
+			NodeFilter.SHOW_TEXT,
+			null
+		);
+		
+		let currentOffset = 0;
+		let currentNode = treeWalker.nextNode();
+		
+		while (currentNode) {
+			if (currentNode === node) {
+				return currentOffset + offset;
+			}
+			
+			currentOffset += (currentNode.textContent || '').length;
+			currentNode = treeWalker.nextNode();
+		}
+		
+		return 0;
+	}
+
+	// Helper function to set cursor position by character offset
+	function setCursorPositionByOffset(offset: number) {
+		if (!editorElement) return;
+		
+		const treeWalker = document.createTreeWalker(
+			editorElement,
+			NodeFilter.SHOW_TEXT,
+			null
+		);
+		
+		let currentOffset = 0;
+		let currentNode = treeWalker.nextNode();
+		
+		while (currentNode) {
+			const nodeLength = (currentNode.textContent || '').length;
+			
+			if (currentOffset + nodeLength >= offset) {
+				const range = document.createRange();
+				const sel = window.getSelection();
+				
+				range.setStart(currentNode, offset - currentOffset);
+				range.collapse(true);
+				
+				sel?.removeAllRanges();
+				sel?.addRange(range);
+				return;
+			}
+			
+			currentOffset += nodeLength;
+			currentNode = treeWalker.nextNode();
+		}
+	}
+
+	// Add these formatting functions after the performRedo function
+	function applyBoldFormatting() {
+		if (useRichTextEditor && document.queryCommandSupported('bold')) {
+			document.execCommand('bold', false);
+			showCommandError('Bold formatting applied');
+		}
+	}
+
+	function applyItalicFormatting() {
+		if (useRichTextEditor && document.queryCommandSupported('italic')) {
+			document.execCommand('italic', false);
+			showCommandError('Italic formatting applied');
+		}
+	}
+
+	function applyIndentation() {
+		if (useRichTextEditor) {
+			document.execCommand('indent', false);
+			showCommandError('Indentation applied');
+		}
+	}
+
+	function applyTextColor(color: string) {
+		if (useRichTextEditor && document.queryCommandSupported('foreColor')) {
+			document.execCommand('foreColor', false, color);
+			showCommandError('Text color changed');
+		}
+	}
+
+	// Add this helper function to implement setSelectionRange for contenteditable divs
+	function setRange(element: HTMLElement, start: number, end: number) {
+		if (!element) return;
+		
+		const selection = window.getSelection();
+		const range = document.createRange();
+		let charCount = 0;
+		let foundStart = false;
+		let foundEnd = false;
+		
+		function traverse(node: Node) {
+			if (foundEnd) return;
+			
+			if (node.nodeType === Node.TEXT_NODE) {
+				const nextCharCount = charCount + node.textContent!.length;
+				
+				// Set start position
+				if (!foundStart && start >= charCount && start <= nextCharCount) {
+					range.setStart(node, start - charCount);
+					foundStart = true;
+				}
+				
+				// Set end position
+				if (foundStart && !foundEnd && end >= charCount && end <= nextCharCount) {
+					range.setEnd(node, end - charCount);
+					foundEnd = true;
+				}
+				
+				charCount = nextCharCount;
+			} else {
+				const childNodes = node.childNodes;
+				for (let i = 0; i < childNodes.length; i++) {
+					traverse(childNodes[i]);
+				}
+			}
+		}
+		
+		traverse(element);
+		
+		if (selection) {
+			selection.removeAllRanges();
+			selection.addRange(range);
+		}
+	}
+
+	// Add a handlePaste function for contenteditable
+	function handlePaste(event: ClipboardEvent) {
+		event.preventDefault();
+		
+		// Get the clipboard text
+		const clipboardText = event.clipboardData?.getData('text/plain') || '';
+		if (!clipboardText) return;
+		
+		// Get the current selection
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		const start = getTextOffset(range.startContainer, range.startOffset);
+		const end = getTextOffset(range.endContainer, range.endOffset);
+		
+		// Insert the clipboard text at the current cursor position
+		const beforePaste = editorContent.substring(0, start);
+		const afterPaste = editorContent.substring(end);
+		const newContent = beforePaste + clipboardText + afterPaste;
+		
+		editorContent = newContent;
+		
+		// Update the editor content using our safe method
+		safelySetEditorContent(newContent);
+		
+		// Set cursor position after the pasted text
+		setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+		
+		// Update line numbers and other UI elements
+		lines = editorContent.split('\n');
+		updateCursorPosition();
+		adjustEditorHeight();
+	}
+
+	// Add export to PDF function
+	function exportToPDF() {
+		if (!browser || !documentData) return;
+		
+		try {
+			// Create a new PDF document
+			const doc = new jsPDF({
+				orientation: 'portrait',
+				unit: 'mm',
+				format: 'a4'
+			});
+			
+			// Set font and text properties
+			doc.setFont('Helvetica');
+			doc.setFontSize(16);
+			
+			// Add document title
+			doc.text(documentData.name || 'Untitled Document', 20, 20);
+			
+			// Add line under title
+			doc.setLineWidth(0.5);
+			doc.line(20, 25, 190, 25);
+			
+			// Add creation date
+			const createdAt = new Date(documentData.created_at).toLocaleDateString();
+			doc.setFontSize(10);
+			doc.text(`Created: ${createdAt}`, 20, 32);
+			
+			// Add content with line wrapping
+			doc.setFontSize(12);
+			const lines = editorContent.split('\n');
+			let y = 40;
+			const lineHeight = 7;
+			
+			for (const line of lines) {
+				// Check if we need a new page
+				if (y > 270) {
+					doc.addPage();
+					y = 20;
+				}
+				
+				// Add the line to the PDF
+				const splitLines = doc.splitTextToSize(line, 170);
+				doc.text(splitLines, 20, y);
+				y += splitLines.length * lineHeight;
+			}
+			
+			// Save the PDF with the document name
+			doc.save(`${documentData.name || 'document'}.pdf`);
+			showCommandError('PDF exported successfully');
+		} catch (error) {
+			console.error('Error exporting PDF:', error);
+			showCommandError('Failed to export PDF');
+		}
+	}
+
+	// Redesigned updateLineNumbers function for better empty line handling
+	function updateLineNumbers() {
+		if (!editorElement) return;
+		
+		// Determine line count based on editor content
+		let lineCount = 1; // Start with at least one line
+		
+		if (useRichTextEditor) {
+			// First check if we have any div elements (paragraphs)
+			const divElements = editorElement.querySelectorAll('div');
+			
+			// If we have divs, count them (each is a paragraph/line)
+			if (divElements.length > 0) {
+				lineCount = divElements.length;
+				
+				// Double-check if there should be an extra line at the end (if cursor is after last div)
+				const selection = window.getSelection();
+				if (selection && selection.rangeCount > 0) {
+					const range = selection.getRangeAt(0);
+					if (range.startContainer === editorElement && 
+						range.startOffset === editorElement.childNodes.length) {
+						// Cursor is after the last div, may need an extra line
+						lineCount++;
+					}
+				}
+			} else {
+				// No divs, check for other line separators
+				const brElements = editorElement.querySelectorAll('br');
+				if (brElements.length > 0) {
+					// Each br tag creates a new line
+					lineCount = brElements.length + 1;
+				} else {
+					// If there's any content at all, ensure at least one line
+					const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
+					lineCount = hasContent ? 1 : 1; // Always at least one line
+					
+					// Also check for newlines in the text content
+					const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
+					if (newlineCount > 0) {
+						lineCount = Math.max(lineCount, newlineCount + 1);
+					}
+				}
+			}
+		} else {
+			// For textarea, count newlines + 1
+			lineCount = (editorContent.match(/\n/g) || []).length + 1;
+		}
+		
+		// Ensure at least one line
+		lineCount = Math.max(1, lineCount);
+		
+		// Update lines array
+		if (useRichTextEditor) {
+			// Extract text from lines for contenteditable
+			const newLines = [];
+			const divElements = editorElement.querySelectorAll('div');
+			
+			if (divElements.length > 0) {
+				// Get text from each div
+				divElements.forEach(div => {
+					newLines.push(div.textContent || '');
+				});
+				
+				// Add an empty line if the cursor suggests there should be one
+				const selection = window.getSelection();
+				if (selection && selection.rangeCount > 0) {
+					const range = selection.getRangeAt(0);
+					if (range.startContainer === editorElement && 
+						range.startOffset === editorElement.childNodes.length) {
+						newLines.push('');
+					}
+				}
+			} else {
+				// Split text by <br> tags or newlines
+				const textContent = editorElement.textContent || '';
+				const htmlContent = editorElement.innerHTML;
+				
+				// Check if we have <br> tags
+				if (htmlContent.includes('<br')) {
+					// Replace <br> tags with newlines for splitting
+					const withNewlines = htmlContent.replace(/<br\s*\/?>/gi, '\n');
+					// Remove other HTML tags
+					const textOnly = withNewlines.replace(/<[^>]*>/g, '');
+					// Split by newlines
+					newLines.push(...textOnly.split('\n'));
+				} else {
+					// Just split by actual newlines
+					newLines.push(...textContent.split('\n'));
+				}
+				
+				// If we still don't have any lines, add one empty line
+				if (newLines.length === 0) {
+					newLines.push('');
+				}
+			}
+			
+			// Update lines array
+			lines = newLines.length > 0 ? newLines : [''];
+		} else {
+			// Textarea: split content by newlines
+			lines = editorContent.split('\n');
+			if (lines.length === 0) {
+				lines = [''];
+			}
+		}
+		
+		// Get line numbers container
+		const lineNumbersContainer = document.querySelector('.line-numbers');
+		if (!lineNumbersContainer) return;
+		
+		// Clear existing line numbers
+		lineNumbersContainer.innerHTML = '';
+		
+		// Create line number elements - ensure activeLineIndex is in bounds
+		activeLineIndex = Math.max(0, Math.min(activeLineIndex, lineCount - 1));
+		
+		// Create all line number elements
+		for (let i = 0; i < lineCount; i++) {
+			const lineNumber = document.createElement('div');
+			lineNumber.className = 'line-number';
+			
+			// Add active class with a clearer, more pronounced style
+			if (i === activeLineIndex) {
+				lineNumber.classList.add('active');
+			}
+			
+			lineNumber.textContent = (i + 1).toString();
+			lineNumbersContainer.appendChild(lineNumber);
+		}
+	}
+
+	// Add performUndo function
+	function performUndo() {
+		if (useRichTextEditor && document.queryCommandSupported('undo')) {
+			document.execCommand('undo', false);
+			showCommandError('Undo operation performed');
+		}
+	}
+	
+	// Add performRedo function 
+	function performRedo() {
+		if (useRichTextEditor && document.queryCommandSupported('redo')) {
+			document.execCommand('redo', false);
+			showCommandError('Redo operation performed');
+		}
+	}
+
+	// Add navigation functions
+	function moveToStartOfLine() {
+		if (!editorElement) return;
+		
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		const textNode = range.startContainer;
+		
+		// Get text up to cursor
+		const textBeforeCursor = getTextBeforeCursor(textNode, range.startOffset);
+		const lines = textBeforeCursor.split('\n');
+		
+		// Count characters before current line
+		let startOfLinePosition = 0;
+		for (let i = 0; i < lines.length - 1; i++) {
+			startOfLinePosition += lines[i].length + 1; // +1 for newline
+		}
+		
+		// Set cursor to start of line
+		setRange(editorElement, startOfLinePosition, startOfLinePosition);
+		updateCursorPosition();
+	}
+	
+	function moveToEndOfLine() {
+		if (!editorElement) return;
+		
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		const textNode = range.startContainer;
+		
+		// Get text up to cursor
+		const textBeforeCursor = getTextBeforeCursor(textNode, range.startOffset);
+		const lines = textBeforeCursor.split('\n');
+		
+		// Find the end of the current line
+		const currentLineIndex = lines.length - 1;
+		const allLines = editorContent.split('\n');
+		
+		if (currentLineIndex < allLines.length) {
+			// Calculate position of end of line
+			let endOfLinePosition = 0;
+			for (let i = 0; i < currentLineIndex; i++) {
+				endOfLinePosition += allLines[i].length + 1; // +1 for newline
+			}
+			endOfLinePosition += allLines[currentLineIndex].length;
+			
+			// Set cursor to end of line
+			setRange(editorElement, endOfLinePosition, endOfLinePosition);
+			updateCursorPosition();
+		}
+	}
+	
+	// Function to move to the end of the document (G command)
+	function moveToEndOfDocument() {
+		if (!editorElement) return;
+		
+		console.log("Executing 'G' command - moving to last line");
+		
+		if (useRichTextEditor) {
+			// For contenteditable divs, use DOM approach
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			
+			if (allDivs.length > 0) {
+				// Get the last div
+				const lastDiv = allDivs[allDivs.length - 1];
+				
+				// Create a range at the end of the last div
+				const range = document.createRange();
+				
+				// Check if the last div has any content
+				if (lastDiv.lastChild && lastDiv.lastChild.nodeType === Node.TEXT_NODE) {
+					// If it has text content, put cursor at the end of the text
+					const textNode = lastDiv.lastChild;
+					const length = textNode.textContent?.length || 0;
+					range.setStart(textNode, length);
+				} else {
+					// If empty, just set cursor at the beginning of the div
+					range.setStart(lastDiv, 0);
+				}
+				range.collapse(true);
+				
+				// Apply the range to move the cursor
+				const selection = window.getSelection();
+				if (selection) {
+					editorElement.focus();
+					selection.removeAllRanges();
+					selection.addRange(range);
+				}
+				
+				// Update indices
+				activeLineIndex = allDivs.length - 1;
+				cursorLine = allDivs.length;
+				
+				// Set cursor column to the end of the line
+				const lineText = lastDiv.textContent || '';
+				cursorColumn = lineText.length + 1;
+			} else {
+				// No divs, just go to the end of the content
+				const length = editorContent.length;
+				setRange(editorElement, length, length);
+			}
+		} else {
+			// For textarea, move to the end of content
+			const textarea = editorElement as HTMLTextAreaElement;
+			textarea.setSelectionRange(editorContent.length, editorContent.length);
+			
+			// Update indices
+			const lines = editorContent.split('\n');
+			activeLineIndex = lines.length - 1;
+			cursorLine = lines.length;
+			cursorColumn = lines[lines.length - 1].length + 1;
+		}
+		
+		// Update UI
+		updateCursorPosition();
+		updateLineNumbers();
+		ensureCursorVisible();
+	}
+
+	// Add user account functions
+	function goToAccount() {
+		goto('/account');
+	}
+	
+	function handleLogout() {
+		logout().then(() => {
+			goto('/login');
+		});
+	}
+	
+	// Add command execution function
+	function executeCommand(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			
+			if (commandPrefix === ':') {
+				const success = handleColonCommand(commandInput);
+				if (success) {
+					exitCommandMode();
+				}
+			} else if ((commandPrefix === '/' || commandPrefix === '?') && searchResults.length > 0) {
+				navigateToSearchResult();
+				exitCommandMode();
+			}
+		} else if (event.key === 'Escape') {
+			exitCommandMode();
+		}
+	}
+	
+	// Add helper function for calculating max column width
+	function calculateMaxColumnWidth(): number {
+		if (!editorElement) return MAX_COLUMN_WIDTH;
+		
+		// Get font metrics
+		const style = window.getComputedStyle(editorElement);
+		const font = style.font;
+		
+		// Create a temporary span to measure character width
+		const span = document.createElement('span');
+		span.style.font = font;
+		span.style.position = 'absolute';
+		span.style.visibility = 'hidden';
+		span.textContent = 'X'.repeat(100); // Use a representative character
+		
+		document.body.appendChild(span);
+		const charWidth = span.getBoundingClientRect().width / 100;
+		document.body.removeChild(span);
+		
+		// Calculate how many characters fit in the editor width with some margin
+		const editorWidth = editorElement.clientWidth - 40; // 20px padding on each side
+		const maxChars = Math.floor(editorWidth / charWidth);
+		
+		return Math.max(60, Math.min(maxChars, 120)); // Keep between 60-120 chars
+	}
+
+	// Function to handle 'v' key press to enter visual mode
+	function enterVisualMode() {
+		editorMode = 'VISUAL';
+		const selection = window.getSelection();
+		if (selection && selection.rangeCount > 0) {
+			const range = selection.getRangeAt(0);
+			visualSelectionStart = getTextOffset(range.startContainer, range.startOffset);
+			visualSelectionEnd = visualSelectionStart;
+			// Set initial selection point
+			setRange(editorElement, visualSelectionStart, visualSelectionEnd);
+		}
+		showCommandError('-- VISUAL --');
+	}
+
+	// Function to extend visual selection
+	function extendVisualSelection(direction: 'up' | 'down' | 'left' | 'right') {
+		if (editorMode !== 'VISUAL' || !editorElement) return;
+		
+		const lines = editorContent.split('\n');
+		
+		// Find current line and column
+		let currentLine = 0;
+		let currentCol = 0;
+		let charCount = 0;
+		
+		for (let i = 0; i < lines.length; i++) {
+			const lineLength = lines[i].length;
+			
+			if (charCount + lineLength + 1 > visualSelectionEnd) {
+				// End position is on this line
+				currentLine = i;
+				currentCol = visualSelectionEnd - charCount;
+				break;
+			}
+			
+			charCount += lineLength + 1; // +1 for newline
+		}
+		
+		// Calculate new selection end based on direction
+		let newEnd = visualSelectionEnd;
+		
+		if (direction === 'down' && currentLine < lines.length - 1) {
+			// Move selection end down one line
+			const targetLine = lines[currentLine + 1];
+			const targetCol = Math.min(currentCol, targetLine.length);
+			
+			// Calculate new position
+			newEnd = 0;
+			for (let i = 0; i <= currentLine; i++) {
+				newEnd += lines[i].length + 1; // +1 for newline
+			}
+			newEnd += targetCol;
+		}
+		else if (direction === 'up' && currentLine > 0) {
+			// Move selection end up one line
+			const targetLine = lines[currentLine - 1];
+			const targetCol = Math.min(currentCol, targetLine.length);
+			
+			// Calculate new position
+			newEnd = 0;
+			for (let i = 0; i < currentLine - 1; i++) {
+				newEnd += lines[i].length + 1; // +1 for newline
+			}
+			newEnd += targetCol;
+		}
+		else if (direction === 'left' && visualSelectionEnd > 0) {
+			newEnd--;
+		}
+		else if (direction === 'right' && visualSelectionEnd < editorContent.length) {
+			newEnd++;
+		}
+		
+		// Update selection
+		visualSelectionEnd = newEnd;
+		
+		// Apply selection - ensure start is always before end
+		const selStart = Math.min(visualSelectionStart, visualSelectionEnd);
+		const selEnd = Math.max(visualSelectionStart, visualSelectionEnd);
+		setRange(editorElement, selStart, selEnd);
+	}
+
+	// Function to handle actions in visual mode
+	function handleVisualModeAction(action: string) {
+		if (editorMode !== 'VISUAL' || !editorElement) return;
+		
+		// Ensure selection range is valid
+		const selStart = Math.min(visualSelectionStart, visualSelectionEnd);
+		const selEnd = Math.max(visualSelectionStart, visualSelectionEnd);
+		
+		switch (action) {
+			case 'delete':
+				// Delete the selected text
+				editorContent = editorContent.substring(0, selStart) + editorContent.substring(selEnd);
+				// Use our safe method instead of innerText
+				safelySetEditorContent(editorContent);
+				
+				// Clean up empty divs
+				const currentDivs = Array.from(editorElement.querySelectorAll('div'));
+				let emptyDivs = currentDivs.filter(div => (div.textContent || '').trim() === '');
+				
+				if (emptyDivs.length > 0 && emptyDivs.length < currentDivs.length) {
+					emptyDivs.forEach(div => {
+						div.remove();
+					});
+				}
+				
+				// Get updated content
+				editorContent = getEditorContent();
+				
+				// Set cursor position
+				setRange(editorElement, selStart, selStart);
+				break;
+			case 'yank':
+				// Copy the selected text
+				const selectedText = editorContent.substring(selStart, selEnd);
+				clipboardText = selectedText;
+				
+				// Try to copy to system clipboard
+				try {
+					navigator.clipboard.writeText(selectedText).then(() => {
+						showCommandError('Text copied to clipboard');
+					});
+				} catch (e) {
+					// Fallback
+					showCommandError('Text copied');
+				}
+				break;
+		}
+		
+		// Exit visual mode and return to normal mode
+		editorMode = 'NORMAL';
+		
+		// Update UI
+		lines = editorContent.split('\n');
+		updateCursorPosition();
+		updateLineNumbers();
+		adjustEditorHeight();
+	}
+
+	// Helper function to get node offset within a specific parent
+	function getNodeOffsetWithinParent(node: Node, parentDiv: Node, offset: number): number {
+		if (!node || !parentDiv) return offset;
+		
+		// If node is a text node and it's directly in the parent div
+		if (node.nodeType === Node.TEXT_NODE && node.parentNode === parentDiv) {
+			return offset;
+		}
+		
+		// Calculate text length before this node in the parent div
+		let textBeforeNode = 0;
+		
+		// Function to traverse the parent's contents
+		function traverseParent(currentNode: Node) {
+			if (currentNode === node) {
+				// Found our node, stop here
+				return true;
+			}
+			
+			if (currentNode.nodeType === Node.TEXT_NODE) {
+				// Add text content length
+				textBeforeNode += (currentNode.textContent || '').length;
+			} else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+				// Traverse child nodes
+				for (let i = 0; i < currentNode.childNodes.length; i++) {
+					if (traverseParent(currentNode.childNodes[i])) {
+						return true;
+					}
+				}
+			}
+			
+			return false;
+		}
+		
+		// Start traversal on parent's children
+		for (let i = 0; i < parentDiv.childNodes.length; i++) {
+			if (traverseParent(parentDiv.childNodes[i])) {
+				break;
+			}
+		}
+		
+		// Return the text before + offset
+		return textBeforeNode + offset;
+	}
+
+	// Helper function to get current selection offset
+	function getSelectionOffset(): number {
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return 0;
+		
+		const range = selection.getRangeAt(0);
+		return getTextOffset(range.startContainer, range.startOffset);
+	}
+
+	// Helper function to safely set editor content while preserving div structure
+	function safelySetEditorContent(content: string) {
+		if (!editorElement) return;
+		
+		// Important check: verify we're not accidentally removing lines
+		const currentDivCount = editorElement.querySelectorAll('div').length;
+		const newLineCount = content.split('\n').length;
+		
+		// If we're reducing the number of lines and in normal mode with a buffer containing just 'g' or 'd',
+		// prevent accidental content replacement
+		if (editorMode === 'NORMAL' && 
+		   (normalModeBuffer === 'g' || normalModeBuffer === 'd') && 
+		   newLineCount < currentDivCount) {
+			console.warn(`Prevented content change that would remove lines during incomplete ${normalModeBuffer} command`);
+			return;
+		}
+		
+		// Always use the div structure approach for consistency
+		// Clear the editor
+		editorElement.innerHTML = '';
+		
+		// Split content into lines
+		const lines = content.split('\n');
+		
+		// Handle the case with no lines - ensure at least one empty div
+		if (lines.length === 0) {
+			const div = document.createElement('div');
+			editorElement.appendChild(div);
+			return;
+		}
+		
+		// Create a div for each line, properly handling empty lines
+		lines.forEach((line, index) => {
+			const div = document.createElement('div');
+			// Even completely empty lines need a div
+			div.textContent = line; // Setting textContent works for empty lines too
+			editorElement.appendChild(div);
+		});
+		
+		// Debug
+		console.log(`Set editor content: ${lines.length} lines (${lines.filter(l => l === '').length} empty)`);
+		
+		// Force browser to recognize empty divs 
+		// This prevents browser optimization from collapsing empty divs
+		const emptyDivs = Array.from(editorElement.querySelectorAll('div')).filter(div => div.textContent === '');
+		emptyDivs.forEach(div => {
+			// Add a zero-width space character to force the browser to keep the div
+			if (!div.firstChild) {
+				div.appendChild(document.createTextNode('\u200B')); // Zero-width space
+			}
+		});
+	}
+
+	// Function to move to the start of the document (gg command)
+	function moveToStartOfDocument() {
+		if (!editorElement) return;
+		
+		console.log("Executing 'gg' command - moving to first line");
+		
+		if (useRichTextEditor) {
+			// For contenteditable divs, use DOM approach
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			
+			if (allDivs.length > 0) {
+				// Get the first div
+				const firstDiv = allDivs[0];
+				
+				// Create a range at the start of the first div
+				const range = document.createRange();
+				range.setStart(firstDiv, 0);
+				range.collapse(true);
+				
+				// Apply the range to move the cursor
+				const selection = window.getSelection();
+				if (selection) {
+					editorElement.focus();
+					selection.removeAllRanges();
+					selection.addRange(range);
+				}
+				
+				// Update indices
+				activeLineIndex = 0;
+				cursorLine = 1;
+				cursorColumn = 1;
+			} else {
+				// No divs, just go to the start of the content
+				setRange(editorElement, 0, 0);
+			}
+		} else {
+			// For textarea, move to the start of content
+			const textarea = editorElement as HTMLTextAreaElement;
+			textarea.setSelectionRange(0, 0);
+			
+			// Update indices
+			activeLineIndex = 0;
+			cursorLine = 1;
+			cursorColumn = 1;
+		}
+		
+		// Update UI
+		updateCursorPosition();
+		updateLineNumbers();
+		ensureCursorVisible();
+	}
 </script>
 
 <svelte:head>
@@ -857,7 +2649,7 @@
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
 
 	<!-- Minimal Navbar with fade-in animation -->
-	<div class="navbar-container" class:fade-in={navbarReady}>
+	<div class="navbar-container" class:fade-in-first={navbarReady}>
 		<nav class="navbar">
 			<a href="/drive" class="logo-link" aria-label="Go to Drive">
 				<div class="logo-container">
@@ -866,33 +2658,72 @@
 				</div>
 			</a>
 			<div class="spacer"></div>
-			<a href="/profile" class="profile-link" aria-label="Go to Profile">
-				<div class="profile-image"></div>
-			</a>
+			
+			<div class="dropdown">
+				<button 
+					class="btn p-0 border-0 bg-transparent" 
+					data-bs-toggle="dropdown"
+					aria-expanded="false"
+					aria-haspopup="true"
+					aria-label="Profile menu"
+				>
+					<img 
+						src={userProfileImage} 
+						alt="Profile" 
+						class="rounded-circle profile-img"
+						style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px; object-fit: cover;"
+						on:error={() => userProfileImage = profileDefault}
+					/>
+				</button>
+				<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark profile-dropdown">
+					<li>
+						<button class="dropdown-item" on:click={goToAccount}>
+							<i class="bi bi-person me-2"></i> My Account
+						</button>
+					</li>
+					<li><hr class="dropdown-divider"></li>
+					<li>
+						<button class="dropdown-item text-danger" on:click={handleLogout}>
+							<i class="bi bi-box-arrow-right me-2"></i> Sign Out
+						</button>
+					</li>
+				</ul>
+			</div>
 		</nav>
 	</div>
 
 	<!-- Project Document Switcher -->
-	{#if projectDocumentsLoaded && projectDocuments.length > 1}
-		<div class="document-switcher fade-in">
-			{#each projectDocuments as doc, index}
+	{#if projectDocumentsLoaded}
+		<div class="document-switcher fade-in-second">
+			{#if projectDocuments.length > 0}
+				{#each projectDocuments as doc, index}
+					<button
+						class="doc-button"
+						class:active={doc.id.toString() === documentId}
+						on:click={() => switchDocument(doc.id)}
+						disabled={doc.id.toString() === documentId}
+						aria-label="Switch to document {index + 1}: {doc.name || 'Untitled'}"
+					>
+						{index + 1}
+					</button>
+				{/each}
+			{:else}
 				<button
-					class="doc-button"
-					class:active={doc.id.toString() === documentId}
-					on:click={() => switchDocument(doc.id)}
-					disabled={doc.id.toString() === documentId}
+					class="doc-button active"
+					disabled
+					aria-label="Document 1"
 				>
-					{index + 1}
+					1
 				</button>
-			{/each}
+	{/if}
 		</div>
 	{/if}
 
 	<!-- Editor Container with animation -->
-	<div class="editor-container" class:fade-in={documentReady}>
+	<div class="editor-container" class:fade-in-third={documentReady}>
 		{#if loading}
 			<div class="loading">Loading document...</div>
-		{:else if error}
+	{:else if error}
 			<div class="error">Error loading document</div>
 		{:else}
 			<!-- Previous document (for animation) -->
@@ -906,41 +2737,59 @@
 							{#each previousDocumentLines as line, i}
 								<div class="line-number {i === previousActiveLineIndex ? 'active' : ''}">{i + 1}</div>
 							{/each}
-						</div>
-						<div class="editor-textarea-static">{previousDocumentContent}</div>
-					</div>
 				</div>
-			{/if}
+						<div class="editor-contenteditable">{previousDocumentContent}</div>
+			</div>
+		</div>
+	{/if}
 
 			<!-- Current document -->
 			<div
 				class="editor-wrapper current {isAnimating ? `${slideDirection}-enter` : ''}"
 				style={animationHeight ? `height: ${animationHeight}px` : ''}
 			>
+				{#if useRichTextEditor}
+				<!-- Toolbar UI removed but functions still available for use -->
+				{/if}
 				<div class="editor-content">
 					<div class="line-numbers">
-						{#each lines as line, i}
-							<div class="line-number {i === activeLineIndex ? 'active' : ''}">{i + 1}</div>
-						{/each}
+						<!-- Line numbers now managed through JS for better synchronization -->
 					</div>
-					<textarea
-						bind:this={editorElement}
-						bind:value={editorContent}
-						on:keydown={handleKeyDown}
-						on:input={handleInput}
-						class="editor-textarea"
-						spellcheck="false"
-						autocomplete="off"
-						autocapitalize="off"
-						{...{ autocorrect: 'off' } as any}
-					></textarea>
+					
+					{#if useRichTextEditor}
+						<div 
+							bind:this={editorElement}
+							class="editor-contenteditable" 
+							contenteditable="true"
+							on:keydown={handleKeyDown}
+							on:input={handleInput}
+							on:paste={handlePaste}
+							spellcheck="false"
+							role="textbox"
+							aria-multiline="true"
+							tabindex="0"
+						></div>
+					{:else}
+						<textarea
+							bind:this={editorElement}
+							bind:value={editorContent}
+							on:keydown={handleKeyDown}
+							on:input={handleInput}
+							on:paste={handlePaste}
+							class="editor-textarea"
+							spellcheck="false"
+							autocomplete="off"
+							autocapitalize="off"
+							{...{ autocorrect: 'off' } as any}
+						></textarea>
+					{/if}
 				</div>
 			</div>
 		{/if}
 	</div>
 
 	<!-- Fixed Status Bar - moved outside the editor wrapper -->
-	<div class="status-bar">
+	<div class="status-bar" class:fade-in-fourth={documentReady}>
 		<div class="mode-indicator">
 			<span class="mode {editorMode.toLowerCase()}">{editorMode}</span>
 			{#if editorMode === 'COMMAND'}
@@ -962,492 +2811,92 @@
 			{/if}
 		</div>
 
+		<div class="document-name">
+			<span>
+				{#if documentData?.project_name}
+					{documentData.project_name}/{documentData.name || 'Untitled'}
+				{:else}
+					{documentData?.name || 'Untitled'}
+				{/if}
+			</span>
+		</div>
+
 		<div class="cursor-position">
+			<button class="commands-toggle" on:click={() => showCommands = !showCommands} title="Toggle Commands Reference" aria-label="Toggle commands reference">
+				<i class="bi bi-info-circle"></i>
+			</button>
 			<span>Line: {cursorLine}, Col: {cursorColumn}</span>
 		</div>
 	</div>
+
+	<!-- Add commands cheat sheet overlay -->
+	<div class="commands-overlay" class:show-commands={showCommands}>
+		<div class="commands-header">
+			<h5>Vim Command Reference</h5>
+			<button class="commands-close" on:click={() => showCommands = false} aria-label="Close commands reference">×</button>
+		</div>
+		<div class="commands-body">
+			<div class="commands-section">
+				<h6>Mode Switching</h6>
+				<ul>
+					<li><span class="key">i</span> Enter Insert mode</li>
+					<li><span class="key">Esc</span> Return to Normal mode</li>
+					<li><span class="key">:</span> Enter Command mode</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Commands</h6>
+				<ul>
+					<li><span class="key">:q</span> Quit document</li>
+					<li><span class="key">:w</span> Save document</li>
+					<li><span class="key">:wq</span> Save and quit</li>
+					<li><span class="key">:export</span> Export to PDF</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Navigation</h6>
+				<ul>
+					<li><span class="key">h</span> Move left</li>
+					<li><span class="key">j</span> Move down</li>
+					<li><span class="key">k</span> Move up</li>
+					<li><span class="key">l</span> Move right</li>
+					<li><span class="key">0</span> Start of line</li>
+					<li><span class="key">$</span> End of line</li>
+					<li><span class="key">gg</span> Start of document</li>
+					<li><span class="key">G</span> End of document</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Editing</h6>
+				<ul>
+					<li><span class="key">x</span> Delete selected</li>
+					<li><span class="key">dd</span> Delete line</li>
+					<li><span class="key">yy</span> Copy line</li>
+					<li><span class="key">p</span> Paste from yank</li>
+				</ul>
+			</div>
+			
+			<div class="commands-section">
+				<h6>Search & Replace</h6>
+				<ul>
+					<li><span class="key">/</span> Search relative forward</li>
+					<li><span class="key">?</span> Search relative backward</li>
+					<li><span class="key">n</span> Next match</li>
+					<li><span class="key">m</span> Previous match</li>
+					<li><span class="key">:%s/old/new/g</span> Replace all</li>
+				</ul>
+			</div>
+
+			<div class="commands-section">
+				<h6>Editor Shortcuts</h6>
+				<ul>
+					<li><span class="key">Ctrl+/</span> Toggle this cheat sheet</li>
+					<li><span class="key">Ctrl+1-9</span> Switch to document number</li>
+				</ul>
+			</div>
+		</div>
+	</div>
 </div>
-
-<style>
-	.editor-page {
-		min-height: 100vh;
-		width: 100%;
-		display: flex;
-		flex-direction: column;
-		color: #e5e5e5;
-		position: relative;
-		overflow-y: auto; /* Allow vertical scrolling */
-		overflow-x: hidden; /* Prevent horizontal scrolling */
-		padding-bottom: 50px; /* Add space for the fixed status bar */
-	}
-
-	.background-image {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background-size: cover;
-		background-position: center;
-		filter: blur(8px);
-		transform: scale(1.1);
-		z-index: -1;
-	}
-
-	.navbar {
-		display: flex;
-		align-items: center;
-		padding: 0.5rem 1rem;
-		background-color: rgba(10, 23, 33, 0.7);
-		backdrop-filter: blur(5px);
-		height: 60px;
-		position: relative;
-		z-index: 2; /* Higher z-index */
-		border-bottom: 1px solid rgba(16, 185, 129, 0.3);
-	}
-
-	.logo-container {
-		display: flex;
-		align-items: center;
-	}
-
-	.logo {
-		height: 40px;
-		width: auto;
-	}
-
-	.logo-link {
-		text-decoration: none;
-	}
-
-	.logo-text {
-		margin-left: 10px;
-		font-size: 24px;
-		font-weight: bold;
-		color: #e5e5e5;
-		font-family: 'JetBrains Mono', monospace;
-	}
-
-	.spacer {
-		flex-grow: 1;
-	}
-
-	.profile-image {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background-color: #555;
-		border: 2px solid #10b981;
-	}
-
-	.editor-container {
-		flex: 1;
-		display: flex;
-		justify-content: center;
-		align-items: flex-start;
-		padding: 2rem 2rem 0 2rem;
-		position: relative;
-		z-index: 1;
-		min-height: 75vh;
-		overflow: visible; /* Allow content to expand */
-	}
-
-	.editor-wrapper {
-		position: relative; /* Change from absolute to relative */
-		width: 90%;
-		max-width: 1400px;
-		min-height: calc(30 * 1.5rem + 3rem); /* 30 lines + padding */
-		background-color: rgba(10, 23, 33, 0.7);
-		backdrop-filter: blur(5px);
-		border-radius: 8px;
-		display: flex;
-		flex-direction: column;
-		transition:
-			transform 0.3s ease,
-			opacity 0.3s ease;
-		margin: 0 auto; /* Center horizontally */
-		will-change: transform, opacity, filter;
-	}
-
-	.editor-wrapper.current {
-		z-index: 1;
-	}
-
-	.editor-wrapper.previous {
-		z-index: 0;
-	}
-
-	/* Exit animations */
-	.editor-wrapper.left-exit {
-		animation: slideOutLeft 0.25s ease-in-out forwards;
-	}
-
-	.editor-wrapper.right-exit {
-		animation: slideOutRight 0.25s ease-in-out forwards;
-	}
-
-	/* Enter animations */
-	.editor-wrapper.left-enter {
-		animation: slideInRight 0.3s ease-out forwards;
-	}
-
-	.editor-wrapper.right-enter {
-		animation: slideInLeft 0.3s ease-out forwards;
-	}
-
-	.editor-content {
-		display: flex;
-		flex: 1;
-		overflow: visible;
-		min-height: 100%;
-		padding-bottom: 0.5rem; /* Reduce padding at the bottom to 10px (0.5rem) */
-	}
-
-	.line-numbers {
-		padding: 1.5rem 0.5rem 0.75rem 1rem; /* Reduce bottom padding to ~12px (0.75rem) */
-		background-color: transparent;
-		font-family: 'JetBrains Mono', monospace;
-		font-size: 16px;
-		line-height: 1.5;
-		color: rgba(229, 229, 229, 0.5);
-		text-align: right;
-		min-width: 3rem;
-		user-select: none;
-		position: relative;
-		min-height: calc(30 * 1.5rem); /* Minimum height for 30 lines */
-	}
-
-	.line-numbers::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background-color: rgba(10, 23, 33, 0.7);
-		filter: blur(8px);
-		z-index: -1;
-	}
-
-	.line-number {
-		height: 1.5rem;
-		position: relative;
-		z-index: 1;
-	}
-
-	.line-number.active {
-		color: #10b981;
-		font-weight: bold;
-	}
-
-	.editor-textarea {
-		flex: 1;
-		background-color: transparent;
-		color: #e5e5e5;
-		border: none;
-		resize: none;
-		padding: 1.5rem 1.5rem 0.75rem 1.5rem; /* Reduce bottom padding to ~12px (0.75rem) */
-		font-family: 'JetBrains Mono', monospace;
-		font-size: 16px;
-		line-height: 1.5;
-		outline: none;
-		overflow: hidden; /* Hide scrollbars */
-		min-height: calc(30 * 1.5rem); /* Minimum height for 30 lines */
-		height: auto; /* Allow height to grow */
-	}
-
-	.editor-textarea-static {
-		flex: 1;
-		background-color: transparent;
-		color: #e5e5e5;
-		padding: 1.5rem 1.5rem 0.75rem 1.5rem; /* Reduce bottom padding to ~12px (0.75rem) */
-		font-family: 'JetBrains Mono', monospace;
-		font-size: 16px;
-		line-height: 1.5;
-		white-space: pre-wrap;
-		overflow-y: hidden;
-		min-height: calc(30 * 1.5rem); /* Minimum height for 30 lines */
-	}
-
-	.status-bar {
-		display: flex;
-		justify-content: space-between;
-		padding: 0.5rem 1rem;
-		font-family: 'JetBrains Mono', monospace;
-		font-size: 14px;
-		position: fixed; /* Make it fixed */
-		bottom: 0; /* Position at bottom */
-		left: 0;
-		right: 0;
-		z-index: 10; /* Ensure it's above other content */
-	}
-
-	.mode-indicator {
-		display: flex;
-		align-items: center;
-	}
-
-	.loading,
-	.error {
-		color: #e5e5e5;
-		font-size: 18px;
-		text-align: center;
-	}
-
-	.error {
-		color: #ef4444;
-	}
-
-	/* Update document switcher styles */
-	.document-switcher {
-		display: flex;
-		gap: 0.5rem;
-		justify-content: center;
-		margin-top: 6rem; /* Increase top margin for more space below navbar */
-		margin-bottom: 1rem;
-		opacity: 0; /* Start hidden */
-		position: relative; /* Ensure proper stacking context */
-		z-index: 100; /* Lower than navbar's z-index */
-	}
-
-	.doc-button {
-		width: 50px;
-		height: 30px;
-		border-radius: 35%;
-		background-color: rgba(16, 185, 129, 0.2);
-		border: 1px solid rgba(16, 185, 129, 0.5);
-		color: #e5e5e5;
-		font-family: 'JetBrains Mono', monospace;
-		font-size: 14px;
-		font-weight: bold;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.doc-button:hover {
-		background-color: rgba(16, 185, 129, 0.4);
-		transform: scale(1.05);
-	}
-
-	.doc-button.active {
-		background-color: rgba(16, 185, 129, 0.6);
-		border: 2px solid #10b981;
-	}
-
-	/* Adjust editor container to account for document switcher */
-	.editor-container {
-		padding-top: 1rem;
-	}
-
-	@keyframes slideOutLeft {
-		0% {
-			transform: translateX(0);
-			opacity: 1;
-			filter: blur(0);
-		}
-		100% {
-			transform: translateX(-110%);
-			opacity: 0;
-			filter: blur(3px);
-			position: absolute;
-		}
-	}
-
-	@keyframes slideOutRight {
-		0% {
-			transform: translateX(0);
-			opacity: 1;
-			filter: blur(0);
-		}
-		100% {
-			transform: translateX(110%);
-			opacity: 0;
-			filter: blur(3px);
-			position: absolute;
-		}
-	}
-
-	@keyframes slideInRight {
-		0% {
-			transform: translateX(110%);
-			opacity: 0;
-			filter: blur(3px);
-		}
-		60% {
-			filter: blur(0);
-		}
-		75% {
-			transform: translateX(-1%);
-			opacity: 1;
-		}
-		90% {
-			transform: translateX(0.5%);
-		}
-		100% {
-			transform: translateX(0);
-			opacity: 1;
-			filter: blur(0);
-		}
-	}
-
-	@keyframes slideInLeft {
-		0% {
-			transform: translateX(-110%);
-			opacity: 0;
-			filter: blur(3px);
-		}
-		60% {
-			filter: blur(0);
-		}
-		75% {
-			transform: translateX(1%);
-			opacity: 1;
-		}
-		90% {
-			transform: translateX(-0.5%);
-		}
-		100% {
-			transform: translateX(0);
-			opacity: 1;
-			filter: blur(0);
-		}
-	}
-
-	/* Only use absolute positioning during animations */
-	.editor-wrapper:not(.left-exit):not(.right-exit):not(.left-enter):not(.right-enter) {
-		position: relative;
-	}
-
-	/* Add fade-in animation for document content */
-	.fade-in {
-		animation: fadeIn 0.6s ease-out forwards;
-	}
-
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	/* Hide the editor container until it's ready */
-	.editor-container {
-		opacity: 0;
-	}
-
-	/* Add a separate fade-in animation for the document switcher */
-	.document-switcher.fade-in {
-		animation: fadeInSwitcher 0.6s ease-out 0.3s forwards; /* Delay by 0.3s */
-	}
-
-	@keyframes fadeInSwitcher {
-		from {
-			opacity: 0;
-			transform: translateY(-10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	/* Add navbar container and animation styles */
-	.navbar-container {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		z-index: 1000;
-		opacity: 0;
-	}
-
-	.navbar-container.fade-in {
-		animation: fadeInNavbar 0.5s ease-out 0.3s forwards;
-	}
-
-	@keyframes fadeInNavbar {
-		from {
-			opacity: 0;
-			transform: translateY(-20px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	/* Add styles for command mode */
-	.command-container {
-		display: inline-flex;
-		align-items: center;
-		margin-left: 8px;
-		background-color: rgba(10, 23, 33, 0.7);
-		border: 1px solid rgba(16, 185, 129, 0.5);
-		border-radius: 4px;
-		padding: 2px 4px;
-		position: relative; /* For positioning the error message */
-	}
-
-	.command-prefix {
-		color: #10b981;
-		font-weight: bold;
-		margin-right: 2px;
-	}
-
-	.command-input {
-		background-color: transparent;
-		border: none;
-		color: #e5e5e5;
-		font-family: 'JetBrains Mono', monospace;
-		font-size: 14px;
-		outline: none;
-		width: 200px;
-		padding: 0;
-	}
-
-	/* Add styles for command error */
-	.command-error {
-		position: absolute;
-		top: -30px;
-		left: 0;
-		right: 0;
-		background-color: rgba(239, 68, 68, 0.9);
-		color: white;
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 12px;
-		white-space: nowrap;
-		animation: fadeInError 0.3s ease-out;
-	}
-
-	@keyframes fadeInError {
-		from {
-			opacity: 0;
-			transform: translateY(5px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	/* Add style for the shortcut hint */
-	.shortcut-hint {
-		margin-left: 12px;
-		color: rgba(229, 229, 229, 0.6);
-		font-size: 12px;
-	}
-
-	/* Update cursor position to accommodate the hint */
-	.cursor-position {
-		display: flex;
-		align-items: center;
-	}
-</style>

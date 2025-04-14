@@ -270,7 +270,7 @@ async fn api_add_permissions(
         return Err(Error::PermissionError);
     }
 
-    // Insert the permission
+    // Insert the project permission
     let result = sqlx::query_as!(
         ProjectPermission,
         "INSERT INTO project_permissions (project_id, user_id, role)
@@ -281,13 +281,52 @@ async fn api_add_permissions(
         project_id,
         payload.user_id,
         payload.role
-    )
-    .fetch_one(&pool)
-    .await;
+            )
+            .fetch_one(&pool)
+            .await;
 
-    match result {
-        Ok(permission) => Ok(Json(permission)),
-        Err(_) => Err(Error::PermissionError),
+            match result {
+        Ok(permission) => {
+            // Get all documents in the project
+            let documents = sqlx::query!(
+                "SELECT document_id FROM document_projects WHERE project_id = $1",
+                project_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+            // For each document, add document permissions
+            for doc in documents {
+                // Check if permission already exists
+                let existing = sqlx::query!(
+                    "SELECT 1 as exists FROM document_permissions 
+                     WHERE document_id = $1 AND user_id = $2",
+                    doc.document_id,
+                    payload.user_id
+                )
+                .fetch_optional(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?;
+
+                if existing.is_none() {
+                    // Add document permission with the same role as project permission
+                    sqlx::query!(
+                        "INSERT INTO document_permissions (document_id, user_id, role)
+                         VALUES ($1, $2, $3)",
+                        doc.document_id,
+                        payload.user_id,
+                        payload.role
+                    )
+                    .execute(&pool)
+                    .await
+                    .map_err(|_| Error::DatabaseError)?;
+                }
+            }
+
+            Ok(Json(permission))
+        }
+        Err(_) => Err(Error::PermissionError)
     }
 }
 
@@ -351,7 +390,57 @@ async fn api_update_permission(
         return Err(Error::PermissionError);
     }
 
-    // Update the permission
+    // Check if this is an ownership transfer
+    if payload.role == "owner" {
+        // Get the current owner's role
+        let current_owner = sqlx::query!(
+            "SELECT user_id, role FROM project_permissions 
+             WHERE project_id = $1 AND role = 'owner'",
+            project_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+
+        // If the current owner is different from the user being made owner
+        if current_owner.user_id != payload.user_id {
+            // Update the current owner to editor
+            sqlx::query!(
+                "UPDATE project_permissions 
+                 SET role = 'editor'
+                 WHERE project_id = $1 AND user_id = $2",
+                project_id,
+                current_owner.user_id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+            // Update all document permissions for the current owner
+            let documents = sqlx::query!(
+                "SELECT document_id FROM document_projects WHERE project_id = $1",
+                project_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+            for doc in documents {
+                sqlx::query!(
+                    "UPDATE document_permissions 
+                     SET role = 'editor'
+                     WHERE document_id = $1 AND user_id = $2",
+                    doc.document_id,
+                    current_owner.user_id
+                )
+                .execute(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?;
+            }
+        }
+    }
+
+    // Update the project permission
     let result = sqlx::query!(
         "UPDATE project_permissions 
          SET role = $1
@@ -364,11 +453,51 @@ async fn api_update_permission(
     .await;
 
     match result {
-        Ok(_) => Ok(Json(json!({
-            "result": {
-                "success": true,
+        Ok(_) => {
+            // Get all documents in the project
+            let documents = sqlx::query!(
+                "SELECT document_id FROM document_projects WHERE project_id = $1",
+                project_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+
+            // Update permissions for all documents
+            for doc in documents {
+                // Check if permission exists
+                let existing = sqlx::query!(
+                    "SELECT 1 as exists FROM document_permissions 
+                     WHERE document_id = $1 AND user_id = $2",
+                    doc.document_id,
+                    payload.user_id
+                )
+                .fetch_optional(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?;
+
+                if existing.is_some() {
+                    // Update existing document permission
+                    sqlx::query!(
+                        "UPDATE document_permissions 
+                         SET role = $1
+                         WHERE document_id = $2 AND user_id = $3",
+                        payload.role,
+                        doc.document_id,
+                        payload.user_id
+                    )
+                    .execute(&pool)
+                    .await
+                    .map_err(|_| Error::DatabaseError)?;
+                }
             }
-        }))),
+
+            Ok(Json(json!({
+                "result": {
+                    "success": true,
+                }
+            })))
+        }
         Err(e) => {
             println!("Error updating permission: {:?}", e);
             Err(Error::PermissionError)
@@ -380,7 +509,7 @@ async fn api_update_permission(
 /// Accessible via: DELETE /api/project/:id/permissions/:user_id
 /// Test: test_projects.rs/test_remove_permissions()
 /// Frontend: project.ts/remove_project_permissions()
-async fn api_remove_permissions(
+async fn api_delete_permissions(
     cookies: Cookies,
     Path((project_id, target_id)): Path<(i32, i32)>,
     Extension(pool): Extension<PgPool>,
@@ -389,7 +518,7 @@ async fn api_remove_permissions(
 
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
-
+    
     // Check if user has owner permission
     let has_permission = check_project_permission(&pool, user_id, project_id, "owner").await?;
 
@@ -422,7 +551,29 @@ async fn api_remove_permissions(
         }
     }
 
-    // Remove the permission
+    // Get all documents in the project
+    let documents = sqlx::query!(
+        "SELECT document_id FROM document_projects WHERE project_id = $1",
+        project_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    // Remove permissions from all documents
+    for doc in documents {
+        sqlx::query!(
+            "DELETE FROM document_permissions 
+             WHERE document_id = $1 AND user_id = $2",
+            doc.document_id,
+            target_id
+        )
+        .execute(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+    }
+
+    // Remove the project permission
     let result = sqlx::query!(
         "DELETE FROM project_permissions 
          WHERE project_id = $1 AND user_id = $2",
@@ -527,22 +678,27 @@ async fn api_get_documents(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Check if user has at least viewer permission
-    let has_permission = check_project_permission(&pool, user_id, project_id, "viewer").await?;
-
-    if !has_permission {
-        return Err(Error::PermissionError);
-    }
-
-    // Get all documents in the project
+    // Get all documents in the project that the user has at least viewer access to
     let documents = sqlx::query_as!(
         Document,
-        r#"SELECT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id,is_trashed, is_starred
+        r#"SELECT DISTINCT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id, d.is_trashed, d.is_starred
         FROM documents d
         JOIN document_projects dp ON d.id = dp.document_id
+        LEFT JOIN document_permissions dp2 ON d.id = dp2.document_id
         WHERE dp.project_id = $1
+        AND (
+            d.user_id = $2  -- User is the owner
+            OR dp2.user_id = $2  -- User has direct document permissions
+            OR EXISTS (  -- User has project permissions
+                SELECT 1 FROM project_permissions pp 
+                WHERE pp.project_id = $1 
+                AND pp.user_id = $2 
+                AND pp.role IN ('owner', 'editor', 'viewer')
+            )
+        )
         ORDER BY d.id"#,
-        project_id
+        project_id,
+        user_id
     )
     .fetch_all(&pool)
     .await
@@ -721,12 +877,12 @@ async fn api_toggle_star_project(
     .map_err(|_| Error::DatabaseError)?;
 
     Ok(Json(json!({
-        "result": {
-            "success": true,
+                "result": {
+                        "success": true,
             "message": "Project star status updated",
             "is_starred": new_status
-        }
-    })))
+                    }
+            })))
 }
 
 /// PUT handler for moving a project to trash.
@@ -867,6 +1023,37 @@ async fn api_get_trashed_projects(
     }
 }
 
+/// GET handler for retrieving all shared projects for a user (where user is not owner but has viewer/editor permissions).
+/// Accessible via: GET /api/project/shared
+async fn api_get_shared_projects(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Project>>> {
+    println!("->> {:<12} - api_get_shared_projects", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all projects where the user has editor/viewer permissions but is not the owner
+    let result = sqlx::query_as!(
+        Project,
+        r#"SELECT p.id, p.name, p.user_id, p.created_at, p.updated_at, is_trashed, is_starred
+           FROM projects p
+           JOIN project_permissions pp ON p.id = pp.project_id
+           WHERE pp.user_id = $1 
+           AND pp.role IN ('editor', 'viewer')
+           AND COALESCE(p.is_trashed, false) = false"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await;
+
+    match result {
+        Ok(projects) => Ok(Json(projects)),
+        Err(_) => Err(Error::ProjectNotFoundError),
+    }
+}
+
 pub fn project_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_projects))
@@ -878,7 +1065,7 @@ pub fn project_routes() -> Router {
         .route("/:id/permissions", post(api_add_permissions))
         .route("/:id/permissions", get(api_get_permissions))
         .route("/:id/permissions", put(api_update_permission))
-        .route("/:id/permissions/:user_id", delete(api_remove_permissions))
+        .route("/:id/permissions/:user_id", delete(api_delete_permissions))
         .route("/:id/documents", get(api_get_documents))
         .route("/:id/documents/:doc_id", post(api_add_document))
         .route("/:id/documents/:doc_id", delete(api_remove_document))
@@ -887,4 +1074,5 @@ pub fn project_routes() -> Router {
         .route("/:id/restore", put(api_restore_project))
         .route("/starred", get(api_get_starred_projects))
         .route("/trash", get(api_get_trashed_projects))
+        .route("/shared", get(api_get_shared_projects))
 }

@@ -52,8 +52,8 @@ pub async fn api_get_document(
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
 
     if has_permission {
-        let result = sqlx::query_as!(
-            Document,
+    let result = sqlx::query_as!(
+        Document,
             r#"SELECT 
                 id, 
                 name, 
@@ -64,15 +64,15 @@ pub async fn api_get_document(
                 is_starred,
                 is_trashed
             FROM documents WHERE id = $1"#,
-            document_id
-        )
-        .fetch_one(&pool)
-        .await;
+        document_id
+    )
+    .fetch_one(&pool)
+    .await;
 
-        match result {
-            Ok(document) => Ok(Json(document)),
-            Err(_) => Err(Error::UserNotFoundError),
-        }
+    match result {
+        Ok(document) => Ok(Json(document)),
+        Err(_) => Err(Error::UserNotFoundError),
+    }
     } else {
         Err(Error::PermissionError)
     }
@@ -117,7 +117,7 @@ pub async fn api_create_document(
     Json(payload): Json<CreateDocumentPayload>,
 ) -> Result<Json<Document>> {
     println!("->> {:<12} - create_document", "HANDLER");
-
+    
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
@@ -441,6 +441,34 @@ pub async fn api_update_permission(
         return Err(Error::PermissionError);
     }
 
+    // Check if this is an ownership transfer
+    if payload.role == "owner" {
+        // Get the current owner's role
+        let current_owner = sqlx::query!(
+            "SELECT user_id, role FROM document_permissions 
+             WHERE document_id = $1 AND role = 'owner'",
+            document_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+
+        // If the current owner is different from the user being made owner
+        if current_owner.user_id != payload.user_id {
+            // Update the current owner to editor
+            sqlx::query!(
+                "UPDATE document_permissions 
+                 SET role = 'editor'
+                 WHERE document_id = $1 AND user_id = $2",
+                document_id,
+                current_owner.user_id
+            )
+            .execute(&pool)
+            .await
+            .map_err(|_| Error::DatabaseError)?;
+        }
+    }
+
     // Update the permission
     let result = sqlx::query!(
         "UPDATE document_permissions 
@@ -448,7 +476,7 @@ pub async fn api_update_permission(
          WHERE document_id = $2 AND user_id = $3",
         payload.role,
         document_id,
-        payload.user_id // The user whose permission is being updated
+        payload.user_id
     )
     .execute(&pool)
     .await;
@@ -485,31 +513,6 @@ pub async fn api_remove_permissions(
 
     if !has_permission {
         return Err(Error::PermissionError);
-    }
-
-    // Prevent removing the last owner
-    let owners_count_result = sqlx::query!(
-        "SELECT COUNT(*) as count FROM document_permissions 
-         WHERE document_id = $1 AND role = 'owner'",
-        document_id
-    )
-    .fetch_one(&pool)
-    .await;
-
-    let is_target_owner = sqlx::query!(
-        "SELECT role FROM document_permissions 
-         WHERE document_id = $1 AND user_id = $2",
-        document_id,
-        user_id
-    )
-    .fetch_optional(&pool)
-    .await;
-
-    // If we're removing an owner and there's only one owner, prevent it
-    if let (Ok(owners_count), Ok(Some(record))) = (&owners_count_result, &is_target_owner) {
-        if record.role == "owner" && owners_count.count.unwrap_or(0) <= 1 {
-            return Err(Error::PermissionError);
-        }
     }
 
     // Remove the permission
@@ -603,8 +606,8 @@ pub async fn api_trash_document(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Check if user has at least editor permission
-    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+    // Check if user has owner permission (changed from editor)
+    let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
         return Err(Error::PermissionError);
@@ -643,8 +646,8 @@ pub async fn api_restore_document(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Check if user has at least editor permission
-    let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
+    // Check if user has owner permission (changed from editor for consistency)
+    let has_permission = check_document_permission(&pool, user_id, document_id, "owner").await?;
 
     if !has_permission {
         return Err(Error::PermissionError);
@@ -729,6 +732,37 @@ pub async fn api_get_trashed_documents(
     Ok(Json(documents))
 }
 
+/// GET handler for retrieving all shared documents for a user (where user is not owner but has viewer/editor permissions).
+/// Accessible via: GET /api/document/shared
+pub async fn api_get_shared_documents(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Document>>> {
+    println!("->> {:<12} - api_get_shared_documents", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get all documents where user has viewer/editor permissions but is not the owner
+    let result = sqlx::query_as!(
+        Document,
+        r#"SELECT DISTINCT d.id, d.name, d.content, d.created_at, d.updated_at, d.user_id, d.is_starred, d.is_trashed
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1 
+           AND dp.role IN ('viewer', 'editor')
+           AND d.user_id != $1"#,
+        user_id
+    )
+    .fetch_all(&pool)
+    .await;
+
+    match result {
+        Ok(documents) => Ok(Json(documents)),
+        Err(_) => Err(Error::DocumentNotFoundError),
+    }
+}
+
 pub fn doc_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_documents))
@@ -746,4 +780,5 @@ pub fn doc_routes() -> Router {
         .route("/:id/restore", put(api_restore_document))
         .route("/starred", get(api_get_starred_documents))
         .route("/trash", get(api_get_trashed_documents))
+        .route("/shared", get(api_get_shared_documents))
 }

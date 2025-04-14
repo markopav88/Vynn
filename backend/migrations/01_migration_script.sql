@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS documents CASCADE;
 DROP TABLE IF EXISTS project_permissions CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS user_profile_images;
 
 -- Create users table
 CREATE TABLE users (
@@ -91,13 +92,20 @@ CREATE TABLE user_keybindings (
     FOREIGN KEY (command_id) REFERENCES commands(command_id)
 );
 
+-- Create table for user profile images
+CREATE TABLE user_profile_images (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    image_data BYTEA NOT NULL,
+    content_type VARCHAR(255) NOT NULL DEFAULT 'image/jpeg'
+);
+
 -- Insert default users
 INSERT INTO users(name,email,password) 
-VALUES('Christian','CFdefence@gmail.com','MyPassword')
+VALUES('Christian','CFdefence@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$kNRxgrDUnkl79WdlNuLXOw$v+gZeEyNvLQNvw2Q3l6T7HQOerrVSbRfOnp/Cx1xadk') --MyPassword--
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO users(name,email,password) 
-VALUES('Marko','MarkoP@gmail.com','MarkosPassword')
+VALUES('Marko','MarkoP@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$6hDoev817tzWWUfs6z/6LA$n1mPBXmxmIw915nVg9nHc3YXba0OjgRw7Yx6q85UCTE') --MarkosPassword--
 ON CONFLICT (email) DO NOTHING;
 
 -- Create a default project for user 1

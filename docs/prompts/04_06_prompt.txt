@@ -1,0 +1,5 @@
+"""
+    Please change @update_document_permissions()  and @update_project_permission() 
+    for when I am attempting to make someone the owner you must make the current owener 
+    an editor and also prompt on the frontend using toast to confirm they want to change ownership
+"""
