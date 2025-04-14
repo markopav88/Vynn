@@ -474,41 +474,102 @@
 			return true;
 		} else if (cmd.startsWith('%s/')) {
 			// Handle find and replace command
-			const parts = cmd.split('/');
-			if (parts.length >= 3) {
-				const searchText = parts[1];
-				const replaceText = parts[2];
-				const flags = parts.length > 3 ? parts[3] : '';
-				const isGlobal = flags.includes('g');
-				const isCaseInsensitive = flags.includes('i');
-
-				if (searchText && replaceText) {
-					// Create a regular expression for the search with proper flags
-					const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
-					const searchRegex = new RegExp(searchText, regexFlags);
-					
-					// Perform the replacement
-					const newContent = editorContent.replace(searchRegex, replaceText);
-					
-					// Update the editor content
-					editorContent = newContent;
-					
-					// Update the document data
-					if (documentData) {
-						documentData.content = newContent;
-						update_document(documentData);
+			// Remove the '%s/' prefix and split the remaining command
+			const commandText = cmd.substring(3); // Remove '%s/'
+			
+			// Find all forward slashes
+			const slashPositions = [];
+			let pos = -1;
+			while ((pos = commandText.indexOf('/', pos + 1)) !== -1) {
+				slashPositions.push(pos);
+			}
+			
+			// We need at least 2 slashes for a valid command
+			if (slashPositions.length >= 2) {
+				// Extract search and replace terms
+				const searchText = commandText.substring(0, slashPositions[0]);
+				const replaceText = commandText.substring(slashPositions[0] + 1, slashPositions[1]);
+				const flags = commandText.substring(slashPositions[1] + 1);
+				
+				console.log('Find and replace:', {
+					search: searchText,
+					replace: replaceText,
+					flags
+				});
+				
+				if (searchText && editorElement) {
+					try {
+						// Create flags for the regex
+						const isGlobal = flags.includes('g');
+						const isCaseInsensitive = flags.includes('i');
+						const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
+						
+						// Create search regex
+						const searchRegex = new RegExp(searchText, regexFlags);
+						
+						// Get the content as an array of lines
+						const divs = Array.from(editorElement.querySelectorAll('div'));
+						const originalLines = divs.map(div => div.textContent || '');
+						
+						// Track replacements
+						let totalReplacements = 0;
+						const newLines = originalLines.map((line, index) => {
+							// Count matches in this line before replacement
+							const matches = line.match(searchRegex);
+							if (matches) {
+								totalReplacements += matches.length;
+							}
+							
+							// Perform the replacement
+							return line.replace(searchRegex, replaceText);
+						});
+						
+						if (totalReplacements > 0) {
+							// Update the content of each div
+							divs.forEach((div, index) => {
+								if (index < newLines.length) {
+									// Create a text node with the new content
+									const textNode = document.createTextNode(newLines[index]);
+									// Clear the div and add the new text node
+									div.textContent = '';
+									div.appendChild(textNode);
+								}
+							});
+							
+							// Update editor content
+							editorContent = newLines.join('\n');
+							
+							// Update document data
+							if (documentData) {
+								documentData.content = editorElement.innerHTML;
+							}
+							
+							// Show success message with the actual search text
+							showCommandError(`Replaced ${totalReplacements} occurrence${totalReplacements !== 1 ? 's' : ''} of "${searchText}"`);
+							
+							// Update UI
+							updateLineNumbers();
+							updateCursorPosition();
+							adjustEditorHeight();
+							
+							return true;
+						} else {
+							showCommandError(`No matches found for "${searchText}"`);
+							return false;
+						}
+					} catch (e) {
+						console.error('Error in find and replace:', e);
+						showCommandError('Invalid search pattern');
+						return false;
 					}
-					
-					// Show success message
-					const replacementCount = (editorContent.match(searchRegex) || []).length;
-					showCommandError(`Replaced ${replacementCount} occurrence${replacementCount !== 1 ? 's' : ''} of "${searchText}" with "${replaceText}"`);
 				} else {
-					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
+					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi');
+					return false;
 				}
 			} else {
-				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
+				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi');
+				return false;
 			}
-			return true;
 		} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
