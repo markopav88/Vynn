@@ -4,11 +4,11 @@
 	import { page } from '$app/stores';
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
-
 	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user'
 	import { get_project_documents } from '$lib/ts/project';
 	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
+	import Toast from '$lib/components/Toast.svelte';
 
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
@@ -515,6 +515,28 @@
 		showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 	}
 
+	// Add toast types and state
+	type ToastData = {
+		message: string;
+		type: 'success' | 'error' | 'warning';
+	};
+	
+	let toasts: ToastData[] = [];
+	
+	// Function to show a toast notification
+	function showToast(message: string, type: 'success' | 'error' | 'warning' = 'success') {
+		toasts = [...toasts, { message, type }];
+		// Remove the toast after 3 seconds
+		setTimeout(() => {
+			toasts = toasts.filter(t => t.message !== message);
+		}, 3000);
+	}
+	
+	// Function to remove a toast
+	function removeToast(index: number) {
+		toasts = toasts.filter((_, i) => i !== index);
+	}
+
 	// Function to handle colon commands
 	function handleColonCommand(command: string) {
 		// Simple command handling for now
@@ -523,23 +545,40 @@
 		if (cmd === 'q' || cmd === 'quit') {
 			// Navigate back to drive
 			goto('/drive');
+			return true;
 		} else if (cmd === 'w' || cmd === 'write') {
 			// Save the document
-			if (documentData) {
-				documentData.content = editorContent;
-				update_document(documentData);
+			if (documentData && editorElement) {
+				// Get the current content from the editor
+				documentData.content = editorElement.innerHTML;
+				// Save it
+				update_document(documentData).then(() => {
+					showToast('Document saved successfully', 'success');
+				}).catch((error) => {
+					console.error('Error saving document:', error);
+					showToast('Failed to save document', 'error');
+				});
+				return true;
 			}
 		} else if (cmd === 'wq') {
 			// Save and quit
-			if (documentData) {
-				documentData.content = editorContent;
+			if (documentData && editorElement) {
+				// Get the current content
+				documentData.content = editorElement.innerHTML;
+				// Save and then navigate
 				update_document(documentData).then(() => {
+					showToast('Document saved successfully', 'success');
 					goto('/drive');
+				}).catch((error) => {
+					console.error('Error saving document:', error);
+					showToast('Failed to save document', 'error');
 				});
+				return true;
 			}
 		} else if (cmd === 'export') {
 			// Export document to PDF
 			exportToPDF();
+			return true;
 		} else if (cmd.startsWith('%s/')) {
 			// Handle find and replace command
 			const parts = cmd.split('/');
@@ -576,6 +615,7 @@
 			} else {
 				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi for global case-insensitive replace');
 			}
+			return true;
 		} else {
 			// Show error for unrecognized command
 			showCommandError(`Unknown command: "${command}"`);
@@ -910,6 +950,13 @@
 		if (!event) return;
 		
 		preventBrowserDefaults(event);
+
+		// Handle Ctrl+/ for toggling commands cheat sheet
+		if (event.ctrlKey && (event.key === '/' || event.key === '?')) {
+			event.preventDefault();
+			showCommands = !showCommands;
+			return;
+		}
 
 		// Handle document switching shortcuts (Ctrl + 1-9)
 		if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
@@ -2317,25 +2364,47 @@
 	function moveToStartOfLine() {
 		if (!editorElement) return;
 		
+		// For contenteditable divs, use DOM approach
 		const selection = window.getSelection();
 		if (!selection || !selection.rangeCount) return;
 		
 		const range = selection.getRangeAt(0);
-		const textNode = range.startContainer;
 		
-		// Get text up to cursor
-		const textBeforeCursor = getTextBeforeCursor(textNode, range.startOffset);
-		const lines = textBeforeCursor.split('\n');
+		// Find the current div element
+		let currentDiv: Node | null = range.startContainer;
 		
-		// Count characters before current line
-		let startOfLinePosition = 0;
-		for (let i = 0; i < lines.length - 1; i++) {
-			startOfLinePosition += lines[i].length + 1; // +1 for newline
+		// If the startContainer is a text node, get its parent
+		if (currentDiv.nodeType === Node.TEXT_NODE) {
+			currentDiv = currentDiv.parentNode;
 		}
 		
-		// Set cursor to start of line
-		setRange(editorElement, startOfLinePosition, startOfLinePosition);
-		updateCursorPosition();
+		// Traverse up the DOM until we find a div that's a direct child of the editor
+		while (currentDiv && currentDiv !== editorElement && currentDiv.parentNode !== editorElement) {
+			currentDiv = currentDiv.parentNode;
+		}
+		
+		// Make sure we found a div
+		if (currentDiv && currentDiv !== editorElement) {
+			// Create a new range at the start of the div
+			const newRange = document.createRange();
+			
+			// If the div has content, position at the start of the first text node
+			if (currentDiv.firstChild && currentDiv.firstChild.nodeType === Node.TEXT_NODE) {
+				newRange.setStart(currentDiv.firstChild, 0);
+			} else {
+				// If the div is empty, position at the start of the div
+				newRange.setStart(currentDiv, 0);
+			}
+			newRange.collapse(true);
+			
+			// Apply the range
+			selection.removeAllRanges();
+			selection.addRange(newRange);
+			
+			// Update cursor position
+			cursorColumn = 1;
+			updateCursorPosition();
+		}
 	}
 	
 	function moveToEndOfLine() {
@@ -2646,11 +2715,34 @@
 		updateLineNumbers();
 		ensureCursorVisible();
 	}
+
+	// Add toast styles near other style definitions
+	const toastSuccess = {
+		theme: {
+			'--toastBackground': '#48BB78',
+			'--toastBarBackground': '#2F855A'
+		}
+	}
+
+	const toastError = {
+		theme: {
+			'--toastBackground': '#F56565',
+			'--toastBarBackground': '#C53030'
+		}
+	}
 </script>
 
 <svelte:head>
 	<title>{documentData ? documentData.name : 'Document'} | Vynn</title>
 </svelte:head>
+
+{#each toasts as toast, i}
+    <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => removeToast(i)} 
+    />
+{/each}
 
 <div class="editor-page">
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
