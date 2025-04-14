@@ -75,3 +75,109 @@
             </div>
         </div>
         
+        <div class="row">
+            <!-- Left column: FAQ -->
+            <div class="col-lg-5 mb-5 mb-lg-0">
+                <div class="card bg-dark text-white border-0 shadow">
+                    <div class="card-body p-4">
+                        <h2 class="card-title mb-4">Frequently Asked Questions</h2>
+                        
+                        <div class="accordion accordion-dark" id="faqAccordion">
+                            <!-- FAQ Item 1 -->
+                            <div class="accordion-item bg-dark border-secondary">
+                                <h3 class="accordion-header">
+                                    <button 
+                                        class="accordion-button bg-dark text-white collapsed" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#faq1"
+                                    >
+                                        How do I customize keybindings?
+                                    </button>
+                                </h3>
+                                <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-white-50">
+                                        You can customize your keybindings in your Account settings. Go to your profile and find the "Keybindings" tab to set your preferred shortcuts.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- FAQ Item 2 -->
+                            <div class="accordion-item bg-dark border-secondary">
+                                <h3 class="accordion-header">
+                                    <button 
+                                        class="accordion-button bg-dark text-white collapsed" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#faq2"
+                                    >
+                                        Can I export my documents?
+                                    </button>
+                                </h3>
+                                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-white-50">
+                                        Yes! When viewing a document, click the "Export PDF" button in the document toolbar to download your document as a PDF file.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- FAQ Item 3 -->
+                            <div class="accordion-item bg-dark border-secondary">
+                                <h3 class="accordion-header">
+                                    <button 
+                                        class="accordion-button bg-dark text-white collapsed" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#faq3"
+                                    >
+                                        How do I use Vim commands?
+                                    </button>
+                                </h3>
+                                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-white-50">
+                                        In the document editor, press <kbd>Ctrl</kbd>+<kbd>/</kbd> to toggle the Vim commands reference sheet. You can also check our tutorial page for a comprehensive guide.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- FAQ Item 4 -->
+                            <div class="accordion-item bg-dark border-secondary">
+                                <h3 class="accordion-header">
+                                    <button 
+                                        class="accordion-button bg-dark text-white collapsed" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#faq4"
+                                    >
+                                        How can I share documents?
+                                    </button>
+                                </h3>
+                                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body text-white-50">
+                                        To share a document, go to your Drive, select the document you want to share, and click on "Share". You can then enter the email address of the person you want to share it with and set their permission level.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional Help Resources -->
+                <div class="card bg-dark text-white border-0 shadow mt-4">
+                    <div class="card-body p-4">
+                        <h3 class="card-title mb-3">Additional Resources</h3>
+                        
+                        <div class="list-group list-group-flush bg-dark">
+                            <a href="/tutorial" class="list-group-item list-group-item-action bg-dark text-white border-secondary">
+                                <i class="bi bi-mortarboard-fill me-2 text-green"></i> Tutorial
+                            </a>
+                            <a href="https://github.com/MaristGormanly/something" target="_blank" class="list-group-item list-group-item-action bg-dark text-white border-secondary">
+                                <i class="bi bi-github me-2 text-green"></i> GitHub Repository
+                            </a>
+                            <a href="mailto:support@vynn.example.com" class="list-group-item list-group-item-action bg-dark text-white border-secondary">
+                                <i class="bi bi-envelope-fill me-2 text-green"></i> Email Support
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
