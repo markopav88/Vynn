@@ -911,12 +911,30 @@
 		
 		preventBrowserDefaults(event);
 
+		// Handle document switching shortcuts (Ctrl + 1-9)
+		if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+			// Check if the key is a number from 1-9
+			const num = parseInt(event.key);
+			if (!isNaN(num) && num >= 1 && num <= 9) {
+				event.preventDefault();
+				// Check if we have a document at this index
+				if (projectDocuments && projectDocuments[num - 1]) {
+					const targetDoc = projectDocuments[num - 1];
+					switchDocument(targetDoc.id);
+					return;
+				}
+			}
+		}
+
 		// Handle Escape key to exit any mode and return to NORMAL mode
 		if (event.key === 'Escape') {
 			editorMode = 'NORMAL';
 			event.preventDefault();
 			return;
 		}
+
+		// Rest of the existing handleKeyDown function...
+		// ... existing code ...
 
 		// COMMAND MODE: Handle only Escape (already done) and Enter
 		if (editorMode === 'COMMAND') {
