@@ -17,7 +17,7 @@
 	import '$lib/assets/style/document.css'
 
 	// Define a type that can be either HTMLDivElement or HTMLTextAreaElement
-	type EditorElement = HTMLDivElement | HTMLTextAreaElement;
+	type EditorElement = HTMLDivElement;
 
 	// Document state
 	let documentId = $page.params.id;
@@ -32,10 +32,10 @@
 
 	// Editor state
 	let editorContent = '';
-	let editorMode: 'NORMAL' | 'INSERT' | 'COMMAND' | 'INSERT'; 
+	let editorMode: 'NORMAL' | 'INSERT' | 'COMMAND' = 'NORMAL'; // Initialize to NORMAL mode
 	let cursorLine = 1; // for indicator in bottom right
 	let cursorColumn = 1; // for indicator in bottom right
-	let editorElement: EditorElement;
+	let editorElement: HTMLDivElement | null = null;
 
 	// Add this for line numbers
 	let lines: string[] = [''];
@@ -65,7 +65,7 @@
 	// Add command mode variables
 	let commandInput = '';
 	let commandPrefix = '';
-	let commandInputElement: HTMLInputElement;
+	let commandInputElement: HTMLInputElement | null = null;
 	let searchResults: number[] = [];
 	let currentSearchIndex = -1;
 
@@ -85,8 +85,7 @@
 	let userId: number | null = null;
 	let userProfileImage = profileDefault;
 
-	// Add this flag to control which editor type is used
-	let useRichTextEditor = true;
+	// Initialize editor element
 
 	let commandMode = false;
 
@@ -718,7 +717,9 @@
 		safelySetEditorContent(newContent);
 		
 		// Set cursor position after the pasted text
-		setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+		if (editorElement) {
+			setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+		}
 		
 		// Update line numbers and other UI elements
 		lines = editorContent.split('\n');
@@ -732,80 +733,49 @@
 
 		console.log(`Deleting line at index ${activeLineIndex}`);
 
-		if (useRichTextEditor) {
-			// For contenteditable, get all divs and delete the one at the active index
-			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		// For contenteditable, get all divs and delete the one at the active index
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		
+		// Make sure we have a valid index
+		if (activeLineIndex >= 0 && activeLineIndex < allDivs.length) {
+			// Get the div to remove
+			const divToRemove = allDivs[activeLineIndex];
 			
-			// Make sure we have a valid index
-			if (activeLineIndex >= 0 && activeLineIndex < allDivs.length) {
-				// Get the div to remove
-				const divToRemove = allDivs[activeLineIndex];
-				
-				// Remove the div directly from the DOM 
-				divToRemove.remove();
-				
-				// If we removed all divs, add an empty one to maintain editor structure
-				if (allDivs.length === 1) {
-					const emptyDiv = document.createElement('div');
-					emptyDiv.appendChild(document.createTextNode('\u200B')); // Zero-width space
-					editorElement.appendChild(emptyDiv);
-				}
-				
-				// Update editor content based on current DOM structure
-				editorContent = getEditorContent();
-				
-				// Calculate new cursor position - move to beginning of the same line, or line above if last line
-				const newLineIndex = Math.min(activeLineIndex, allDivs.length - 2);
-				activeLineIndex = Math.max(0, newLineIndex);
-				
-				// Position cursor at the beginning of the line
-				if (allDivs.length > 1) {
-					const targetDiv = editorElement.querySelectorAll('div')[activeLineIndex];
-					if (targetDiv) {
-						const range = document.createRange();
-						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
-							range.setStart(targetDiv.firstChild, 0);
-						} else {
-							range.setStart(targetDiv, 0);
-						}
-						range.collapse(true);
-						
-						const selection = window.getSelection();
-						if (selection) {
-							selection.removeAllRanges();
-							selection.addRange(range);
-						}
+			// Remove the div directly from the DOM 
+			divToRemove.remove();
+			
+			// If we removed all divs, add an empty one to maintain editor structure
+			if (allDivs.length === 1) {
+				const emptyDiv = document.createElement('div');
+				emptyDiv.appendChild(document.createTextNode('\u200B')); // Zero-width space
+				editorElement.appendChild(emptyDiv);
+			}
+			
+			// Update editor content based on current DOM structure
+			editorContent = getEditorContent();
+			
+			// Calculate new cursor position - move to beginning of the same line, or line above if last line
+			const newLineIndex = Math.min(activeLineIndex, allDivs.length - 2);
+			activeLineIndex = Math.max(0, newLineIndex);
+			
+			// Position cursor at the beginning of the line
+			if (allDivs.length > 1) {
+				const targetDiv = editorElement.querySelectorAll('div')[activeLineIndex];
+				if (targetDiv) {
+					const range = document.createRange();
+					if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+						range.setStart(targetDiv.firstChild, 0);
+					} else {
+						range.setStart(targetDiv, 0);
+					}
+					range.collapse(true);
+					
+					const selection = window.getSelection();
+					if (selection) {
+						selection.removeAllRanges();
+						selection.addRange(range);
 					}
 				}
-			}
-		} else {
-			// For textarea, split content into lines and remove the active line
-			const lines = editorContent.split('\n');
-			
-			// Make sure we have a valid line index
-			if (activeLineIndex >= 0 && activeLineIndex < lines.length) {
-				// Remove the current line
-				lines.splice(activeLineIndex, 1);
-				
-				// If we removed the last line and there are no lines left, add an empty line
-				if (lines.length === 0) {
-					lines.push('');
-				}
-				
-				// If we removed the last line, move cursor up
-				if (activeLineIndex >= lines.length) {
-					activeLineIndex = Math.max(0, lines.length - 1);
-				}
-				
-				// Update editor content
-				editorContent = lines.join('\n');
-				
-				// Update the textarea value
-				(editorElement as HTMLTextAreaElement).value = editorContent;
-				
-				// Position cursor at the beginning of the line
-				const newPosition = getPositionFromLineIndex(activeLineIndex);
-				(editorElement as HTMLTextAreaElement).setSelectionRange(newPosition, newPosition);
 			}
 		}
 		
@@ -840,48 +810,77 @@
 
 	// Special handler for Enter key to fix line counting issues
 	function handleKeyDown(event: KeyboardEvent) {
+		if (!event) return;
+		
 		preventBrowserDefaults(event);
 
-		// Don't handle keydown in command mode except for Escape and Enter
-		if (commandMode && event.key !== 'Escape' && event.key !== 'Enter') {
+		// Handle Escape key to exit any mode and return to NORMAL mode
+		if (event.key === 'Escape') {
+			editorMode = 'NORMAL';
+			event.preventDefault();
 			return;
 		}
 
-		// Handle arrow keys in any mode - just update line highlighting
-		if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
-			event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-			// Let browser handle actual cursor movement
-			// Then update our position tracking
+		// COMMAND MODE: Handle only Escape (already done) and Enter
+		if (editorMode === 'COMMAND') {
+			if (event.key === 'Enter') {
+				// Command execution is handled by the executeCommand function
+				// which is bound directly to the command input
+				return;
+			}
+			// Ignore all other keys in command mode
+			return;
+		}
+
+		// INSERT MODE: Allow typing but handle minimal key commands
+		if (editorMode === 'INSERT') {
+			// Handle arrow keys in any mode - just update line highlighting
+			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
+				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+				// Let browser handle actual cursor movement
+				// Then update our position tracking
+				setTimeout(() => {
+					updateCursorPosition();
+					updateLineNumbers();
+				}, 0);
+			}
+			
+			// For all other keys in INSERT mode, just let the default behavior occur
+			// and update the cursor position afterward
 			setTimeout(() => {
 				updateCursorPosition();
 				updateLineNumbers();
+				ensureCursorVisible();
 			}, 0);
-			return;
+			
+			return; // End INSERT mode handling
 		}
 
-		// Normal mode specific handling
+		// NORMAL MODE: Handle all editor commands
 		if (editorMode === 'NORMAL') {
+			// Handle arrow keys
+			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
+				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+				// Let browser handle actual cursor movement
+				setTimeout(() => {
+					updateCursorPosition();
+					updateLineNumbers();
+				}, 0);
+				return;
+			}
+
+			// List of allowed navigation keys that shouldn't be prevented
 			const allowedKeys = [
-				'Escape',
 				'Home',
 				'End',
 				'PageUp',
 				'PageDown',
-				'Tab',
-				'n',
-				'm',
-				'h',
-				'j',
-				'k',
-				'l',
-				'0',
-				'$',
-				'g',
-				'G'
+				'Tab'
 			];
 
+			// Block most key inputs in normal mode except for command keys
 			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd', 'n', 'm', 'h', 'j', 'k', 'l', 'u', '0', '$', 'g', 'G'];
-
+			
 			if (!event.ctrlKey && !allowedKeys.includes(event.key) && !commandKeys.includes(event.key)) {
 				event.preventDefault();
 			}
@@ -893,70 +892,64 @@
 				return;
 			}
 
-			// Handle vim navigation keys
-			if (useRichTextEditor) {
-				if (event.key === 'h') {
-					// Move left using native Selection API
-					const selection = window.getSelection();
-					if (selection && selection.rangeCount > 0) {
-						const range = selection.getRangeAt(0);
-						const currentOffset = getTextOffset(range.startContainer, range.startOffset);
-						if (currentOffset > 0) {
-							setCursorPositionByOffset(currentOffset - 1);
-						}
+			// Vim-style movement keys
+			if (event.key === 'h') {
+				// Move left using native Selection API
+				const selection = window.getSelection();
+				if (selection && selection.rangeCount > 0) {
+					const range = selection.getRangeAt(0);
+					const currentOffset = getTextOffset(range.startContainer, range.startOffset);
+					if (currentOffset > 0) {
+						setCursorPositionByOffset(currentOffset - 1);
 					}
-					// Update line numbers
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 0);
-					event.preventDefault();
-					return;
-				} else if (event.key === 'l') {
-					// Move right using native Selection API
-					const selection = window.getSelection();
-					if (selection && selection.rangeCount > 0) {
-						const range = selection.getRangeAt(0);
-						const currentOffset = getTextOffset(range.startContainer, range.startOffset);
-						if (currentOffset < editorContent.length) {
-							setCursorPositionByOffset(currentOffset + 1);
-						}
-					}
-					// Update line numbers
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 0);
-					event.preventDefault();
-					return;
-				} else if (event.key === 'k') {
-					// Move up one line
-					document.getSelection()?.modify("move", "backward", "line");
-					// Update line numbers
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 0);
-					event.preventDefault();
-					return;
-				} else if (event.key === 'j') {
-					// Move down one line
-					document.getSelection()?.modify("move", "forward", "line");
-					// Update line numbers
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 0);
-					event.preventDefault();
-					return;
 				}
+				setTimeout(() => {
+					updateCursorPosition();
+					updateLineNumbers();
+				}, 0);
+				event.preventDefault();
+				return;
+			} else if (event.key === 'l') {
+				// Move right using native Selection API
+				const selection = window.getSelection();
+				if (selection && selection.rangeCount > 0) {
+					const range = selection.getRangeAt(0);
+					const currentOffset = getTextOffset(range.startContainer, range.startOffset);
+					if (currentOffset < editorContent.length) {
+						setCursorPositionByOffset(currentOffset + 1);
+					}
+				}
+				setTimeout(() => {
+					updateCursorPosition();
+					updateLineNumbers();
+				}, 0);
+				event.preventDefault();
+				return;
+			} else if (event.key === 'k') {
+				// Move up one line
+				document.getSelection()?.modify("move", "backward", "line");
+				setTimeout(() => {
+					updateCursorPosition();
+					updateLineNumbers();
+				}, 0);
+				event.preventDefault();
+				return;
+			} else if (event.key === 'j') {
+				// Move down one line
+				document.getSelection()?.modify("move", "forward", "line");
+				setTimeout(() => {
+					updateCursorPosition();
+					updateLineNumbers();
+				}, 0);
+				event.preventDefault();
+				return;
 			}
-
-			// Handle mode switches and commands
+          
+			// Mode switching commands
 			if (event.key === 'i') {
-					editorMode = 'INSERT';
-					event.preventDefault();
-					return;
+				editorMode = 'INSERT';
+				event.preventDefault();
+				return;
 			} else if (event.key === ':') {
 				enterCommandMode(':');
 				event.preventDefault();
@@ -969,92 +962,80 @@
 				enterCommandMode('?');
 				event.preventDefault();
 				return;
-			} else if (event.key === 'x') {
-				// In normal mode, delete character or selection
+			} 
+			
+			// Editing commands
+			else if (event.key === 'x') {
 				deleteText();
 				event.preventDefault();
 				return;
 			} else if (event.key === 'p') {
 				pasteText();
-				ensureCursorVisible(); // Make sure cursor is visible after pasting
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
-			} else if (event.key === 'n' && searchResults.length > 0) {
-				// Navigate to next match (direction depends on search command used)
+			} 
+			
+			// Search navigation
+			else if (event.key === 'n' && searchResults.length > 0) {
 				navigateSearchResults(true);
-				ensureCursorVisible(); // Make sure cursor is visible after navigating to search result
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
 			} else if (event.key === 'm' && searchResults.length > 0) {
-				// Navigate to previous match (direction depends on search command used)
 				navigateSearchResults(false);
-				ensureCursorVisible(); // Make sure cursor is visible after navigating to search result
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
-			} else if (event.key === 'u') {
-				// Perform undo operation
+			} 
+			
+			// Undo/Redo
+			else if (event.key === 'u') {
 				performUndo();
-				ensureCursorVisible(); // Make sure cursor is visible after undo
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
-			} else if (event.key === '0') {
-				// Move to the start of the current line
+			} 
+			
+			// Line navigation
+			else if (event.key === '0') {
 				moveToStartOfLine();
-				ensureCursorVisible(); // Make sure cursor is visible after moving
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
 			} else if (event.key === '$') {
-				// Move to the end of the current line
 				moveToEndOfLine();
-				ensureCursorVisible(); // Make sure cursor is visible after moving
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
-			} else if (event.key === 'G') {
-				// Move to the end of the document
+			} 
+			
+			// Document navigation
+			else if (event.key === 'G') {
 				moveToEndOfDocument();
-				ensureCursorVisible(); // Make sure cursor is visible after moving to end of document
+				ensureCursorVisible();
 				event.preventDefault();
 				return;
-			} else if (event.key === 'g') {
-				// 'g' could be the start of 'gg' command - prevent any DOM updates for single 'g'
-				event.preventDefault(); // Always prevent default for 'g'
-				
-				// Only call handleNormalModeSequence to add to the buffer, don't do anything else
+			} 
+			
+			// Multi-key commands
+			else if (event.key === 'g') {
+				// 'g' could be the start of 'gg' command
+				event.preventDefault();
 				handleNormalModeSequence(event.key);
-				
-				// Important: Return immediately without triggering any DOM updates
-				// We'll handle everything in the handleNormalModeSequence function when 'gg' is completed
 				return;
 			} else if (event.key === 'd' || event.key === 'y') {
-				// For 'd' or 'y', just add to buffer without any other action
-				event.preventDefault(); // Prevent default for these keys
-				
-				// Only call handleNormalModeSequence to add to the buffer, don't do anything else
+				// For 'd' or 'y', just add to buffer
+				event.preventDefault();
 				handleNormalModeSequence(event.key);
-				
-				// Important: Return immediately without triggering any DOM updates
-				// We'll handle everything in the handleNormalModeSequence function when 'dd' or 'yy' is completed
 				return;
 			}
-
-			// Only use handleNormalModeKeydown for textarea mode, not for contenteditable
-			if (!useRichTextEditor) {
-				handleNormalModeKeydown(event, editorElement as unknown as HTMLTextAreaElement);
-				ensureCursorVisible(); // Make sure cursor is visible after command
-			}
-		}
-
-		if (event.key === 'Escape') {
-			editorMode = 'NORMAL';
-			event.preventDefault();
-		}
-
-		// Update cursor position and line numbers for non-arrow key events
-		if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+			
+			// For all other keys in NORMAL mode, update UI but don't modify content
 			setTimeout(() => {
 				updateCursorPosition();
 				updateLineNumbers();
-				ensureCursorVisible(); // Make sure cursor is visible after key presses
+				ensureCursorVisible();
 			}, 0);
 		}
 	}
@@ -1064,136 +1045,143 @@
 		if (!editorElement || !browser) return;
 		
 		try {
-			// For rich text editor
-			if (useRichTextEditor) {
-				const selection = window.getSelection();
-				if (!selection || selection.rangeCount === 0) {
-					// If no selection exists but editor has focus, we're probably on an empty editor
-					// Just use first line
-					activeLineIndex = 0;
-					cursorLine = 1;
-					cursorColumn = 1;
-					return;
-				}
-				
-				const range = selection.getRangeAt(0);
-				const textNode = range.startContainer;
-				const offset = range.startOffset;
-				
-				// Calculate line using textBeforeCursor
-				const textBeforeCursor = getTextBeforeCursor(textNode, offset);
-				const lines = textBeforeCursor.split('\n');
-				cursorLine = lines.length;
-				activeLineIndex = cursorLine - 1;
-				
-				// Calculate column based ONLY on current line's content
-				// This ensures the column is relative to the current line only
-				cursorColumn = lines[lines.length - 1].length + 1;
-				
-				// Handle empty lines better by looking at the actual node structure
-				let currentNode = textNode;
-				let foundDiv = false;
-				
-				// Special case: if we're inside the editor directly (not in a div or text node)
-				// This happens when the editor is completely empty or when on an empty line
-				if (textNode === editorElement || 
-					(textNode.nodeType === Node.TEXT_NODE && textNode.textContent === "" && textNode.parentNode === editorElement)) {
-					// Use the first child as the active div, or just use line 0 if totally empty
-					activeLineIndex = 0;
-					cursorLine = 1;
-					cursorColumn = 1; // On an empty line, cursor is at column 1
-					foundDiv = true;
-				} 
-				// Special case: if we're at the beginning of a div element (empty or not)
-				else if (textNode.nodeType === Node.ELEMENT_NODE && textNode.nodeName === 'DIV' && offset === 0) {
-					// Get all divs to find our index
-					const allDivs = Array.from(editorElement.querySelectorAll('div'));
-					const divIndex = allDivs.indexOf(textNode as HTMLDivElement);
-					if (divIndex !== -1) {
-						activeLineIndex = divIndex;
-						cursorLine = divIndex + 1;
-						cursorColumn = 1; // At the beginning of a div, column is 1
-						foundDiv = true;
-					}
-				}
-				// If we're inside a div element directly or its text child
-				else {
-					// Look for a parent div
-					let parentDiv = textNode;
-					while (parentDiv && parentDiv !== editorElement) {
-						if (parentDiv.nodeName === 'DIV') {
-							// Found the div containing the cursor
-							foundDiv = true;
-							break;
-						}
-						parentDiv = parentDiv.parentNode as HTMLElement;
-					}
-					
-					// If we found a div, count its position among other divs
-					if (foundDiv && parentDiv !== editorElement) {
-						const allDivs = Array.from(editorElement.querySelectorAll('div'));
-						const divIndex = allDivs.indexOf(parentDiv as HTMLDivElement);
-						
-						if (divIndex !== -1) {
-							// Set the active line index based on div position
-							activeLineIndex = divIndex;
-							cursorLine = divIndex + 1;
-							
-							// Calculate column based on offset within this specific div
-							const divContent = parentDiv.textContent || '';
-							const nodeOffset = getNodeOffsetWithinParent(textNode, parentDiv, offset);
-							cursorColumn = nodeOffset + 1; // +1 because columns are 1-based
-						}
-					}
-				}
-				
-				// If no div was found but we're in the contenteditable element,
-				// we might be in text directly in the editor (first line)
-				if (!foundDiv && editorElement.contains(textNode)) {
-					// Check if we're at the beginning with no divs yet
-					const hasNoContent = editorElement.innerText.trim() === '';
-					const hasNoDivs = editorElement.querySelectorAll('div').length === 0;
-					
-					if (hasNoContent || hasNoDivs) {
-						activeLineIndex = 0;
-						cursorLine = 1;
-						cursorColumn = offset + 1; // Direct text in editor, column is offset + 1
-					}
-				}
-				
-				// Handle the case when cursorLine is still not set correctly
-				// This happens sometimes after pressing Enter
-				if (cursorLine <= 0) {
-					// Check for divs again
-					const allDivs = editorElement.querySelectorAll('div');
-					
-					if (allDivs.length > 0) {
-						// If we have divs, we're at least on line 1
-						cursorLine = Math.max(1, cursorLine);
-						activeLineIndex = cursorLine - 1;
-					} else {
-						// No divs, fallback to line 1
-						cursorLine = 1;
-						activeLineIndex = 0;
-					}
-				}
-			} else {
-				// For textarea, use the selectionStart to determine line and column
-				const textarea = editorElement as HTMLTextAreaElement;
-				const cursorPos = textarea.selectionStart;
-				
-				// Get text up to cursor position
-				const textBeforeCursor = editorContent.substring(0, cursorPos);
-				const lines = textBeforeCursor.split('\n');
-				
-				// Calculate line
-				cursorLine = lines.length;
-				activeLineIndex = cursorLine - 1;
-				
-				// Calculate column based ONLY on the current line
-				cursorColumn = lines[lines.length - 1].length + 1;
+			const selection = window.getSelection();
+			if (!selection || selection.rangeCount === 0) {
+				// If no selection exists but editor has focus, we're probably on an empty editor
+				// Just use first line
+				activeLineIndex = 0;
+				cursorLine = 1;
+				cursorColumn = 1;
+				return;
 			}
 			
+			const range = selection.getRangeAt(0);
+			const textNode = range.startContainer;
+			const offset = range.startOffset;
+			
+			// Calculate line using textBeforeCursor
+			const textBeforeCursor = getTextBeforeCursor(textNode, offset);
+			const linesBeforeCursor = textBeforeCursor.split('\n');
+			cursorLine = linesBeforeCursor.length;
+			activeLineIndex = cursorLine - 1; // 0-based index
+			
+			// Verify that activeLineIndex is set correctly based on DOM structure
+			// This ensures we highlight the right line visually
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			
+			// For each div element in the editor, check if it contains the cursor
+			let foundInDivs = false;
+			for (let i = 0; i < allDivs.length; i++) {
+				const div = allDivs[i];
+				if (div.contains(textNode) || 
+				    (textNode === editorElement && offset >= i && offset <= i+1)) {
+					// Found the div containing our cursor
+					activeLineIndex = i;
+					cursorLine = i + 1;
+					foundInDivs = true;
+					break;
+				}
+			}
+			
+			// Safety check: if we're at the end of the document but didn't find a containing div
+			if (!foundInDivs && textNode === editorElement && offset === editorElement.childNodes.length) {
+				// If the cursor is at the very end, highlight the last line
+				activeLineIndex = Math.max(0, allDivs.length - 1);
+				cursorLine = allDivs.length;
+			}
+			
+			// Calculate column based ONLY on current line's content
+			// This ensures the column is relative to the current line only
+			cursorColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length + 1;
+			
+			// Handle empty lines better by looking at the actual node structure
+			let currentNode = textNode;
+			let foundDiv = false;
+			
+			// Special case: if we're inside the editor directly (not in a div or text node)
+			// This happens when the editor is completely empty or when on an empty line
+			if (textNode === editorElement || 
+				(textNode.nodeType === Node.TEXT_NODE && textNode.textContent === "" && textNode.parentNode === editorElement)) {
+				// Use the first child as the active div, or just use line 0 if totally empty
+				activeLineIndex = 0;
+				cursorLine = 1;
+				cursorColumn = 1; // On an empty line, cursor is at column 1
+				foundDiv = true;
+			} 
+			// Special case: if we're at the beginning of a div element (empty or not)
+			else if (textNode.nodeType === Node.ELEMENT_NODE && textNode.nodeName === 'DIV' && offset === 0) {
+				// Get all divs to find our index
+				const allDivs = Array.from(editorElement.querySelectorAll('div'));
+				const divIndex = allDivs.indexOf(textNode as HTMLDivElement);
+				if (divIndex !== -1) {
+					activeLineIndex = divIndex;
+					cursorLine = divIndex + 1;
+					cursorColumn = 1; // At the beginning of a div, column is 1
+					foundDiv = true;
+				}
+			}
+			// If we're inside a div element directly or its text child
+			else {
+				// Look for a parent div
+				let parentDiv = textNode;
+				while (parentDiv && parentDiv !== editorElement) {
+					if (parentDiv.nodeName === 'DIV') {
+						// Found the div containing the cursor
+						foundDiv = true;
+						break;
+					}
+					parentDiv = parentDiv.parentNode as HTMLElement;
+				}
+				
+				// If we found a div, count its position among other divs
+				if (foundDiv && parentDiv !== editorElement) {
+					const allDivs = Array.from(editorElement.querySelectorAll('div'));
+					const divIndex = allDivs.indexOf(parentDiv as HTMLDivElement);
+					
+					if (divIndex !== -1) {
+						// Set the active line index based on div position
+						activeLineIndex = divIndex;
+						cursorLine = divIndex + 1;
+						
+						// Calculate column based on offset within this specific div
+						const divContent = parentDiv.textContent || '';
+						const nodeOffset = getNodeOffsetWithinParent(textNode, parentDiv, offset);
+						cursorColumn = nodeOffset + 1; // +1 because columns are 1-based
+					}
+				}
+			}
+			
+			// If no div was found but we're in the contenteditable element,
+			// we might be in text directly in the editor (first line)
+			if (!foundDiv && editorElement.contains(textNode)) {
+				// Check if we're at the beginning with no divs yet
+				const hasNoContent = editorElement.innerText.trim() === '';
+				const hasNoDivs = editorElement.querySelectorAll('div').length === 0;
+				
+				if (hasNoContent || hasNoDivs) {
+					activeLineIndex = 0;
+					cursorLine = 1;
+					cursorColumn = offset + 1; // Direct text in editor, column is offset + 1
+				}
+			}
+			
+			// Handle the case when cursorLine is still not set correctly
+			// This happens sometimes after pressing Enter
+			if (cursorLine <= 0) {
+				// Check for divs again
+				const allDivs = editorElement.querySelectorAll('div');
+				
+				if (allDivs.length > 0) {
+					// If we have divs, we're at least on line 1
+					cursorLine = Math.max(1, cursorLine);
+					activeLineIndex = cursorLine - 1;
+				} else {
+					// No divs, fallback to line 1
+					cursorLine = 1;
+					activeLineIndex = 0;
+				}
+			}
+		
 			// Ensure bounds are valid
 			const totalLines = Math.max(1, editorContent.split('\n').length);
 			if (cursorLine > totalLines) {
@@ -1252,35 +1240,30 @@
 		// Get the actual number of lines from DOM structure for more accuracy
 		let numberOfLines; 
 
-		if (useRichTextEditor) {
-			// Count actual div elements (each div is a line)
-			const divElements = editorElement.querySelectorAll('div');
-			numberOfLines = divElements.length;
-			
-			// If no divs but there's content, ensure at least one line
-			if (numberOfLines === 0 && editorElement.textContent && editorElement.textContent.trim().length > 0) {
-				numberOfLines = 1;
-			}
-			
-			// Ensure a minimum of 1 line
-			numberOfLines = Math.max(1, numberOfLines);
-			
-			// Check if we need to add an extra line for cursor at end of document
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				if (range.startContainer === editorElement && 
-					range.startOffset === editorElement.childNodes.length) {
-					// Cursor is after the last div, add an extra line
-					numberOfLines++;
-				}
-			}
-			
-			console.log(`Line count from DOM: ${numberOfLines} divs`);
-		} else {
-			// For textarea, count newlines + 1
-			numberOfLines = editorContent.split('\n').length;
+		// Count actual div elements (each div is a line)
+		const divElements = editorElement.querySelectorAll('div');
+		numberOfLines = divElements.length;
+		
+		// If no divs but there's content, ensure at least one line
+		if (numberOfLines === 0 && editorElement.textContent && editorElement.textContent.trim().length > 0) {
+			numberOfLines = 1;
 		}
+		
+		// Ensure a minimum of 1 line
+		numberOfLines = Math.max(1, numberOfLines);
+		
+		// Check if we need to add an extra line for cursor at end of document
+		const selection = window.getSelection();
+		if (selection && selection.rangeCount > 0) {
+			const range = selection.getRangeAt(0);
+			if (range.startContainer === editorElement && 
+				range.startOffset === editorElement.childNodes.length) {
+				// Cursor is after the last div, add an extra line
+				numberOfLines++;
+			}
+		}
+		
+		console.log(`Line count from DOM: ${numberOfLines} divs`);
 		
 		// Calculate the height based on number of lines
 		const contentHeight = numberOfLines * LINE_HEIGHT;
@@ -1372,25 +1355,20 @@
 					// Set initial cursor and focus the editor
 					if (editorElement) {
 						editorElement.focus();
+
+						const selection = window.getSelection();
+						const range = document.createRange();
 						
-						// Set cursor at the beginning of the document
-						if (useRichTextEditor) {
-							const selection = window.getSelection();
-							const range = document.createRange();
-							
-							// Select the first text node or the editor element itself if empty
-							if (editorElement.firstChild) {
-								range.setStart(editorElement.firstChild, 0);
-							} else {
-								range.setStart(editorElement, 0);
-							}
-							range.collapse(true);
-							
-							selection?.removeAllRanges();
-							selection?.addRange(range);
+						// Select the first text node or the editor element itself if empty
+						if (editorElement.firstChild) {
+							range.setStart(editorElement.firstChild, 0);
 						} else {
-							(editorElement as HTMLTextAreaElement).setSelectionRange(0, 0);
+							range.setStart(editorElement, 0);
 						}
+						range.collapse(true);
+						
+						selection?.removeAllRanges();
+						selection?.addRange(range);
 						
 						// Set active line to first line
 						activeLineIndex = 0;
@@ -1403,7 +1381,7 @@
 					adjustEditorHeight();
 					
 					// Set up a MutationObserver to watch for content changes
-					if (editorElement && useRichTextEditor) {
+					if (editorElement) {
 						const observer = new MutationObserver((mutations) => {
 							// Content might have changed, ensure line numbers are updated
 							const content = getEditorContent();
@@ -1639,63 +1617,66 @@
 	
 	// Improved handleInput function to work in coordination with handleKeyDown
 	function handleInput(event: Event) {
+		// In NORMAL mode, prevent any changes to content
 		if (editorMode === 'NORMAL') {
-			// In normal mode, prevent edits
+			// Restore the original content to prevent changes
 			setEditorContent(editorContent);
 			event.preventDefault();
 			return;
 		}
 		
-		// In INSERT mode
-		// Get the actual content directly from the element
-		const newContent = getEditorContent();
-		
-		// Only process if content actually changed
-		if (newContent !== editorContent) {
-			// Log for debugging the content change
-			console.log('Content changed via input event:', {
-				oldLines: editorContent.split('\n').length, 
-				newLines: newContent.split('\n').length
-			});
+		// Only allow editing in INSERT mode
+		if (editorMode === 'INSERT') {
+			// Get the actual content directly from the element
+			const newContent = getEditorContent();
 			
-			// Update our content tracking
-			editorContent = newContent;
-			
-			// Always update line numbers first based on the new content
-			updateLineNumbers();
-			
-			// Check if wrapping is needed
-			const contentLines = editorContent.split('\n');
-			let needsWrapping = false;
-			
-			for (const line of contentLines) {
-				if (line.length > MAX_COLUMN_WIDTH) {
-					needsWrapping = true;
-					break;
+			// Only process if content actually changed
+			if (newContent !== editorContent) {
+				// Log for debugging the content change
+				console.log('Content changed via input event:', {
+					oldLines: editorContent.split('\n').length, 
+					newLines: newContent.split('\n').length
+				});
+				
+				// Update our content tracking
+				editorContent = newContent;
+				
+				// Always update line numbers first based on the new content
+				updateLineNumbers();
+				
+				// Check if wrapping is needed
+				const contentLines = editorContent.split('\n');
+				let needsWrapping = false;
+				
+				for (const line of contentLines) {
+					if (line.length > MAX_COLUMN_WIDTH) {
+						needsWrapping = true;
+						break;
+					}
 				}
-			}
-			
-			// Apply wrapping if needed
-			if (needsWrapping) {
-				const selection = window.getSelection();
-				const range = selection?.getRangeAt(0);
-				const cursorOffset = range ? getTextOffset(range.startContainer, range.startOffset) : 0;
 				
-				// Apply wrapping
-				const wrappedContent = autoWrapLine(editorContent);
-				
-				// Only update if wrapping actually changed something
-				if (wrappedContent !== editorContent) {
-					editorContent = wrappedContent;
-					setEditorContent(wrappedContent);
+				// Apply wrapping if needed
+				if (needsWrapping) {
+					const selection = window.getSelection();
+					const range = selection?.getRangeAt(0);
+					const cursorOffset = range ? getTextOffset(range.startContainer, range.startOffset) : 0;
 					
-					// Attempt to restore cursor position
-					setCursorPositionByOffset(Math.min(cursorOffset, editorContent.length));
+					// Apply wrapping
+					const wrappedContent = autoWrapLine(editorContent);
+					
+					// Only update if wrapping actually changed something
+					if (wrappedContent !== editorContent) {
+						editorContent = wrappedContent;
+						setEditorContent(wrappedContent);
+						
+						// Attempt to restore cursor position
+						setCursorPositionByOffset(Math.min(cursorOffset, editorContent.length));
+					}
+				} else {
+					// If no wrapping needed, still update cursor position and height
+					updateCursorPosition();
+					adjustEditorHeight();
 				}
-			} else {
-				// If no wrapping needed, still update cursor position and height
-				updateCursorPosition();
-				adjustEditorHeight();
 			}
 		}
 	}
@@ -1705,51 +1686,46 @@
 		if (!editorElement) return '';
 		
 		let content = '';
+
+		// For contenteditable, use div structure to preserve empty lines accurately
+		const divElements = editorElement.querySelectorAll('div');
 		
-		if (useRichTextEditor) {
-			// For contenteditable, use div structure to preserve empty lines accurately
-			const divElements = editorElement.querySelectorAll('div');
+		if (divElements.length > 0) {
+			// Collect text from each div, preserving empty lines
+			const lines = Array.from(divElements).map(div => {
+				// Get text content, replacing zero-width spaces with nothing
+				let text = div.textContent || '';
+				text = text.replace(/\u200B/g, ''); // Remove zero-width spaces
+				return text;
+			});
 			
-			if (divElements.length > 0) {
-				// Collect text from each div, preserving empty lines
-				const lines = Array.from(divElements).map(div => {
-					// Get text content, replacing zero-width spaces with nothing
-					let text = div.textContent || '';
-					text = text.replace(/\u200B/g, ''); // Remove zero-width spaces
-					return text;
-				});
-				
-				// Join with newlines to form content
-				content = lines.join('\n');
-				
-				// Check if we need an extra newline at the end
-				const selection = window.getSelection();
-				if (selection && selection.rangeCount > 0) {
-					const range = selection.getRangeAt(0);
-					if (range.startContainer === editorElement && 
-						range.startOffset === editorElement.childNodes.length) {
-						// Cursor is after the last div, add an extra newline
-						content += '\n';
-					}
+			// Join with newlines to form content
+			content = lines.join('\n');
+			
+			// Check if we need an extra newline at the end
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				const range = selection.getRangeAt(0);
+				if (range.startContainer === editorElement && 
+					range.startOffset === editorElement.childNodes.length) {
+					// Cursor is after the last div, add an extra newline
+					content += '\n';
 				}
-			} else {
-				// No divs, use innerText and normalize
-				content = editorElement.innerText || '';
 			}
-			
-			// Check if we need to normalize line breaks (some browsers use different conventions)
-			if (content.includes('\r\n')) {
-				// Convert Windows-style CRLF to just LF
-				content = content.replace(/\r\n/g, '\n');
-			}
-			
-			// Log for debugging
-			console.log(`getEditorContent: ${content.split('\n').length} lines (${content.split('\n').filter(l => l === '').length} empty)`);
 		} else {
-			// For textarea, get the value directly
-			content = (editorElement as HTMLTextAreaElement).value || '';
+			// No divs, use innerText and normalize
+			content = editorElement.innerText || '';
 		}
 		
+		// Check if we need to normalize line breaks (some browsers use different conventions)
+		if (content.includes('\r\n')) {
+			// Convert Windows-style CRLF to just LF
+			content = content.replace(/\r\n/g, '\n');
+		}
+		
+		// Log for debugging
+		console.log(`getEditorContent: ${content.split('\n').length} lines (${content.split('\n').filter(l => l === '').length} empty)`);
+	
 		return content;
 	}
 	
@@ -1762,13 +1738,8 @@
 			content = '';
 		}
 		
-		// Set content based on editor type
-		if (useRichTextEditor) {
-			// Use our safe helper method
-			safelySetEditorContent(content);
-		} else {
-			(editorElement as HTMLTextAreaElement).value = content;
-		}
+		// Use our safe helper method
+		safelySetEditorContent(content);
 		
 		// Force a complete update of line numbers and UI
 		setTimeout(() => {
@@ -1846,28 +1817,26 @@
 
 	// Add these formatting functions after the performRedo function
 	function applyBoldFormatting() {
-		if (useRichTextEditor && document.queryCommandSupported('bold')) {
+		if (document.queryCommandSupported('bold')) {
 			document.execCommand('bold', false);
 			showCommandError('Bold formatting applied');
 		}
 	}
 
 	function applyItalicFormatting() {
-		if (useRichTextEditor && document.queryCommandSupported('italic')) {
+		if (document.queryCommandSupported('italic')) {
 			document.execCommand('italic', false);
 			showCommandError('Italic formatting applied');
 		}
 	}
 
 	function applyIndentation() {
-		if (useRichTextEditor) {
-			document.execCommand('indent', false);
-			showCommandError('Indentation applied');
-		}
+		document.execCommand('indent', false);
+		showCommandError('Indentation applied');
 	}
 
 	function applyTextColor(color: string) {
-		if (useRichTextEditor && document.queryCommandSupported('foreColor')) {
+		if (document.queryCommandSupported('foreColor')) {
 			document.execCommand('foreColor', false, color);
 			showCommandError('Text color changed');
 		}
@@ -1945,7 +1914,9 @@
 		safelySetEditorContent(newContent);
 		
 		// Set cursor position after the pasted text
-		setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+		if (editorElement) {
+			setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+		}
 		
 		// Update line numbers and other UI elements
 		lines = editorContent.split('\n');
@@ -2016,104 +1987,90 @@
 		// Determine line count based on editor content
 		let lineCount = 1; // Start with at least one line
 		
-		if (useRichTextEditor) {
-			// First check if we have any div elements (paragraphs)
-			const divElements = editorElement.querySelectorAll('div');
+		// First check if we have any div elements (paragraphs)
+		const divElements = editorElement.querySelectorAll('div');
+		
+		// If we have divs, count them (each is a paragraph/line)
+		if (divElements.length > 0) {
+			lineCount = divElements.length;
 			
-			// If we have divs, count them (each is a paragraph/line)
-			if (divElements.length > 0) {
-				lineCount = divElements.length;
-				
-				// Double-check if there should be an extra line at the end (if cursor is after last div)
-				const selection = window.getSelection();
-				if (selection && selection.rangeCount > 0) {
-					const range = selection.getRangeAt(0);
-					if (range.startContainer === editorElement && 
-						range.startOffset === editorElement.childNodes.length) {
-						// Cursor is after the last div, may need an extra line
-						lineCount++;
-					}
-				}
-			} else {
-				// No divs, check for other line separators
-				const brElements = editorElement.querySelectorAll('br');
-				if (brElements.length > 0) {
-					// Each br tag creates a new line
-					lineCount = brElements.length + 1;
-				} else {
-					// If there's any content at all, ensure at least one line
-					const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
-					lineCount = hasContent ? 1 : 1; // Always at least one line
-					
-					// Also check for newlines in the text content
-					const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
-					if (newlineCount > 0) {
-						lineCount = Math.max(lineCount, newlineCount + 1);
-					}
+			// Double-check if there should be an extra line at the end (if cursor is after last div)
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				const range = selection.getRangeAt(0);
+				if (range.startContainer === editorElement && 
+					range.startOffset === editorElement.childNodes.length) {
+					// Cursor is after the last div, may need an extra line
+					lineCount++;
 				}
 			}
 		} else {
-			// For textarea, count newlines + 1
-			lineCount = (editorContent.match(/\n/g) || []).length + 1;
+			// No divs, check for other line separators
+			const brElements = editorElement.querySelectorAll('br');
+			if (brElements.length > 0) {
+				// Each br tag creates a new line
+				lineCount = brElements.length + 1;
+			} else {
+				// If there's any content at all, ensure at least one line
+				const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
+				lineCount = hasContent ? 1 : 1; // Always at least one line
+				
+				// Also check for newlines in the text content
+				const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
+				if (newlineCount > 0) {
+					lineCount = Math.max(lineCount, newlineCount + 1);
+				}
+			}
 		}
-		
+
 		// Ensure at least one line
 		lineCount = Math.max(1, lineCount);
 		
-		// Update lines array
-		if (useRichTextEditor) {
-			// Extract text from lines for contenteditable
-			const newLines = [];
-			const divElements = editorElement.querySelectorAll('div');
+		// Extract text from lines for contenteditable
+		const newLines = [];
+		const divs = editorElement.querySelectorAll('div');
+		
+		if (divs.length > 0) {
+			// Get text from each div
+			divs.forEach(div => {
+				newLines.push(div.textContent || '');
+			});
 			
-			if (divElements.length > 0) {
-				// Get text from each div
-				divElements.forEach(div => {
-					newLines.push(div.textContent || '');
-				});
-				
-				// Add an empty line if the cursor suggests there should be one
-				const selection = window.getSelection();
-				if (selection && selection.rangeCount > 0) {
-					const range = selection.getRangeAt(0);
-					if (range.startContainer === editorElement && 
-						range.startOffset === editorElement.childNodes.length) {
-						newLines.push('');
-					}
-				}
-			} else {
-				// Split text by <br> tags or newlines
-				const textContent = editorElement.textContent || '';
-				const htmlContent = editorElement.innerHTML;
-				
-				// Check if we have <br> tags
-				if (htmlContent.includes('<br')) {
-					// Replace <br> tags with newlines for splitting
-					const withNewlines = htmlContent.replace(/<br\s*\/?>/gi, '\n');
-					// Remove other HTML tags
-					const textOnly = withNewlines.replace(/<[^>]*>/g, '');
-					// Split by newlines
-					newLines.push(...textOnly.split('\n'));
-				} else {
-					// Just split by actual newlines
-					newLines.push(...textContent.split('\n'));
-				}
-				
-				// If we still don't have any lines, add one empty line
-				if (newLines.length === 0) {
+			// Add an empty line if the cursor suggests there should be one
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				const range = selection.getRangeAt(0);
+				if (range.startContainer === editorElement && 
+					range.startOffset === editorElement.childNodes.length) {
 					newLines.push('');
 				}
 			}
-			
-			// Update lines array
-			lines = newLines.length > 0 ? newLines : [''];
 		} else {
-			// Textarea: split content by newlines
-			lines = editorContent.split('\n');
-			if (lines.length === 0) {
-				lines = [''];
+			// Split text by <br> tags or newlines
+			const textContent = editorElement.textContent || '';
+			const htmlContent = editorElement.innerHTML;
+			
+			// Check if we have <br> tags
+			if (htmlContent.includes('<br')) {
+				// Replace <br> tags with newlines for splitting
+				const withNewlines = htmlContent.replace(/<br\s*\/?>/gi, '\n');
+				// Remove other HTML tags
+				const textOnly = withNewlines.replace(/<[^>]*>/g, '');
+				// Split by newlines
+				newLines.push(...textOnly.split('\n'));
+			} else {
+				// Just split by actual newlines
+				newLines.push(...textContent.split('\n'));
+			}
+			
+			// If we still don't have any lines, add one empty line
+			if (newLines.length === 0) {
+				newLines.push('');
 			}
 		}
+		
+		// Update lines array
+		lines = newLines.length > 0 ? newLines : [''];
 		
 		// Get line numbers container
 		const lineNumbersContainer = document.querySelector('.line-numbers');
@@ -2142,7 +2099,7 @@
 
 	// Add performUndo function
 	function performUndo() {
-		if (useRichTextEditor && document.queryCommandSupported('undo')) {
+		if (document.queryCommandSupported('undo')) {
 			document.execCommand('undo', false);
 			showCommandError('Undo operation performed');
 		}
@@ -2150,7 +2107,7 @@
 	
 	// Add performRedo function 
 	function performRedo() {
-		if (useRichTextEditor && document.queryCommandSupported('redo')) {
+		if (document.queryCommandSupported('redo')) {
 			document.execCommand('redo', false);
 			showCommandError('Redo operation performed');
 		}
@@ -2184,77 +2141,47 @@
 	function moveToEndOfLine() {
 		if (!editorElement) return;
 		
-		if (useRichTextEditor) {
-			// For contenteditable divs, use DOM approach
-			const selection = window.getSelection();
-			if (!selection || !selection.rangeCount) return;
+		// For contenteditable divs, use DOM approach
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+		
+		const range = selection.getRangeAt(0);
+		
+		// Find the current div element
+		let currentDiv: Node | null = range.startContainer;
+		
+		// If the startContainer is a text node, get its parent
+		if (currentDiv.nodeType === Node.TEXT_NODE) {
+			currentDiv = currentDiv.parentNode;
+		}
+		
+		// Traverse up the DOM until we find a div that's a direct child of the editor
+		while (currentDiv && currentDiv !== editorElement && currentDiv.parentNode !== editorElement) {
+			currentDiv = currentDiv.parentNode;
+		}
+		
+		// Make sure we found a div
+		if (currentDiv && currentDiv !== editorElement) {
+			// Create a new range at the end of the div
+			const newRange = document.createRange();
 			
-			const range = selection.getRangeAt(0);
-			
-			// Find the current div element
-			let currentDiv: Node | null = range.startContainer;
-			
-			// If the startContainer is a text node, get its parent
-			if (currentDiv.nodeType === Node.TEXT_NODE) {
-				currentDiv = currentDiv.parentNode;
+			// If the div has content, position at the end of the last text node
+			if (currentDiv.lastChild && currentDiv.lastChild.nodeType === Node.TEXT_NODE) {
+				const textNode = currentDiv.lastChild;
+				const length = textNode.textContent?.length || 0;
+				newRange.setStart(textNode, length);
+			} else {
+				// If the div is empty, position at the start of the div
+				newRange.setStart(currentDiv, 0);
 			}
+			newRange.collapse(true);
 			
-			// Traverse up the DOM until we find a div that's a direct child of the editor
-			while (currentDiv && currentDiv !== editorElement && currentDiv.parentNode !== editorElement) {
-				currentDiv = currentDiv.parentNode;
-			}
+			// Apply the range
+			selection.removeAllRanges();
+			selection.addRange(newRange);
 			
-			// Make sure we found a div
-			if (currentDiv && currentDiv !== editorElement) {
-				// Create a new range at the end of the div
-				const newRange = document.createRange();
-				
-				// If the div has content, position at the end of the last text node
-				if (currentDiv.lastChild && currentDiv.lastChild.nodeType === Node.TEXT_NODE) {
-					const textNode = currentDiv.lastChild;
-					const length = textNode.textContent?.length || 0;
-					newRange.setStart(textNode, length);
-				} else {
-					// If the div is empty, position at the start of the div
-					newRange.setStart(currentDiv, 0);
-				}
-				newRange.collapse(true);
-				
-				// Apply the range
-				selection.removeAllRanges();
-				selection.addRange(newRange);
-				
-				// Update cursor position
-				updateCursorPosition();
-			}
-		} else {
-			// Original implementation for textarea mode
-			const selection = window.getSelection();
-			if (!selection || !selection.rangeCount) return;
-			
-			const range = selection.getRangeAt(0);
-			const textNode = range.startContainer;
-			
-			// Get text up to cursor
-			const textBeforeCursor = getTextBeforeCursor(textNode, range.startOffset);
-			const lines = textBeforeCursor.split('\n');
-			
-			// Find the end of the current line
-			const currentLineIndex = lines.length - 1;
-			const allLines = editorContent.split('\n');
-			
-			if (currentLineIndex < allLines.length) {
-				// Calculate position of end of line
-				let endOfLinePosition = 0;
-				for (let i = 0; i < currentLineIndex; i++) {
-					endOfLinePosition += allLines[i].length + 1; // +1 for newline
-				}
-				endOfLinePosition += allLines[currentLineIndex].length;
-				
-				// Set cursor to end of line
-				setRange(editorElement, endOfLinePosition, endOfLinePosition);
-				updateCursorPosition();
-			}
+			// Update cursor position
+			updateCursorPosition();
 		}
 	}
 	
@@ -2264,59 +2191,47 @@
 		
 		console.log("Executing 'G' command - moving to last line");
 		
-		if (useRichTextEditor) {
-			// For contenteditable divs, use DOM approach
-			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		// For contenteditable divs, use DOM approach
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		
+		if (allDivs.length > 0) {
+			// Get the last div
+			const lastDiv = allDivs[allDivs.length - 1];
 			
-			if (allDivs.length > 0) {
-				// Get the last div
-				const lastDiv = allDivs[allDivs.length - 1];
-				
-				// Create a range at the end of the last div
-				const range = document.createRange();
-				
-				// Check if the last div has any content
-				if (lastDiv.lastChild && lastDiv.lastChild.nodeType === Node.TEXT_NODE) {
-					// If it has text content, put cursor at the end of the text
-					const textNode = lastDiv.lastChild;
-					const length = textNode.textContent?.length || 0;
-					range.setStart(textNode, length);
-				} else {
-					// If empty, just set cursor at the beginning of the div
-					range.setStart(lastDiv, 0);
-				}
-				range.collapse(true);
-				
-				// Apply the range to move the cursor
-				const selection = window.getSelection();
-				if (selection) {
-					editorElement.focus();
-					selection.removeAllRanges();
-					selection.addRange(range);
-				}
-				
-				// Update indices
-				activeLineIndex = allDivs.length - 1;
-				cursorLine = allDivs.length;
-				
-				// Set cursor column to the end of the line
-				const lineText = lastDiv.textContent || '';
-				cursorColumn = lineText.length + 1;
+			// Create a range at the end of the last div
+			const range = document.createRange();
+			
+			// Check if the last div has any content
+			if (lastDiv.lastChild && lastDiv.lastChild.nodeType === Node.TEXT_NODE) {
+				// If it has text content, put cursor at the end of the text
+				const textNode = lastDiv.lastChild;
+				const length = textNode.textContent?.length || 0;
+				range.setStart(textNode, length);
 			} else {
-				// No divs, just go to the end of the content
-				const length = editorContent.length;
-				setRange(editorElement, length, length);
+				// If empty, just set cursor at the beginning of the div
+				range.setStart(lastDiv, 0);
 			}
-		} else {
-			// For textarea, move to the end of content
-			const textarea = editorElement as HTMLTextAreaElement;
-			textarea.setSelectionRange(editorContent.length, editorContent.length);
+			range.collapse(true);
+			
+			// Apply the range to move the cursor
+			const selection = window.getSelection();
+			if (selection) {
+				editorElement.focus();
+				selection.removeAllRanges();
+				selection.addRange(range);
+			}
 			
 			// Update indices
-			const lines = editorContent.split('\n');
-			activeLineIndex = lines.length - 1;
-			cursorLine = lines.length;
-			cursorColumn = lines[lines.length - 1].length + 1;
+			activeLineIndex = allDivs.length - 1;
+			cursorLine = allDivs.length;
+			
+			// Set cursor column to the end of the line
+			const lineText = lastDiv.textContent || '';
+			cursorColumn = lineText.length + 1;
+		} else {
+			// No divs, just go to the end of the content
+			const length = editorContent.length;
+			setRange(editorElement, length, length);
 		}
 		
 		// Update UI
@@ -2471,7 +2386,10 @@
 			const div = document.createElement('div');
 			// Even completely empty lines need a div
 			div.textContent = line; // Setting textContent works for empty lines too
-			editorElement.appendChild(div);
+			if(editorElement) {
+				editorElement.appendChild(div);	
+			}
+			
 		});
 		
 		// Debug
@@ -2494,46 +2412,35 @@
 		
 		console.log("Executing 'gg' command - moving to first line");
 		
-		if (useRichTextEditor) {
-			// For contenteditable divs, use DOM approach
-			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		// For contenteditable divs, use DOM approach
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		
+		if (allDivs.length > 0) {
+			// Get the first div
+			const firstDiv = allDivs[0];
 			
-			if (allDivs.length > 0) {
-				// Get the first div
-				const firstDiv = allDivs[0];
-				
-				// Create a range at the start of the first div
-				const range = document.createRange();
-				range.setStart(firstDiv, 0);
-				range.collapse(true);
-				
-				// Apply the range to move the cursor
-				const selection = window.getSelection();
-				if (selection) {
-					editorElement.focus();
-					selection.removeAllRanges();
-					selection.addRange(range);
-				}
-				
-				// Update indices
-				activeLineIndex = 0;
-				cursorLine = 1;
-				cursorColumn = 1;
-			} else {
-				// No divs, just go to the start of the content
-				setRange(editorElement, 0, 0);
+			// Create a range at the start of the first div
+			const range = document.createRange();
+			range.setStart(firstDiv, 0);
+			range.collapse(true);
+			
+			// Apply the range to move the cursor
+			const selection = window.getSelection();
+			if (selection) {
+				editorElement.focus();
+				selection.removeAllRanges();
+				selection.addRange(range);
 			}
-		} else {
-			// For textarea, move to the start of content
-			const textarea = editorElement as HTMLTextAreaElement;
-			textarea.setSelectionRange(0, 0);
 			
 			// Update indices
 			activeLineIndex = 0;
 			cursorLine = 1;
 			cursorColumn = 1;
+		} else {
+			// No divs, just go to the start of the content
+			setRange(editorElement, 0, 0);
 		}
-		
+	
 		// Update UI
 		updateCursorPosition();
 		updateLineNumbers();
@@ -2648,41 +2555,22 @@
 				class="editor-wrapper current {isAnimating ? `${slideDirection}-enter` : ''}"
 				style={animationHeight ? `height: ${animationHeight}px` : ''}
 			>
-				{#if useRichTextEditor}
-				<!-- Toolbar UI removed but functions still available for use -->
-				{/if}
 				<div class="editor-content">
 					<div class="line-numbers">
 						<!-- Line numbers now managed through JS for better synchronization -->
 					</div>
-					
-					{#if useRichTextEditor}
-						<div 
-							bind:this={editorElement}
-							class="editor-contenteditable" 
-							contenteditable="true"
-							on:keydown={handleKeyDown}
-							on:input={handleInput}
-							on:paste={handlePaste}
-							spellcheck="false"
-							role="textbox"
-							aria-multiline="true"
-							tabindex="0"
-						></div>
-					{:else}
-						<textarea
-							bind:this={editorElement}
-							bind:value={editorContent}
-							on:keydown={handleKeyDown}
-							on:input={handleInput}
-							on:paste={handlePaste}
-							class="editor-textarea"
-							spellcheck="false"
-							autocomplete="off"
-							autocapitalize="off"
-							{...{ autocorrect: 'off' } as any}
-						></textarea>
-					{/if}
+					<div 
+						bind:this={editorElement}
+						class="editor-contenteditable" 
+						contenteditable="true"
+						on:keydown={handleKeyDown}
+						on:input={handleInput}
+						on:paste={handlePaste}
+						spellcheck="false"
+						role="textbox"
+						aria-multiline="true"
+						tabindex="0"
+					></div>
 				</div>
 			</div>
 		{/if}
