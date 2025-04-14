@@ -68,6 +68,9 @@
 	let commandInputElement: HTMLInputElement | null = null;
 	let searchResults: number[] = [];
 	let currentSearchIndex = -1;
+	let searchDirection: 'forward' | 'backward' = 'forward';
+	let lastSearchQuery = '';
+	let lastSearchDirection: 'forward' | 'backward' = 'forward';
 
 	// Add variables for error messages
 	let commandError = '';
@@ -388,10 +391,6 @@
 
 	// Function to handle command input
 	function handleCommandInput() {
-		if (commandPrefix === '/' || commandPrefix === '?') {
-			// For search commands, update search results as user types
-			performSearch();
-		}
 	}
 
 	// Function to show command error for a few seconds
@@ -407,112 +406,6 @@
 		commandErrorTimeout = setTimeout(() => {
 			commandError = '';
 		}, 3000);
-	}
-
-	// Function to perform search based on command input
-	function performSearch() {
-		// Check if editor content is empty
-		if (!editorContent.trim()) {
-			searchResults = [];
-			currentSearchIndex = -1;
-			showCommandError('No content to search in');
-			return;
-		}
-
-		// Check if search term is empty
-		if (!commandInput.trim()) {
-			searchResults = [];
-			currentSearchIndex = -1;
-			showCommandError('Please enter a search term');
-			return;
-		}
-
-		const searchTerm = commandInput.toLowerCase();
-		const content = editorContent.toLowerCase();
-		const results: number[] = [];
-
-		let index = content.indexOf(searchTerm);
-		while (index !== -1) {
-			results.push(index);
-			index = content.indexOf(searchTerm, index + 1);
-		}
-
-		searchResults = results;
-
-		// Show error if no results found
-		if (results.length === 0) {
-			showCommandError(`No matches found for "${commandInput}"`);
-		} else {
-			// Clear any existing error
-			commandError = '';
-		}
-
-		// Set current index based on search direction
-		if (searchResults.length > 0) {
-			if (commandPrefix === '/') {
-				// Forward search - start from the beginning
-				currentSearchIndex = 0;
-			} else {
-				// Backward search - start from the end
-				currentSearchIndex = searchResults.length - 1;
-			}
-		} else {
-			currentSearchIndex = -1;
-		}
-	}
-
-	// Function to navigate to the current search result
-	function navigateToSearchResult() {
-		if (searchResults.length > 0 && currentSearchIndex >= 0) {
-			const position = searchResults[currentSearchIndex];
-
-			// Set cursor position to the search result
-			if (editorElement) {
-				editorElement.focus();
-				setRange(editorElement, position, position + commandInput.length);
-
-				// Ensure the cursor is visible
-				const textBeforeCursor = editorContent.substring(0, position);
-				const lines = textBeforeCursor.split('\n');
-				activeLineIndex = lines.length - 1;
-
-				// Update cursor position
-				cursorLine = lines.length;
-				cursorColumn = lines[lines.length - 1].length + 1;
-				
-				// Make sure the cursor is visible by scrolling
-				ensureCursorVisible();
-			}
-		}
-	}
-
-	// Function to navigate through search results with n/m
-	function navigateSearchResults(forward: boolean) {
-		if (searchResults.length === 0) return;
-
-		// Get search direction (whether we're in a forward or backward search)
-		const isBackwardSearch = commandPrefix === '?';
-		
-		// Determine which direction to move based on search direction and key pressed
-		// For '/' searches: 'n' moves forward, 'm' moves backward
-		// For '?' searches: 'n' moves backward, 'm' moves forward
-		let moveForward = forward;
-		
-		// If we're in a backward search ('?'), invert the direction
-		if (isBackwardSearch) {
-			moveForward = !moveForward;
-		}
-		
-		if (moveForward) {
-			currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
-		} else {
-			currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
-		}
-
-		navigateToSearchResult();
-		
-		// Show feedback about current match position
-		showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 	}
 
 	// Add toast types and state
@@ -1184,19 +1077,6 @@
 				return;
 			} 
 			
-			// Search navigation
-			else if (event.key === 'n' && searchResults.length > 0) {
-				navigateSearchResults(true);
-				ensureCursorVisible();
-				event.preventDefault();
-				return;
-			} else if (event.key === 'm' && searchResults.length > 0) {
-				navigateSearchResults(false);
-				ensureCursorVisible();
-				event.preventDefault();
-				return;
-			} 
-			
 			// Undo/Redo
 			else if (event.key === 'u') {
 				performUndo();
@@ -1245,6 +1125,21 @@
 				updateLineNumbers();
 				ensureCursorVisible();
 			}, 0);
+
+			// Add search navigation keys
+			if (event.key === 'n') {
+				event.preventDefault();
+				findNextMatch(false); // Use natural direction (forward for /, backward for ?)
+				return;
+			} else if (event.key === 'N') {
+				event.preventDefault();
+				findNextMatch(true); // Reverse the natural direction
+				return;
+			} else if (event.key === 'm') {
+				event.preventDefault();
+				findNextMatch(true); // Same as N - reverse the natural direction
+				return;
+			}
 		}
 	}
 
@@ -1954,57 +1849,73 @@
 	function getTextOffset(node: Node, offset: number): number {
 		if (!editorElement) return 0;
 		
-		const treeWalker = document.createTreeWalker(
-			editorElement,
-			NodeFilter.SHOW_TEXT,
-			null
-		);
+		let totalOffset = 0;
+		const divs = Array.from(editorElement.querySelectorAll('div'));
 		
-		let currentOffset = 0;
-		let currentNode = treeWalker.nextNode();
-		
-		while (currentNode) {
-			if (currentNode === node) {
-				return currentOffset + offset;
+		for (let i = 0; i < divs.length; i++) {
+			const div = divs[i];
+			if (div.contains(node)) {
+				// Found the div containing our node
+				let currentNode = div.firstChild;
+				while (currentNode && currentNode !== node) {
+					if (currentNode.nodeType === Node.TEXT_NODE) {
+						totalOffset += currentNode.textContent?.length || 0;
+					}
+					currentNode = currentNode.nextSibling;
+				}
+				return totalOffset + offset;
+			} else {
+				// Add length of previous divs
+				totalOffset += (div.textContent?.length || 0);
+				// Only add newline if not the last div
+				if (i < divs.length - 1) {
+					totalOffset += 1;
+				}
 			}
-			
-			currentOffset += (currentNode.textContent || '').length;
-			currentNode = treeWalker.nextNode();
 		}
 		
-		return 0;
+		return totalOffset;
 	}
 
 	// Helper function to set cursor position by character offset
 	function setCursorPositionByOffset(offset: number) {
 		if (!editorElement) return;
 		
-		const treeWalker = document.createTreeWalker(
-			editorElement,
-			NodeFilter.SHOW_TEXT,
-			null
-		);
+		let currentPos = 0;
+		const divs = Array.from(editorElement.querySelectorAll('div'));
 		
-		let currentOffset = 0;
-		let currentNode = treeWalker.nextNode();
-		
-		while (currentNode) {
-			const nodeLength = (currentNode.textContent || '').length;
+		for (let i = 0; i < divs.length; i++) {
+			const div = divs[i];
+			const divLength = (div.textContent || '').length + 1; // +1 for newline
 			
-			if (currentOffset + nodeLength >= offset) {
-				const range = document.createRange();
-				const sel = window.getSelection();
+			if (currentPos + divLength > offset) {
+				// Found the div containing our target position
+				const offsetInDiv = offset - currentPos;
+				let currentNode = div.firstChild;
+				let currentOffset = 0;
 				
-				range.setStart(currentNode, offset - currentOffset);
-				range.collapse(true);
-				
-				sel?.removeAllRanges();
-				sel?.addRange(range);
-				return;
+				while (currentNode) {
+					if (currentNode.nodeType === Node.TEXT_NODE) {
+						const nodeLength = currentNode.textContent?.length || 0;
+						if (currentOffset + nodeLength >= offsetInDiv) {
+							const range = document.createRange();
+							range.setStart(currentNode, offsetInDiv - currentOffset);
+							range.collapse(true);
+							
+							const selection = window.getSelection();
+							if (selection) {
+								selection.removeAllRanges();
+								selection.addRange(range);
+							}
+							return;
+						}
+						currentOffset += nodeLength;
+					}
+					currentNode = currentNode.nextSibling;
+				}
+				break;
 			}
-			
-			currentOffset += nodeLength;
-			currentNode = treeWalker.nextNode();
+			currentPos += divLength;
 		}
 	}
 
@@ -2530,8 +2441,10 @@
 				if (success) {
 					exitCommandMode();
 				}
-			} else if ((commandPrefix === '/' || commandPrefix === '?') && searchResults.length > 0) {
-				navigateToSearchResult();
+			} else if (commandPrefix === '/' || commandPrefix === '?') {
+				// Set the search direction based on the command
+				const direction = commandPrefix === '/' ? 'forward' : 'backward';
+				performSearch(commandInput, direction);
 				exitCommandMode();
 			}
 		} else if (event.key === 'Escape') {
@@ -2729,6 +2642,284 @@
 			'--toastBackground': '#F56565',
 			'--toastBarBackground': '#C53030'
 		}
+	}
+
+	// Add search functions
+	function performSearch(query: string, direction: 'forward' | 'backward' = 'forward') {
+		if (!editorElement || !query) {
+			console.log('Search aborted:', !editorElement ? 'No editor element' : 'Empty query');
+			return;
+		}
+
+		console.log('Starting search:', {
+			query,
+			direction,
+			contentLength: editorContent.length
+		});
+
+		// Save last search for 'n' and 'N' commands
+		lastSearchQuery = query;
+		lastSearchDirection = direction;
+		searchDirection = direction;
+
+		// Get the current cursor position
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) {
+			console.log('Search aborted: No valid selection');
+			return;
+		}
+		
+		const range = selection.getRangeAt(0);
+		const currentOffset = getTextOffset(range.startContainer, range.startOffset);
+
+		// Clear previous results
+		searchResults = [];
+		currentSearchIndex = -1;
+
+		// Create a case-insensitive regex from the query
+		try {
+			console.log('Creating search regex:', query);
+			const regex = new RegExp(query, 'gi');
+			let match;
+
+			// Get the raw text content without extra newlines
+			const searchContent = Array.from(editorElement.querySelectorAll('div'))
+				.map((div, i, arr) => div.textContent + (i < arr.length - 1 ? '\n' : ''))
+				.join('');
+
+			// Find all matches in the content
+			while ((match = regex.exec(searchContent)) !== null) {
+				searchResults.push(match.index);
+				console.log('Found match:', {
+					index: match.index,
+					matchedText: match[0],
+					surroundingContext: searchContent.substring(
+						Math.max(0, match.index - 10),
+						Math.min(searchContent.length, match.index + match[0].length + 10)
+					)
+				});
+			}
+
+			if (searchResults.length > 0) {
+				// Find the appropriate result based on search direction
+				if (direction === 'forward') {
+					currentSearchIndex = searchResults.findIndex(pos => pos > currentOffset);
+					if (currentSearchIndex === -1) {
+						currentSearchIndex = 0; // Wrap to start
+					}
+				} else {
+					currentSearchIndex = searchResults.findIndex(pos => pos >= currentOffset) - 1;
+					if (currentSearchIndex === -2) {
+						currentSearchIndex = searchResults.length - 1; // Wrap to end
+					}
+				}
+
+				// Navigate to the result
+				navigateToSearchResult();
+			} else {
+				showCommandError(`No matches found for: ${query}`);
+			}
+		} catch (e) {
+			console.error('Search regex error:', e);
+			showCommandError('Invalid search pattern');
+		}
+	}
+
+	function navigateToSearchResult() {
+		if (!editorElement || searchResults.length === 0 || currentSearchIndex < 0) {
+			console.log('Navigate aborted:', {
+				hasEditor: !!editorElement,
+				resultsCount: searchResults.length,
+				currentIndex: currentSearchIndex
+			});
+			return;
+		}
+
+		const position = searchResults[currentSearchIndex];
+		const query = lastSearchQuery;
+
+		console.log('Navigating to result:', {
+			position,
+			queryLength: query.length,
+			resultNumber: currentSearchIndex + 1,
+			totalResults: searchResults.length,
+			matchText: editorContent.substring(position, position + query.length)
+		});
+
+		// Find the div and position within the div for the match
+		let currentPos = 0;
+		let targetDiv: HTMLDivElement | null = null;
+		let offsetInDiv = 0;
+
+		const divs = Array.from(editorElement.querySelectorAll('div'));
+		
+		// Calculate cumulative lengths and find target div
+		const divLengths: number[] = [];
+		for (const div of divs) {
+			divLengths.push(currentPos);
+			currentPos += (div.textContent || '').length + 1; // +1 for newline
+		}
+
+		// Find the div containing our position
+		for (let i = 0; i < divs.length; i++) {
+			const nextPos = i < divs.length - 1 ? divLengths[i + 1] : currentPos;
+			if (position >= divLengths[i] && position < nextPos) {
+				targetDiv = divs[i];
+				offsetInDiv = position - divLengths[i];
+				activeLineIndex = i;
+				console.log('Found target div:', {
+					divIndex: i,
+					divContent: divs[i].textContent,
+					offsetInDiv,
+					totalOffset: position,
+					divStart: divLengths[i],
+					divEnd: nextPos
+				});
+				break;
+			}
+		}
+
+		// Special handling for last line
+		if (!targetDiv && position >= divLengths[divLengths.length - 1]) {
+			const lastIndex = divs.length - 1;
+			targetDiv = divs[lastIndex];
+			offsetInDiv = position - divLengths[lastIndex];
+			activeLineIndex = lastIndex;
+			console.log('Found match in last div:', {
+				divIndex: lastIndex,
+				divContent: targetDiv.textContent,
+				offsetInDiv,
+				totalOffset: position
+			});
+		}
+
+		if (targetDiv) {
+			// Create a range for the match
+			const range = document.createRange();
+			let currentNode = targetDiv.firstChild;
+			let currentOffset = 0;
+
+			// If no text nodes exist, create one
+			if (!currentNode) {
+				const textNode = document.createTextNode(targetDiv.textContent || '');
+				targetDiv.appendChild(textNode);
+				currentNode = textNode;
+			}
+
+			// Find or create the appropriate text node
+			while (currentNode) {
+				if (currentNode.nodeType === Node.TEXT_NODE) {
+					const nodeLength = currentNode.textContent?.length || 0;
+					if (currentOffset + nodeLength >= offsetInDiv) {
+						// Found the node containing our position
+						const startOffset = offsetInDiv - currentOffset;
+						
+						// Ensure we don't exceed the node's length
+						const endOffset = Math.min(
+							startOffset + query.length,
+							nodeLength
+						);
+						
+						console.log('Setting range:', {
+							node: currentNode.textContent,
+							startOffset,
+							endOffset,
+							nodeLength
+						});
+
+						try {
+							range.setStart(currentNode, startOffset);
+							range.setEnd(currentNode, endOffset);
+							
+							const selection = window.getSelection();
+							if (selection) {
+								selection.removeAllRanges();
+								selection.addRange(range);
+								
+								// Force scroll into view if needed
+								const rect = range.getBoundingClientRect();
+								if (rect.top < 0 || rect.bottom > window.innerHeight) {
+									targetDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+								}
+							}
+						} catch (e) {
+							console.error('Error setting range:', e, {
+								startOffset,
+								endOffset,
+								nodeLength,
+								text: currentNode.textContent
+							});
+						}
+						break;
+					}
+					currentOffset += nodeLength;
+				}
+				currentNode = currentNode.nextSibling;
+			}
+		}
+
+		// Update cursor position and line numbers
+		updateCursorPosition();
+		updateLineNumbers();
+
+		// Show feedback
+		showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
+	}
+
+	function findNextMatch(reverse = false) {
+		if (!lastSearchQuery || searchResults.length === 0) {
+			console.log('Next match aborted:', {
+				hasLastQuery: !!lastSearchQuery,
+				resultsCount: searchResults.length
+			});
+			showCommandError('No previous search');
+			return;
+		}
+
+		console.log('Finding next match:', {
+			reverse,
+			currentIndex: currentSearchIndex,
+			totalResults: searchResults.length,
+			lastQuery: lastSearchQuery,
+			lastDirection: lastSearchDirection,
+			searchDirection: searchDirection
+		});
+
+		// Determine actual direction based on initial search direction and reverse flag
+		const moveForward = lastSearchDirection === 'forward' ? !reverse : reverse;
+		
+		console.log('Movement direction:', {
+			initialDirection: lastSearchDirection,
+			reverse,
+			moveForward
+		});
+
+		if (moveForward) {
+			// Move forward through results
+			currentSearchIndex++;
+			if (currentSearchIndex >= searchResults.length) {
+				currentSearchIndex = 0; // Wrap to beginning
+				console.log('Wrapped to beginning of results');
+			}
+		} else {
+			// Move backward through results
+			currentSearchIndex--;
+			if (currentSearchIndex < 0) {
+				currentSearchIndex = searchResults.length - 1; // Wrap to end
+				console.log('Wrapped to end of results');
+			}
+		}
+
+		console.log('Selected next match:', {
+			newIndex: currentSearchIndex,
+			position: searchResults[currentSearchIndex],
+			matchText: editorContent.substring(
+				searchResults[currentSearchIndex],
+				searchResults[currentSearchIndex] + lastSearchQuery.length
+			)
+		});
+
+		navigateToSearchResult();
 	}
 </script>
 
