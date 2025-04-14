@@ -378,6 +378,16 @@
                                             on:change={handleFileSelect}
                                         />
                                     </div>
+                                    <!-- Confirm Password -->
+                                    <div class="mb-3">
+                                        <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                                        <input 
+                                            type="password" 
+                                            class="form-control bg-black text-white border-secondary" 
+                                            id="confirmPassword" 
+                                            bind:value={confirmPassword} 
+                                        />
+                                    </div>
                 
                 <!-- Account Links -->
                 <div class="card bg-dark text-white border-0 shadow mt-4">
