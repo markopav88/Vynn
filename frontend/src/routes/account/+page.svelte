@@ -352,6 +352,32 @@
                     <div class="card bg-dark text-white border-0 shadow">
                         <div class="card-body p-4">
                             <h2 class="card-title text-center mb-4">Profile Information</h2>
+                                    <!-- Profile Image -->
+                                    <div class="text-center mb-4">
+                                        <div class="position-relative mx-auto" style="width: 150px; height: 150px;">
+                                            <img 
+                                                src={imagePreview || profileImage} 
+                                                alt="Profile" 
+                                                class="rounded-circle bg-black"
+                                                style="width: 150px; height: 150px; object-fit: cover; border: 3px solid var(--color-primary);"
+                                            />
+                                            <label 
+                                                for="profileImageInput" 
+                                                class="position-absolute bottom-0 end-0 bg-dark rounded-circle p-2 cursor-pointer"
+                                                style="cursor: pointer;"
+                                            >
+                                                <i class="bi bi-camera-fill text-green"></i>
+                                                <span class="visually-hidden">Change profile picture</span>
+                                            </label>
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            id="profileImageInput" 
+                                            accept="image/*" 
+                                            class="d-none"
+                                            on:change={handleFileSelect}
+                                        />
+                                    </div>
                 
                 <!-- Account Links -->
                 <div class="card bg-dark text-white border-0 shadow mt-4">
