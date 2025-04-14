@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { get_current_user, update_user, upload_profile_image, get_profile_image_url } from '$lib/ts/user';
+    import { get_all_commands, get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/document';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
     
@@ -21,6 +22,18 @@
     let profileImage = profileDefault;
     let imageFile: File | null = null;
     let imagePreview: string | null = null;
+    
+    // Active tab
+    let activeTab = 'profile'; // 'profile' or 'keybindings'
+    
+    // Keybindings data
+    let commands: Command[] = [];
+    let userKeybindings: UserKeybinding[] = [];
+    let isLoadingKeybindings = false;
+    let keybindingsSuccessMessage = '';
+    let keybindingsErrorMessage = '';
+    let editingKeybinding: number | null = null;
+    let newKeybindingValue = '';
     
     onMount(async () => {
         try {
@@ -44,6 +57,9 @@
                 } catch (error) {
                     console.error('Error checking profile image:', error);
                 }
+                
+                // Load data
+                await loadKeybindings();
             } else {
                 // Redirect to login if not logged in
                 window.location.href = '/login';
@@ -145,6 +161,138 @@
         } finally {
             isSaving = false;
         }
+    }
+    
+    // Load keybindings data
+    async function loadKeybindings() {
+        try {
+            isLoadingKeybindings = true;
+            keybindingsErrorMessage = '';
+            
+            // Load commands and user keybindings in parallel
+            const [cmdResult, keyResult] = await Promise.all([
+                get_all_commands(),
+                get_all_keybindings()
+            ]);
+            
+            if (cmdResult) {
+                commands = cmdResult;
+            } else {
+                keybindingsErrorMessage = 'Failed to load commands';
+            }
+            
+            if (keyResult) {
+                userKeybindings = keyResult;
+            } else {
+                // If user doesn't have custom keybindings yet, that's fine
+                userKeybindings = [];
+            }
+            
+        } catch (error) {
+            console.error('Error loading keybindings:', error);
+            keybindingsErrorMessage = 'Failed to load keybindings';
+        } finally {
+            isLoadingKeybindings = false;
+        }
+    }
+    
+    // Get the current keybinding for a command
+    function getKeybinding(commandId: number): string {
+        // First check if the user has a custom keybinding
+        const customKeybinding = userKeybindings.find(kb => kb.command_id === commandId);
+        if (customKeybinding) {
+            return customKeybinding.keybinding;
+        }
+        
+        // Otherwise, return the default keybinding
+        const command = commands.find(cmd => cmd.command_id === commandId);
+        return command ? command.default_keybinding : '';
+    }
+    
+    // Start editing a keybinding
+    function startEditKeybinding(commandId: number) {
+        editingKeybinding = commandId;
+        newKeybindingValue = getKeybinding(commandId);
+    }
+    
+    // Cancel editing a keybinding
+    function cancelEditKeybinding() {
+        editingKeybinding = null;
+        newKeybindingValue = '';
+    }
+    
+    // Save a keybinding
+    async function saveKeybinding(commandId: number) {
+        try {
+            keybindingsErrorMessage = '';
+            keybindingsSuccessMessage = '';
+            
+            if (!newKeybindingValue.trim()) {
+                keybindingsErrorMessage = 'Keybinding cannot be empty';
+                return;
+            }
+            
+            const result = await add_update_keybinding(commandId, newKeybindingValue);
+            
+            if (result) {
+                // Update local state
+                const existingIndex = userKeybindings.findIndex(kb => kb.command_id === commandId);
+                if (existingIndex >= 0) {
+                    userKeybindings[existingIndex] = result;
+                } else {
+                    userKeybindings = [...userKeybindings, result];
+                }
+                
+                keybindingsSuccessMessage = 'Keybinding updated successfully';
+                editingKeybinding = null;
+                newKeybindingValue = '';
+            } else {
+                keybindingsErrorMessage = 'Failed to update keybinding';
+            }
+            
+        } catch (error) {
+            console.error('Error saving keybinding:', error);
+            keybindingsErrorMessage = 'An unexpected error occurred';
+        }
+    }
+    
+    // Reset a keybinding to default
+    async function resetKeybinding(commandId: number) {
+        try {
+            keybindingsErrorMessage = '';
+            keybindingsSuccessMessage = '';
+            
+            const result = await delete_keybinding(commandId);
+            
+            if (result) {
+                // Remove from user keybindings
+                userKeybindings = userKeybindings.filter(kb => kb.command_id !== commandId);
+                
+                keybindingsSuccessMessage = 'Keybinding reset to default';
+                
+                // If we were editing this keybinding, clear the edit state
+                if (editingKeybinding === commandId) {
+                    editingKeybinding = null;
+                    newKeybindingValue = '';
+                }
+            } else {
+                keybindingsErrorMessage = 'Failed to reset keybinding';
+            }
+            
+        } catch (error) {
+            console.error('Error resetting keybinding:', error);
+            keybindingsErrorMessage = 'An unexpected error occurred';
+        }
+    }
+    
+    // Check if a command has a custom keybinding
+    function hasCustomKeybinding(commandId: number): boolean {
+        return userKeybindings.some(kb => kb.command_id === commandId);
+    }
+    
+    // Format the keybinding for display (e.g., "Ctrl+B" -> "Ctrl + B")
+    function formatKeybinding(keybinding: string): string {
+        return keybinding.split('+').join(' + ');
     }
 </script>
 
