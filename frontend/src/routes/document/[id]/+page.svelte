@@ -209,6 +209,91 @@
 					}, 10);
 				}
 				
+				// Set the HTML content in the editor element
+				if (editorElement) {
+					// Set HTML content
+					editorElement.innerHTML = editorContent;
+					
+					// Count actual divs in the content for line numbering
+					const divCount = editorElement.querySelectorAll('div').length;
+					console.log(`Document switched: found ${divCount} divs for line numbering`);
+					
+					// If content has no divs but has content, convert it to proper structure
+					if (divCount === 0 && editorContent.trim() !== '') {
+						// Split by newlines and create proper div structure
+						const lines = editorContent.split('\n');
+						console.log(`Converting content to ${lines.length} divs`);
+						
+						// Create HTML with divs
+						const htmlWithDivs = lines.map(line => 
+							line.trim() === '' ? '<div><br></div>' : `<div>${line}</div>`
+						).join('');
+						
+						// Set the properly formatted HTML
+						editorElement.innerHTML = htmlWithDivs;
+					} else if (divCount === 0) {
+						// Empty document case - add at least one empty div
+						editorElement.innerHTML = '<div><br></div>';
+						console.log("Empty document: adding empty div");
+					}
+					
+					
+					// First update immediately
+					updateLineNumbers();
+					
+					// Then update after a short delay to ensure the DOM has stabilized
+					setTimeout(() => {
+						console.log("Refreshing line numbers after document switch");
+						// Force a complete refresh of the line numbers based on div count
+						const finalDivCount = editorElement?.querySelectorAll('div').length ?? 0;
+						console.log(`Document switch complete: ${finalDivCount} lines detected`);
+						
+						// Make sure we're using the right line count by forcing a refresh
+						updateLineNumbers();
+						updateCursorPosition();
+						adjustEditorHeight();
+						// Set cursor to beginning of document
+						if (editorElement && editorElement.firstChild) {
+							const range = document.createRange();
+							range.setStart(editorElement.firstChild, 0);
+							range.collapse(true);
+							const selection = window.getSelection();
+							if (selection) {
+								selection.removeAllRanges();
+								selection.addRange(range);
+							}
+						}
+					}, 50);
+
+					// Then update after a short delay to ensure the DOM has stabilized
+					setTimeout(() => {
+						if (editorElement) {
+							console.log("Refreshing line numbers after document switch");
+							// Force a complete refresh of the line numbers based on div count
+							const finalDivCount = editorElement.querySelectorAll('div').length;
+							console.log(`Document switch complete: ${finalDivCount} lines detected`);
+							
+							// Make sure we're using the right line count by forcing a refresh
+							updateLineNumbers();
+							updateCursorPosition();
+							adjustEditorHeight();
+							
+							// Set cursor to beginning of document
+							if (editorElement.firstChild) {
+								const range = document.createRange();
+								range.setStart(editorElement.firstChild, 0);
+								range.collapse(true);
+								
+								const selection = window.getSelection();
+								if (selection) {
+									selection.removeAllRanges();
+									selection.addRange(range);
+								}
+							}
+						}
+					}, 50);
+				}
+				
 				// Update current document index
 				currentDocumentIndex = projectDocuments.findIndex((doc) => doc.id === docId);
 
@@ -857,6 +942,25 @@
 				}, 0);
 			}
 			
+			// Handle arrow keys in any mode - update line highlighting with better timing
+			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
+				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+				// Let browser handle actual cursor movement
+				// Then update our position tracking with two phases to ensure accuracy
+				setTimeout(() => {
+					// First update the cursor position
+					updateCursorPosition();
+					// Then update line numbers based on the updated cursor position
+					updateLineNumbers();
+					
+					// Do a second update after a short delay to ensure accuracy
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 10);
+				}, 0);
+			}
+			
 			// For all other keys in INSERT mode, just let the default behavior occur
 			// and update the cursor position afterward
 			setTimeout(() => {
@@ -873,10 +977,37 @@
 			// Handle arrow keys
 			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
 				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-				// Let browser handle actual cursor movement
-				setTimeout(() => {
+					setTimeout(() => {
+					// First update the cursor position
 					updateCursorPosition();
+					// Then update line numbers based on the updated cursor position
 					updateLineNumbers();
+					
+					// Second phase update to ensure everything is in sync
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 10);
+				}, 0);
+				return;
+			}
+
+			// Handle arrow keys with improved line number updating
+			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
+				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+				// Let browser handle actual cursor movement
+				// Then update with a multi-phase approach for better accuracy
+				setTimeout(() => {
+					// First update the cursor position
+					updateCursorPosition();
+					// Then update line numbers based on the updated cursor position
+					updateLineNumbers();
+					
+					// Second phase update to ensure everything is in sync
+					setTimeout(() => {
+						updateCursorPosition();
+						updateLineNumbers();
+					}, 10);
 				}, 0);
 				return;
 			}
@@ -1056,30 +1187,19 @@
 	function updateCursorPosition() {
 		if (!editorElement || !browser) return;
 		
+		console.log("Updating cursor position");
+		
 		try {
 			const selection = window.getSelection();
-			if (!selection || selection.rangeCount === 0) {
-				// If no selection exists but editor has focus, we're probably on an empty editor
-				// Just use first line
-				activeLineIndex = 0;
-				cursorLine = 1;
-				cursorColumn = 1;
-				return;
-			}
+			if (!selection || selection.rangeCount === 0) return;
 			
 			const range = selection.getRangeAt(0);
 			const textNode = range.startContainer;
 			const offset = range.startOffset;
 			
-			// Calculate line using textBeforeCursor
-			const textBeforeCursor = getTextBeforeCursor(textNode, offset);
-			const linesBeforeCursor = textBeforeCursor.split('\n');
-			cursorLine = linesBeforeCursor.length;
-			activeLineIndex = cursorLine - 1; // 0-based index
-			
-			// Verify that activeLineIndex is set correctly based on DOM structure
-			// This ensures we highlight the right line visually
+			// Get all divs first for reference
 			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			console.log(`Document has ${allDivs.length} divs`);
 			
 			// For each div element in the editor, check if it contains the cursor
 			let foundInDivs = false;
@@ -1091,126 +1211,52 @@
 					activeLineIndex = i;
 					cursorLine = i + 1;
 					foundInDivs = true;
-					break;
-				}
-			}
-			
-			// Safety check: if we're at the end of the document but didn't find a containing div
-			if (!foundInDivs && textNode === editorElement && offset === editorElement.childNodes.length) {
-				// If the cursor is at the very end, highlight the last line
-				activeLineIndex = Math.max(0, allDivs.length - 1);
-				cursorLine = allDivs.length;
-			}
-			
-			// Calculate column based ONLY on current line's content
-			// This ensures the column is relative to the current line only
-			cursorColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length + 1;
-			
-			// Handle empty lines better by looking at the actual node structure
-			let currentNode = textNode;
-			let foundDiv = false;
-			
-			// Special case: if we're inside the editor directly (not in a div or text node)
-			// This happens when the editor is completely empty or when on an empty line
-			if (textNode === editorElement || 
-				(textNode.nodeType === Node.TEXT_NODE && textNode.textContent === "" && textNode.parentNode === editorElement)) {
-				// Use the first child as the active div, or just use line 0 if totally empty
-				activeLineIndex = 0;
-				cursorLine = 1;
-				cursorColumn = 1; // On an empty line, cursor is at column 1
-				foundDiv = true;
-			} 
-			// Special case: if we're at the beginning of a div element (empty or not)
-			else if (textNode.nodeType === Node.ELEMENT_NODE && textNode.nodeName === 'DIV' && offset === 0) {
-				// Get all divs to find our index
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				const divIndex = allDivs.indexOf(textNode as HTMLDivElement);
-				if (divIndex !== -1) {
-					activeLineIndex = divIndex;
-					cursorLine = divIndex + 1;
-					cursorColumn = 1; // At the beginning of a div, column is 1
-					foundDiv = true;
-				}
-			}
-			// If we're inside a div element directly or its text child
-			else {
-				// Look for a parent div
-				let parentDiv = textNode;
-				while (parentDiv && parentDiv !== editorElement) {
-					if (parentDiv.nodeName === 'DIV') {
-						// Found the div containing the cursor
-						foundDiv = true;
-						break;
-					}
-					parentDiv = parentDiv.parentNode as HTMLElement;
-				}
-				
-				// If we found a div, count its position among other divs
-				if (foundDiv && parentDiv !== editorElement) {
-					const allDivs = Array.from(editorElement.querySelectorAll('div'));
-					const divIndex = allDivs.indexOf(parentDiv as HTMLDivElement);
+					console.log(`Cursor found in div at index ${i}, setting activeLineIndex to ${i}`);
 					
-					if (divIndex !== -1) {
-						// Set the active line index based on div position
-						activeLineIndex = divIndex;
-						cursorLine = divIndex + 1;
-						
-						// Calculate column based on offset within this specific div
-						const divContent = parentDiv.textContent || '';
-						const nodeOffset = getNodeOffsetWithinParent(textNode, parentDiv, offset);
-						cursorColumn = nodeOffset + 1; // +1 because columns are 1-based
+					// Calculate cursor column
+					if (textNode.nodeType === Node.TEXT_NODE) {
+						cursorColumn = offset + 1;
+						if (textNode !== div.firstChild) {
+							// Add length of any previous text nodes in the same div
+							let node = div.firstChild;
+							while (node && node !== textNode) {
+								if (node.nodeType === Node.TEXT_NODE) {
+									cursorColumn += node.textContent?.length || 0;
+								}
+								node = node.nextSibling;
+							}
+						}
+					} else {
+						cursorColumn = 1;
 					}
+					
+					// Only update line numbers if we actually found a new position
+					if (foundInDivs) {
+						updateLineNumbers();
+					}
+					
+					console.log("Cursor position updated:", {
+						activeLineIndex,
+						cursorLine,
+						cursorColumn,
+						totalLines: allDivs.length
+					});
 				}
 			}
 			
-			// If no div was found but we're in the contenteditable element,
-			// we might be in text directly in the editor (first line)
-			if (!foundDiv && editorElement.contains(textNode)) {
-				// Check if we're at the beginning with no divs yet
-				const hasNoContent = editorElement.innerText.trim() === '';
-				const hasNoDivs = editorElement.querySelectorAll('div').length === 0;
-				
-				if (hasNoContent || hasNoDivs) {
-					activeLineIndex = 0;
-					cursorLine = 1;
-					cursorColumn = offset + 1; // Direct text in editor, column is offset + 1
-				}
+			// Only update line numbers if we actually found a new position
+			if (foundInDivs) {
+				updateLineNumbers();
 			}
 			
-			// Handle the case when cursorLine is still not set correctly
-			// This happens sometimes after pressing Enter
-			if (cursorLine <= 0) {
-				// Check for divs again
-				const allDivs = editorElement.querySelectorAll('div');
-				
-				if (allDivs.length > 0) {
-					// If we have divs, we're at least on line 1
-					cursorLine = Math.max(1, cursorLine);
-					activeLineIndex = cursorLine - 1;
-				} else {
-					// No divs, fallback to line 1
-					cursorLine = 1;
-					activeLineIndex = 0;
-				}
-			}
-		
-			// Ensure bounds are valid
-			const totalLines = Math.max(1, editorContent.split('\n').length);
-			if (cursorLine > totalLines) {
-				cursorLine = totalLines;
-				activeLineIndex = totalLines - 1;
-			} else if (cursorLine < 1) {
-				cursorLine = 1;
-				activeLineIndex = 0;
-			}
-			
-			// Update line highlighting
-			updateLineNumbers();
+			console.log("Cursor position updated:", {
+				activeLineIndex,
+				cursorLine,
+				cursorColumn,
+				totalLines: allDivs.length
+			});
 		} catch (error) {
-			// Fallback to first line if there's an error
-			activeLineIndex = 0;
-			cursorLine = 1;
-			updateLineNumbers();
+			console.error("Error updating cursor position:", error);
 		}
 	}
 
@@ -1348,12 +1394,16 @@
 		// Check if we're in a browser environment first
 		if (!browser) return;
 		
+		console.log("onMount: Initializing editor");
+		
 		// Load document data and profile image in parallel
 		try {
 			const [docResult, userResult] = await Promise.all([
 				loadDocumentData(),
 				loadUserProfile()
 			]);
+			
+			console.log("onMount: Document loaded, content length:", editorContent?.length || 0);
 			
 			// Set navbar ready first
 			navbarReady = true;
@@ -1366,8 +1416,25 @@
 				setTimeout(() => {
 					// Set initial cursor and focus the editor
 					if (editorElement) {
-						editorElement.focus();
-
+						console.log("Editor element found in onMount:", editorElement);
+						
+						// Ensure content is set
+						if (editorContent && (!editorElement.innerHTML || editorElement.innerHTML.trim() === '')) {
+							console.log("Editor was empty, setting content from editorContent");
+							safelySetEditorContent(editorContent);
+						}
+						
+						// Force a complete refresh of line numbers based on actual content
+						const divCount = editorElement.querySelectorAll('div').length;
+						console.log(`Initial line count: ${divCount} divs`);
+						
+						// Update lines array based on actual content
+						lines = editorContent.split('\n');
+						if (lines.length === 0) {
+							lines = [''];
+						}
+						
+						// Position cursor at the beginning
 						const selection = window.getSelection();
 						const range = document.createRange();
 						
@@ -1386,11 +1453,74 @@
 						activeLineIndex = 0;
 						cursorLine = 1;
 						cursorColumn = 1;
+						
+						// Focus the editor
+						editorElement.focus();
+						
+						// Force update line numbers
+						updateLineNumbers();
+						
+						// Add click event listener for cursor position updates
+						editorElement.addEventListener('click', (event) => {
+							// Prevent any default click behavior that might interfere
+							event.preventDefault();
+							
+							if (!editorElement) return;
+							
+							// Get the clicked div
+							const selection = window.getSelection();
+							if (!selection || !selection.rangeCount) return;
+							
+							const range = selection.getRangeAt(0);
+							const clickedNode = range.startContainer;
+							
+							// Find the div that was clicked
+							let currentDiv: Node | null = clickedNode;
+							while (currentDiv && currentDiv.parentElement !== editorElement) {
+								currentDiv = currentDiv.parentElement;
+							}
+							
+							if (currentDiv && currentDiv instanceof HTMLDivElement) {
+								// Get all divs to find the index
+								const allDivs = Array.from(editorElement.querySelectorAll('div'));
+								const clickedIndex = allDivs.indexOf(currentDiv);
+								
+								if (clickedIndex !== -1) {
+									// Update indices directly
+									activeLineIndex = clickedIndex;
+									cursorLine = clickedIndex + 1;
+									
+									// Calculate cursor column
+									if (clickedNode.nodeType === Node.TEXT_NODE) {
+										cursorColumn = range.startOffset + 1;
+									} else {
+										cursorColumn = 1;
+									}
+									
+									// Update line numbers only once
+									updateLineNumbers();
+									console.log('Click handler updated position:', {
+										activeLineIndex,
+										cursorLine,
+										cursorColumn
+									});
+								}
+							}
+						});
+						
+						// Add selection change listener to track cursor movement
+						document.addEventListener('selectionchange', () => {
+							if (document.activeElement === editorElement) {
+								updateCursorPosition();
+								updateLineNumbers();
+							}
+						});
+						
+						// Update UI
+						updateCursorPosition();
+						updateLineNumbers();
+						adjustEditorHeight();
 					}
-					
-					updateLineNumbers();
-					updateCursorPosition();
-					adjustEditorHeight();
 					
 					// Set up a MutationObserver to watch for content changes
 					if (editorElement) {
@@ -1402,7 +1532,7 @@
 								editorContent = content;
 								updateLineNumbers();
 								updateCursorPosition();
-								adjustEditorHeight(); // Ensure height is updated when content changes
+								adjustEditorHeight();
 							}
 						});
 						
@@ -1411,67 +1541,6 @@
 							childList: true,
 							characterData: true,
 							subtree: true
-						});
-						
-						// Add additional observer specifically for line structure changes
-						const structureObserver = new MutationObserver(() => {
-							// If the DOM structure changes, make sure to adjust height
-							console.log('Structure observer detected changes');
-							setTimeout(() => {
-								// First update the editor content from the DOM state
-								const newContent = getEditorContent();
-								if (newContent !== editorContent) {
-									editorContent = newContent;
-									console.log(`Content updated: ${editorContent.split('\n').length} lines`);
-								}
-								
-								// Update line numbers based on DOM state, not string content
-								updateLineNumbers();
-								
-								// Update cursor position
-								updateCursorPosition();
-								
-								// Finally adjust height based on actual DOM structure
-								adjustEditorHeight();
-							}, 0);
-						});
-						
-						// Observe the editor element for structure changes
-						structureObserver.observe(editorElement, {
-							childList: true,
-							subtree: true
-						});
-
-						// Also add a resize observer to adjust height when container resizes
-						if (typeof ResizeObserver !== 'undefined') {
-							const resizeObserver = new ResizeObserver(() => {
-								console.log('Resize observer detected changes');
-								adjustEditorHeight();
-							});
-							
-							resizeObserver.observe(editorElement);
-						}
-
-						// Add window scroll listener to keep status bar at bottom
-						window.addEventListener('scroll', () => {
-							const statusBar = document.querySelector('.status-bar') as HTMLElement;
-							if (statusBar) {
-								statusBar.style.bottom = '0';
-							}
-						});
-
-						// Add resize listener to adjust editor height when window size changes
-						window.addEventListener('resize', () => {
-							adjustEditorHeight();
-						});
-						
-						// Add a click handler to update cursor position when clicking in editor
-						editorElement.addEventListener('click', () => {
-							// Need a small delay to let the browser update selection
-							setTimeout(() => {
-								updateCursorPosition();
-								updateLineNumbers();
-							}, 0);
 						});
 					}
 				}, 100);
@@ -1503,10 +1572,12 @@
 	async function loadDocumentData() {
 		try {
 			documentData = await get_document(parseInt(documentId));
+			console.log("Document data loaded:", documentData);
 
 			if (documentData) {
 				// Get the HTML content from the document
 				let htmlContent = documentData.content || '';
+				console.log("Raw HTML content:", htmlContent);
 				
 				// If the content is empty, create a default empty div
 				if (htmlContent.trim() === '') {
@@ -1521,6 +1592,7 @@
 						// If line is empty, add a <br> tag to preserve it
 						return line.trim() === '' ? '<div><br></div>' : `<div>${line}</div>`;
 					}).join('');
+					console.log("Converted to HTML:", htmlContent);
 				}
 				
 				// If content doesn't have div tags, convert it to HTML format
@@ -1535,11 +1607,35 @@
 				
 				// Store the HTML content
 				editorContent = htmlContent;
+				console.log("Editor content set to:", editorContent);
 				
 				// Set the content in the editor
 				if (editorElement) {
 					// Directly set innerHTML to render the HTML structure
+					console.log("Setting innerHTML on editorElement:", htmlContent);
 					editorElement.innerHTML = htmlContent;
+				} else {
+					console.warn("Editor element not available yet for setting content");
+					// Set up a retry mechanism for when the editor element becomes available
+					const maxRetries = 5;
+					let retryCount = 0;
+					
+					const retryInterval = setInterval(() => {
+						if (editorElement) {
+							console.log("Editor element now available, setting content");
+							editorElement.innerHTML = htmlContent;
+							clearInterval(retryInterval);
+							
+							// Update UI after setting content
+							updateLineNumbers();
+							updateCursorPosition();
+							adjustEditorHeight();
+						} else if (retryCount >= maxRetries) {
+							console.error("Failed to set editor content after max retries");
+							clearInterval(retryInterval);
+						}
+						retryCount++;
+					}, 200);
 				}
 
 				// Check if document is part of a project
@@ -2016,29 +2112,55 @@
 	function updateLineNumbers() {
 		if (!editorElement) return;
 		
+		console.log("updateLineNumbers called");
+		console.log("Current activeLineIndex:", activeLineIndex);
+		console.log("Current cursorLine:", cursorLine);
+		
 		// Determine line count based on editor content
 		let lineCount = 1; // Start with at least one line
 		
 		// First check if we have any div elements (paragraphs)
 		const divElements = editorElement.querySelectorAll('div');
+		const divCount = divElements.length;
+		console.log(`Found ${divCount} divs for line numbering`);
+		
+		// Debug current selection state
+		const selection = window.getSelection();
+		if (selection && selection.rangeCount > 0) {
+			const range = selection.getRangeAt(0);
+			console.log("Current selection:", {
+				startContainer: range.startContainer.nodeType === Node.TEXT_NODE ? 'TEXT_NODE' : 'ELEMENT_NODE',
+				startOffset: range.startOffset,
+				endContainer: range.endContainer.nodeType === Node.TEXT_NODE ? 'TEXT_NODE' : 'ELEMENT_NODE',
+				endOffset: range.endOffset,
+				collapsed: range.collapsed
+			});
+		}
 		
 		// If we have divs, count them (each is a paragraph/line)
-		if (divElements.length > 0) {
-			lineCount = divElements.length;
+		if (divCount > 0) {
+			lineCount = divCount;
+			
+			// Debug each div's content
+			divElements.forEach((div, index) => {
+				console.log(`Div ${index}: "${div.textContent}" (length: ${div.textContent?.length})`);
+			});
 			
 			// Double-check if there should be an extra line at the end (if cursor is after last div)
-			const selection = window.getSelection();
 			if (selection && selection.rangeCount > 0) {
 				const range = selection.getRangeAt(0);
 				if (range.startContainer === editorElement && 
 					range.startOffset === editorElement.childNodes.length) {
 					// Cursor is after the last div, may need an extra line
 					lineCount++;
+					console.log("Added extra line for cursor at end");
 				}
 			}
 		} else {
 			// No divs, check for other line separators
 			const brElements = editorElement.querySelectorAll('br');
+			console.log(`No divs found, but found ${brElements.length} <br> elements`);
+			
 			if (brElements.length > 0) {
 				// Each br tag creates a new line
 				lineCount = brElements.length + 1;
@@ -2046,17 +2168,20 @@
 				// If there's any content at all, ensure at least one line
 				const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
 				lineCount = hasContent ? 1 : 1; // Always at least one line
+				console.log(`No divs or <br>, content present: ${hasContent}`);
 				
 				// Also check for newlines in the text content
 				const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
 				if (newlineCount > 0) {
 					lineCount = Math.max(lineCount, newlineCount + 1);
+					console.log(`Found ${newlineCount} newlines in text content`);
 				}
 			}
 		}
 
 		// Ensure at least one line
 		lineCount = Math.max(1, lineCount);
+		console.log(`Final line count: ${lineCount}`);
 		
 		// Extract text from lines for contenteditable
 		const newLines = [];
@@ -2064,23 +2189,26 @@
 		
 		if (divs.length > 0) {
 			// Get text from each div
-			divs.forEach(div => {
-				newLines.push(div.textContent || '');
+			divs.forEach((div, index) => {
+				const lineText = div.textContent || '';
+				newLines.push(lineText);
+				console.log(`Line ${index}: "${lineText}"`);
 			});
 			
 			// Add an empty line if the cursor suggests there should be one
-			const selection = window.getSelection();
 			if (selection && selection.rangeCount > 0) {
 				const range = selection.getRangeAt(0);
 				if (range.startContainer === editorElement && 
 					range.startOffset === editorElement.childNodes.length) {
 					newLines.push('');
+					console.log("Added empty line at end due to cursor position");
 				}
 			}
 		} else {
 			// Split text by <br> tags or newlines
 			const textContent = editorElement.textContent || '';
 			const htmlContent = editorElement.innerHTML;
+			console.log("Editor HTML content:", htmlContent);
 			
 			// Check if we have <br> tags
 			if (htmlContent.includes('<br')) {
@@ -2090,31 +2218,43 @@
 				const textOnly = withNewlines.replace(/<[^>]*>/g, '');
 				// Split by newlines
 				newLines.push(...textOnly.split('\n'));
+				console.log("Split content by <br> tags:", newLines);
 			} else {
 				// Just split by actual newlines
 				newLines.push(...textContent.split('\n'));
+				console.log("Split content by newlines:", newLines);
 			}
 			
 			// If we still don't have any lines, add one empty line
 			if (newLines.length === 0) {
 				newLines.push('');
+				console.log("Added default empty line");
 			}
 		}
 		
 		// Update lines array
 		lines = newLines.length > 0 ? newLines : [''];
+		console.log(`Lines array updated with ${lines.length} entries:`, lines);
 		
-		// Get line numbers container
-		const lineNumbersContainer = document.querySelector('.line-numbers');
-		if (!lineNumbersContainer) return;
+		// Get line numbers container - be more specific with selector
+		const lineNumbersContainer = document.querySelector('.editor-content .line-numbers');
+		console.log("Line numbers container:", lineNumbersContainer);
+		if (!lineNumbersContainer) {
+			console.error("Could not find line numbers container");
+			return;
+		}
 		
 		// Clear existing line numbers
 		lineNumbersContainer.innerHTML = '';
+		console.log("Cleared existing line numbers");
 		
 		// Create line number elements - ensure activeLineIndex is in bounds
+		const previousActiveLineIndex = activeLineIndex;
 		activeLineIndex = Math.max(0, Math.min(activeLineIndex, lineCount - 1));
+		console.log(`Active line index adjusted from ${previousActiveLineIndex} to ${activeLineIndex}`);
 		
 		// Create all line number elements
+		console.log(`Creating ${lineCount} line number elements`);
 		for (let i = 0; i < lineCount; i++) {
 			const lineNumber = document.createElement('div');
 			lineNumber.className = 'line-number';
@@ -2122,11 +2262,21 @@
 			// Add active class with a clearer, more pronounced style
 			if (i === activeLineIndex) {
 				lineNumber.classList.add('active');
+				console.log(`Highlighting line number ${i + 1} as active`);
 			}
 			
 			lineNumber.textContent = (i + 1).toString();
 			lineNumbersContainer.appendChild(lineNumber);
 		}
+		
+		console.log("Line numbers updated successfully");
+		console.log("Final state:", {
+			lineCount,
+			activeLineIndex,
+			cursorLine,
+			cursorColumn,
+			totalLines: lines.length
+		});
 	}
 
 	// Add performUndo function
