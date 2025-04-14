@@ -305,123 +305,30 @@
     
     <div class="container py-5">
         <div class="row justify-content-center">
-            <div class="col-12 col-md-8 col-lg-6">
-                <div class="card bg-dark text-white border-0 shadow">
-                    <div class="card-body p-4">
-                        <h2 class="card-title text-center mb-4">My Account</h2>
-                        
-                        {#if isLoading}
-                            <div class="text-center p-4">
-                                <div class="spinner-border text-green" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </div>
-                        {:else}
-                            <!-- Success message -->
-                            {#if successMessage}
-                                <div class="alert alert-success mb-4" role="alert">
-                                    {successMessage}
-                                </div>
-                            {/if}
-                            
-                            <!-- Error message -->
-                            {#if errorMessage}
-                                <div class="alert alert-danger mb-4" role="alert">
-                                    {errorMessage}
-                                </div>
-                            {/if}
-                            
-                            <form on:submit|preventDefault={handleSubmit}>
-                                <!-- Profile Image -->
-                                <div class="text-center mb-4">
-                                    <div class="position-relative mx-auto" style="width: 150px; height: 150px;">
-                                        <img 
-                                            src={imagePreview || profileImage} 
-                                            alt="Profile" 
-                                            class="rounded-circle bg-black"
-                                            style="width: 150px; height: 150px; object-fit: cover; border: 3px solid var(--color-primary);"
-                                        />
-                                        <label 
-                                            for="profileImageInput" 
-                                            class="position-absolute bottom-0 end-0 bg-dark rounded-circle p-2 cursor-pointer"
-                                            style="cursor: pointer;"
-                                        >
-                                            <i class="bi bi-camera-fill text-green"></i>
-                                            <span class="visually-hidden">Change profile picture</span>
-                                        </label>
-                                    </div>
-                                    <input 
-                                        type="file" 
-                                        id="profileImageInput" 
-                                        accept="image/*" 
-                                        class="d-none"
-                                        on:change={handleFileSelect}
-                                    />
-                                </div>
-                                
-                                <!-- Name -->
-                                <div class="mb-3">
-                                    <label for="name" class="form-label">Name</label>
-                                    <input 
-                                        type="text" 
-                                        class="form-control bg-black text-white border-secondary" 
-                                        id="name" 
-                                        bind:value={name} 
-                                        required
-                                    />
-                                </div>
-                                
-                                <!-- Email -->
-                                <div class="mb-3">
-                                    <label for="email" class="form-label">Email</label>
-                                    <input 
-                                        type="email" 
-                                        class="form-control bg-black text-white border-secondary" 
-                                        id="email" 
-                                        bind:value={email} 
-                                        required
-                                    />
-                                </div>
-                                
-                                <!-- Password -->
-                                <div class="mb-3">
-                                    <label for="password" class="form-label">New Password (leave blank to keep current)</label>
-                                    <input 
-                                        type="password" 
-                                        class="form-control bg-black text-white border-secondary" 
-                                        id="password" 
-                                        bind:value={password} 
-                                    />
-                                </div>
-                                
-                                <!-- Confirm Password -->
-                                <div class="mb-3">
-                                    <label for="confirmPassword" class="form-label">Confirm New Password</label>
-                                    <input 
-                                        type="password" 
-                                        class="form-control bg-black text-white border-secondary" 
-                                        id="confirmPassword" 
-                                        bind:value={confirmPassword} 
-                                    />
-                                </div>
-                                
-                                <!-- Submit Button -->
-                                <button 
-                                    type="submit" 
-                                    class="btn btn-green w-100" 
-                                    disabled={isSaving}
-                                >
-                                    {#if isSaving}
-                                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                        Saving...
-                                    {:else}
-                                        Save Changes
-                                    {/if}
-                                </button>
-                            </form>
-                        {/if}
-                    </div>
-                </div>
+                <!-- Tabs navigation -->
+                <ul class="nav nav-tabs mb-4">
+                    <li class="nav-item">
+                        <button 
+                            class="nav-link text-white {activeTab === 'profile' ? 'active bg-dark' : ''}" 
+                            on:click={() => activeTab = 'profile'}
+                        >
+                            <i class="bi bi-person me-2"></i> Profile
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button 
+                            class="nav-link text-white {activeTab === 'keybindings' ? 'active bg-dark' : ''}" 
+                            on:click={() => activeTab = 'keybindings'}
+                        >
+                            <i class="bi bi-keyboard me-2"></i> Keybindings
+                        </button>
+                    </li>
+                </ul>
+                {#if activeTab === 'profile'}
+                    <!-- Profile Tab Content -->
+                    <div class="card bg-dark text-white border-0 shadow">
+                        <div class="card-body p-4">
+                            <h2 class="card-title text-center mb-4">Profile Information</h2>
                 
                 <!-- Account Links -->
                 <div class="card bg-dark text-white border-0 shadow mt-4">
