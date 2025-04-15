@@ -31,13 +31,12 @@ Neovim for Writers is an innovative text editor designed for writers who value e
 ### Frontend
 - SvelteKit
 - Tailwind CSS
-- WebAssembly
+- Typescript
 
 ### Backend
 - Rust + Axum
 - PostgreSQL
-- Redis
-- WebSocket
+- Sqlx
 
 ## Getting Started
 
