@@ -6,7 +6,7 @@
 
 	import Navbar from '$lib/components/Navbar.svelte';
 
-	import '$lib/assets/style/login.css'
+	import '$lib/assets/style/login.css';
 
 	let email = '';
 	let password = '';

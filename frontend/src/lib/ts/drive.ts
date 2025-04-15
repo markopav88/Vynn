@@ -217,10 +217,10 @@ export async function update_project(project_id: number, name: string): Promise<
  */
 export async function delete_project(project_id: number, force: boolean = false): Promise<boolean> {
 	try {
-		const apiUrl = force 
+		const apiUrl = force
 			? `http://localhost:3001/api/project/${project_id}/force`
 			: `http://localhost:3001/api/project/${project_id}`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'
@@ -392,8 +392,8 @@ export async function get_shared_projects(): Promise<Project[] | null> {
 			method: 'GET',
 			credentials: 'include',
 			headers: {
-				'Content-Type': 'application/json',
-			},
+				'Content-Type': 'application/json'
+			}
 		});
 
 		if (!response.ok) {

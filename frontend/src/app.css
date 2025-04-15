@@ -3,29 +3,29 @@
 
 /* Custom variables */
 :root {
-  --color-primary: #10B981;
-  --color-text: #ffffff;
-  --color-background: #000000;
-  --color-border: rgba(255, 255, 255, 0.1);
+	--color-primary: #10b981;
+	--color-text: #ffffff;
+	--color-background: #000000;
+	--color-border: rgba(255, 255, 255, 0.1);
 }
 
 /* Global styles */
 body {
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	background-color: var(--color-background);
+	color: var(--color-text);
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Custom utility classes */
 .btn-green {
-  background-color: var(--color-primary);
-  color: white;
+	background-color: var(--color-primary);
+	color: white;
 }
 
 .text-green {
-  color: var(--color-primary);
+	color: var(--color-primary);
 }
 
 .border-subtle {
-  border-color: var(--color-border);
+	border-color: var(--color-border);
 }

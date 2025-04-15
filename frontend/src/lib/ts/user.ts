@@ -249,22 +249,22 @@ export async function check_auth(): Promise<boolean> {
 export async function upload_profile_image(file: File): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/users/profile-image`;
-		
+
 		// Create a FormData object to send the file
 		const formData = new FormData();
 		formData.append('image', file);
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			body: formData,
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to upload profile image:', response.status);
 			return false;
 		}
-		
+
 		return true;
 	} catch (error) {
 		console.error('Error uploading profile image:', error);
