@@ -710,7 +710,7 @@
 			<div class="col-md-2 p-0 sidebar-column">
 				<div class="sidebar bg-dark border-end border-dark">
 					<!-- Navigation Categories -->
-					<div class="p-2" style="margin-top: 20px">
+					<div class="p-2" style="margin-top: 17px">
 						<ul class="nav flex-column">
 							<li class="nav-item">
 								<button class="nav-link text-white {activeCategory === 'all' ? 'active bg-black' : ''}" 
