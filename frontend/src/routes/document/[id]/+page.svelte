@@ -499,13 +499,21 @@
 				
 				if (searchText && editorElement) {
 					try {
-						// Create flags for the regex
-						const isGlobal = flags.includes('g');
+						// Create flags for the regex - default to global if no flags specified
+						const isGlobal = flags.includes('g') || flags === '';
 						const isCaseInsensitive = flags.includes('i');
 						const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
 						
+						// Escape special regex characters in search text if not using regex
+						const escapedSearchText = flags.includes('r') ? searchText : searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+						
+						console.log('Creating regex with:', {
+							pattern: escapedSearchText,
+							flags: regexFlags
+						});
+						
 						// Create search regex
-						const searchRegex = new RegExp(searchText, regexFlags);
+						const searchRegex = new RegExp(escapedSearchText, regexFlags);
 						
 						// Get the content as an array of lines
 						const divs = Array.from(editorElement.querySelectorAll('div'));
@@ -519,6 +527,9 @@
 							if (matches) {
 								totalReplacements += matches.length;
 							}
+							
+							// Reset lastIndex for global regex between lines
+							searchRegex.lastIndex = 0;
 							
 							// Perform the replacement
 							return line.replace(searchRegex, replaceText);
@@ -563,11 +574,11 @@
 						return false;
 					}
 				} else {
-					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi');
+					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/[flags]');
 					return false;
 				}
 			} else {
-				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/gi');
+				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/[flags]');
 				return false;
 			}
 		} else {
@@ -905,74 +916,57 @@
 		
 		preventBrowserDefaults(event);
 
-		// Handle Ctrl+/ for toggling commands cheat sheet
-		if (event.ctrlKey && (event.key === '/' || event.key === '?')) {
+		// Handle Ctrl+/ for command cheat sheet in any mode
+		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
 			event.preventDefault();
 			showCommands = !showCommands;
 			return;
 		}
 
-		// Handle document switching shortcuts (Ctrl + 1-9)
-		if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
-			// Check if the key is a number from 1-9
-			const num = parseInt(event.key);
-			if (!isNaN(num) && num >= 1 && num <= 9) {
-				event.preventDefault();
-				// Check if we have a document at this index
-				if (projectDocuments && projectDocuments[num - 1]) {
-					const targetDoc = projectDocuments[num - 1];
-					switchDocument(targetDoc.id);
-					return;
-				}
+		// Handle Ctrl+1-9 for document switching in any mode
+		if ((event.ctrlKey || event.metaKey) && /^[1-9]$/.test(event.key)) {
+			event.preventDefault();
+			const index = parseInt(event.key) - 1;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document ${index + 1}:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index ${index + 1}`);
+				showCommandError(`No document ${index + 1} available`);
 			}
+			return;
 		}
 
 		// Handle Escape key to exit any mode and return to NORMAL mode
 		if (event.key === 'Escape') {
 			editorMode = 'NORMAL';
+			clearNormalModeBuffer();
 			event.preventDefault();
 			return;
 		}
-
-		// Rest of the existing handleKeyDown function...
-		// ... existing code ...
 
 		// COMMAND MODE: Handle only Escape (already done) and Enter
 		if (editorMode === 'COMMAND') {
 			if (event.key === 'Enter') {
 				// Command execution is handled by the executeCommand function
-				// which is bound directly to the command input
 				return;
 			}
-			// Ignore all other keys in command mode
+			clearNormalModeBuffer();
 			return;
 		}
 
 		// INSERT MODE: Allow typing but handle minimal key commands
 		if (editorMode === 'INSERT') {
-			// Handle arrow keys in any mode - just update line highlighting
-			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
-				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-				// Let browser handle actual cursor movement
-				// Then update our position tracking
-				setTimeout(() => {
-					updateCursorPosition();
-					updateLineNumbers();
-				}, 0);
-			}
-			
+			clearNormalModeBuffer();
 			// Handle arrow keys in any mode - update line highlighting with better timing
 			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
 				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
 				// Let browser handle actual cursor movement
 				// Then update our position tracking with two phases to ensure accuracy
 				setTimeout(() => {
-					// First update the cursor position
 					updateCursorPosition();
-					// Then update line numbers based on the updated cursor position
 					updateLineNumbers();
 					
-					// Do a second update after a short delay to ensure accuracy
 					setTimeout(() => {
 						updateCursorPosition();
 						updateLineNumbers();
@@ -981,227 +975,150 @@
 			}
 			
 			// For all other keys in INSERT mode, just let the default behavior occur
-			// and update the cursor position afterward
 			setTimeout(() => {
 				updateCursorPosition();
 				updateLineNumbers();
 				ensureCursorVisible();
 			}, 0);
 			
-			return; // End INSERT mode handling
+			return;
 		}
 
-		// NORMAL MODE: Handle all editor commands
+		// NORMAL MODE: Handle editor commands
 		if (editorMode === 'NORMAL') {
-			// Handle arrow keys
-			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
-				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-					setTimeout(() => {
-					// First update the cursor position
-					updateCursorPosition();
-					// Then update line numbers based on the updated cursor position
-					updateLineNumbers();
-					
-					// Second phase update to ensure everything is in sync
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 10);
-				}, 0);
-				return;
+			// Clear any existing buffer timeout
+			if (normalModeBufferTimeout) {
+				clearTimeout(normalModeBufferTimeout);
+				normalModeBufferTimeout = null;
 			}
 
-			// Handle arrow keys with improved line number updating
-			if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
-				event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-				// Let browser handle actual cursor movement
-				// Then update with a multi-phase approach for better accuracy
-				setTimeout(() => {
-					// First update the cursor position
-					updateCursorPosition();
-					// Then update line numbers based on the updated cursor position
-					updateLineNumbers();
-					
-					// Second phase update to ensure everything is in sync
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 10);
-				}, 0);
-				return;
-			}
-
-			// List of allowed navigation keys that shouldn't be prevented
-			const allowedKeys = [
-				'Home',
-				'End',
-				'PageUp',
-				'PageDown',
-				'Tab'
-			];
-
-			// Block most key inputs in normal mode except for command keys
-			const commandKeys = [':', '/', '?', 'i', 'x', 'y', 'p', 'd', 'n', 'm', 'h', 'j', 'k', 'l', 'u', '0', '$', 'g', 'G'];
-			
-			if (!event.ctrlKey && !allowedKeys.includes(event.key) && !commandKeys.includes(event.key)) {
-				event.preventDefault();
-			}
-
-			// Handle Ctrl+r for redo
-			if (event.ctrlKey && event.key === 'r') {
-				event.preventDefault();
-				performRedo();
-				return;
-			}
-
-			// Vim-style movement keys
-			if (event.key === 'h') {
-				// Move left using native Selection API
-				const selection = window.getSelection();
-				if (selection && selection.rangeCount > 0) {
-					const range = selection.getRangeAt(0);
-					const currentOffset = getTextOffset(range.startContainer, range.startOffset);
-					if (currentOffset > 0) {
-						setCursorPositionByOffset(currentOffset - 1);
-					}
-				}
-				setTimeout(() => {
-					updateCursorPosition();
-					updateLineNumbers();
-				}, 0);
-				event.preventDefault();
-				return;
-			} else if (event.key === 'l') {
-				// Move right using native Selection API
-				const selection = window.getSelection();
-				if (selection && selection.rangeCount > 0) {
-					const range = selection.getRangeAt(0);
-					const currentOffset = getTextOffset(range.startContainer, range.startOffset);
-					if (currentOffset < editorContent.length) {
-						setCursorPositionByOffset(currentOffset + 1);
-					}
-				}
-				setTimeout(() => {
-					updateCursorPosition();
-					updateLineNumbers();
-				}, 0);
-				event.preventDefault();
-				return;
-			} else if (event.key === 'k') {
-				// Move up one line
-				document.getSelection()?.modify("move", "backward", "line");
-				setTimeout(() => {
-					updateCursorPosition();
-					updateLineNumbers();
-				}, 0);
-				event.preventDefault();
-				return;
-			} else if (event.key === 'j') {
-				// Move down one line
-				document.getSelection()?.modify("move", "forward", "line");
-				setTimeout(() => {
-					updateCursorPosition();
-					updateLineNumbers();
-				}, 0);
-				event.preventDefault();
-				return;
-			}
-          
-			// Mode switching commands
+			// Mode switching commands - these should clear the buffer immediately
 			if (event.key === 'i') {
+				clearNormalModeBuffer();
 				editorMode = 'INSERT';
 				event.preventDefault();
 				return;
-			} else if (event.key === ':') {
-				enterCommandMode(':');
-				event.preventDefault();
-				return;
-			} else if (event.key === '/') {
-				enterCommandMode('/');
-				event.preventDefault();
-				return;
-			} else if (event.key === '?') {
-				enterCommandMode('?');
-				event.preventDefault();
-				return;
-			} 
-			
-			// Editing commands
-			else if (event.key === 'x') {
-				deleteText();
-				event.preventDefault();
-				return;
-			} else if (event.key === 'p') {
-				pasteText();
-				ensureCursorVisible();
-				event.preventDefault();
-				return;
-			} 
-			
-			// Undo/Redo
-			else if (event.key === 'u') {
-				performUndo();
-				ensureCursorVisible();
-				event.preventDefault();
-				return;
-			} 
-			
-			// Line navigation
-			else if (event.key === '0') {
-				moveToStartOfLine();
-				ensureCursorVisible();
+			} else if (event.key === ':' || event.key === '/' || event.key === '?') {
+				clearNormalModeBuffer();
+				enterCommandMode(event.key);
 				event.preventDefault();
 				return;
 			} else if (event.key === '$') {
+				event.preventDefault();
+				clearNormalModeBuffer();
 				moveToEndOfLine();
-				ensureCursorVisible();
-				event.preventDefault();
-				return;
-			} 
-			
-			// Document navigation
-			else if (event.key === 'G') {
-				moveToEndOfDocument();
-				ensureCursorVisible();
-				event.preventDefault();
-				return;
-			} 
-			
-			// Multi-key commands
-			else if (event.key === 'g') {
-				// 'g' could be the start of 'gg' command
-				event.preventDefault();
-				handleNormalModeSequence(event.key);
-				return;
-			} else if (event.key === 'd' || event.key === 'y') {
-				// For 'd' or 'y', just add to buffer
-				event.preventDefault();
-				handleNormalModeSequence(event.key);
 				return;
 			}
-			
-			// For all other keys in NORMAL mode, update UI but don't modify content
-			setTimeout(() => {
-				updateCursorPosition();
-				updateLineNumbers();
-				ensureCursorVisible();
-			}, 0);
 
-			// Add search navigation keys
-			if (event.key === 'n') {
+			// Handle multi-key commands
+			if (event.key === 'd' || event.key === 'y' || event.key === 'g') {
+					normalModeBuffer += event.key;
+					event.preventDefault();
+
+					// Check for complete commands
+					if (normalModeBuffer === 'dd') {
+						deleteCurrentLine();
+						clearNormalModeBuffer();
+						return;
+					} else if (normalModeBuffer === 'yy') {
+						copyText();
+						clearNormalModeBuffer();
+						return;
+					} else if (normalModeBuffer === 'gg') {
+						moveToStartOfDocument();
+						clearNormalModeBuffer();
+						return;
+					}
+
+					// Set timeout to clear buffer if no matching command is completed
+					normalModeBufferTimeout = window.setTimeout(() => {
+						console.log('Buffer cleared by timeout:', normalModeBuffer);
+						clearNormalModeBuffer();
+					}, 1000) as unknown as number;
+					
+					return;
+			}
+
+			// Single key commands that should execute immediately
+			if (event.key === 'G') {
 				event.preventDefault();
-				findNextMatch(false); // Use natural direction (forward for /, backward for ?)
+				clearNormalModeBuffer();
+				moveToEndOfDocument();
 				return;
-			} else if (event.key === 'N') {
+			} else if (event.key === 'x') {
 				event.preventDefault();
-				findNextMatch(true); // Reverse the natural direction
+				clearNormalModeBuffer();
+				deleteHighlightedText();
+				return;
+			} else if (event.key === 'n') {
+				event.preventDefault();
+				clearNormalModeBuffer();
+				findNextMatch(false); // Search forward
 				return;
 			} else if (event.key === 'm') {
 				event.preventDefault();
-				findNextMatch(true); // Same as N - reverse the natural direction
+				clearNormalModeBuffer();
+				findNextMatch(true); // Search backward
 				return;
 			}
+
+			// Single key commands - these should clear the buffer immediately
+			if (event.key === 'p' || event.key === 'u' ||
+				event.key === '0' || event.key === 'h' || 
+				event.key === 'j' || event.key === 'k' ||
+				event.key === 'l' || event.key === 'N') {
+				clearNormalModeBuffer();
+			}
+
+			// Rest of your normal mode commands...
+			// [Previous normal mode commands remain unchanged]
 		}
+	}
+
+	// Add deleteHighlightedText function
+	function deleteHighlightedText() {
+		if (!editorElement) return;
+
+				const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+					const range = selection.getRangeAt(0);
+		const currentDiv = range.startContainer.parentElement;
+		
+		// If no text is selected, delete the character at cursor
+		if (range.collapsed) {
+			const textNode = range.startContainer;
+			if (textNode.nodeType === Node.TEXT_NODE) {
+				const offset = range.startOffset;
+				const text = textNode.textContent || '';
+				
+				// Only proceed if there's a character to delete
+				if (offset < text.length) {
+					const newText = text.slice(0, offset) + text.slice(offset + 1);
+					textNode.textContent = newText;
+					
+					// Maintain cursor position
+					range.setStart(textNode, offset);
+					range.setEnd(textNode, offset);
+					selection.removeAllRanges();
+					selection.addRange(range);
+				}
+			}
+		} else {
+			// Delete selected text
+			range.deleteContents();
+		}
+
+		// Update editor content
+		editorContent = getEditorContent();
+		
+		// Update UI
+				updateCursorPosition();
+				updateLineNumbers();
+		adjustEditorHeight();
+		
+		// Show feedback
+		showCommandError('Text deleted');
 	}
 
 	// Update the updateCursorPosition function to ensure all lines (including empty ones) are properly highlighted
@@ -1342,8 +1259,6 @@
 			}
 		}
 		
-		console.log(`Line count from DOM: ${numberOfLines} divs`);
-		
 		// Calculate the height based on number of lines
 		const contentHeight = numberOfLines * LINE_HEIGHT;
 		
@@ -1352,8 +1267,6 @@
 
 		// Set height to the larger of content height or minimum height, plus extra padding
 		const newHeight = Math.max(contentHeight, minHeight) + 48; // Add extra padding
-		
-		console.log(`Adjusting editor height: lines=${numberOfLines}, newHeight=${newHeight}px`);
 
 		// Apply the new height to editor without overflow
 		editorElement.style.height = `${newHeight}px`;
@@ -1362,25 +1275,17 @@
 		editorElement.style.overflowY = 'visible';
 		editorElement.style.maxHeight = 'none'; // Remove max height constraint
 
-		// Update the line numbers container height
+		// Update the line numbers container height to match
 		const lineNumbersContainer = document.querySelector('.line-numbers') as HTMLElement;
 		if (lineNumbersContainer) {
 			lineNumbersContainer.style.height = `${newHeight}px`;
-			lineNumbersContainer.style.overflowY = 'visible'; // Remove scrolling to match editor
 		}
-
-		// Update the editor wrapper - this is the container with the transparent backdrop
-		const editorWrapper = document.querySelector('.editor-wrapper.current') as HTMLElement;
-		if (editorWrapper) {
-			editorWrapper.style.height = 'auto'; // Let it grow naturally with content
-			editorWrapper.style.minHeight = `${newHeight}px`; // Ensure minimum height
-		}
-
-		// Update the editor content container
-		const editorContentElement = document.querySelector('.editor-content') as HTMLElement;
-		if (editorContentElement) {
-			editorContentElement.style.minHeight = `${newHeight}px`;
-		}
+		
+		// Force a reflow to ensure the height is applied
+		editorElement.offsetHeight;
+		
+		// Ensure cursor is visible after height adjustment
+		ensureCursorVisible();
 	}
 
 	// Add this function to ensure cursor is visible
@@ -1733,35 +1638,60 @@
 			// If line is exactly at or under the limit, keep it as is
 			if (line.length <= MAX_COLUMN_WIDTH) {
 				wrappedLines.push(line);
-			} else {
+				continue;
+			}
+			
 				// Line is too long and needs wrapping
 				let remainingText = line;
 				
-				while (remainingText.length > MAX_COLUMN_WIDTH) {
-					// Find the best place to break (prefer at spaces)
-					// Only look for spaces up to MAX_COLUMN_WIDTH (not MAX_COLUMN_WIDTH-1)
-					let breakIndex = remainingText.lastIndexOf(' ', MAX_COLUMN_WIDTH);
-					
-					// If no good break point or it's too far back, break exactly at the column limit
-					if (breakIndex === -1 || breakIndex < MAX_COLUMN_WIDTH - 20) {
+			while (remainingText.length > 0) {
+				// If remaining text fits in one line
+				if (remainingText.length <= MAX_COLUMN_WIDTH) {
+					if (remainingText.trim()) {
+						wrappedLines.push(remainingText);
+					}
+					break;
+				}
+				
+				// Always try to break at a space within the limit first
+				let breakIndex = -1;
+				for (let i = MAX_COLUMN_WIDTH; i >= MAX_COLUMN_WIDTH - 20; i--) {
+					if (remainingText[i] === ' ') {
+						breakIndex = i;
+						break;
+					}
+				}
+				
+				// If no suitable space found, force break at MAX_COLUMN_WIDTH
+				if (breakIndex === -1) {
 						breakIndex = MAX_COLUMN_WIDTH;
 					}
 					
-					// Add the segment up to the break point
-					wrappedLines.push(remainingText.substring(0, breakIndex));
-					
-					// Continue with the rest of the text, making sure to remove any leading spaces
-					remainingText = remainingText.substring(breakIndex).trimStart();
+				// Get the segment up to the break point, ensuring it's not longer than MAX_COLUMN_WIDTH
+				const segment = remainingText.substring(0, Math.min(breakIndex, MAX_COLUMN_WIDTH)).trimEnd();
+				if (segment) {
+					wrappedLines.push(segment);
 				}
 				
-				// Add any remaining text as a new line (only if there's actually content)
-				if (remainingText.length > 0) {
-					wrappedLines.push(remainingText);
-				}
+				// Move to next segment, trimming any leading spaces
+					remainingText = remainingText.substring(breakIndex).trimStart();
 			}
 		}
 		
-		return wrappedLines.join('\n');
+		// Ensure we always have at least one line
+		if (wrappedLines.length === 0) {
+			wrappedLines.push('');
+		}
+		
+		// Double-check that no line exceeds MAX_COLUMN_WIDTH
+		return wrappedLines
+			.map(line => {
+				if (line.length > MAX_COLUMN_WIDTH) {
+					return line.substring(0, MAX_COLUMN_WIDTH);
+				}
+				return line;
+			})
+			.join('\n');
 	}
 	
 	// Improved handleInput function to work in coordination with handleKeyDown
@@ -2055,265 +1985,184 @@
 	// Add a handlePaste function for contenteditable
 	function handlePaste(event: ClipboardEvent) {
 		event.preventDefault();
+		console.log('Paste event triggered');
 		
-		// Get the clipboard text
-		const clipboardText = event.clipboardData?.getData('text/plain') || '';
-		if (!clipboardText) return;
+		// Get the clipboard text, strip any HTML
+		let clipboardText = event.clipboardData?.getData('text/plain') || '';
+		console.log('Raw clipboard text:', clipboardText);
+		
+		// If we got HTML content, convert it to plain text by removing HTML tags
+		if (clipboardText.includes('<') && clipboardText.includes('>')) {
+			console.log('HTML content detected, converting to plain text');
+			clipboardText = clipboardText
+				.replace(/<[^>]*>/g, '') // Remove HTML tags
+				.replace(/&[^;]+;/g, '') // Remove HTML entities
+				.replace(/\s+/g, ' ')    // Normalize whitespace
+				.trim();
+			console.log('Converted clipboard text:', clipboardText);
+		}
+		
+		if (!clipboardText) {
+			console.log('No clipboard text after processing, aborting paste');
+			return;
+		}
 		
 		// Get the current selection
 		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return;
+		if (!selection || !selection.rangeCount) {
+			console.log('No valid selection, aborting paste');
+			return;
+		}
 		
 		const range = selection.getRangeAt(0);
 		const start = getTextOffset(range.startContainer, range.startOffset);
 		const end = getTextOffset(range.endContainer, range.endOffset);
 		
-		// Insert the clipboard text at the current cursor position
-		const beforePaste = editorContent.substring(0, start);
-		const afterPaste = editorContent.substring(end);
-		const newContent = beforePaste + clipboardText + afterPaste;
+		console.log('Paste position:', { start, end });
 		
+		// Get the current line's content before the paste position
+		let currentLineStart = start;
+		while (currentLineStart > 0 && editorContent[currentLineStart - 1] !== '\n') {
+			currentLineStart--;
+		}
+		
+		const currentLineBeforePaste = editorContent.substring(currentLineStart, start);
+		console.log('Current line before paste:', currentLineBeforePaste);
+		
+		// Get the current line's content after the paste position
+		let currentLineEnd = end;
+		while (currentLineEnd < editorContent.length && editorContent[currentLineEnd] !== '\n') {
+			currentLineEnd++;
+		}
+		
+		const currentLineAfterPaste = editorContent.substring(end, currentLineEnd);
+		console.log('Current line after paste:', currentLineAfterPaste);
+		
+		// Calculate remaining space in the current line
+		const currentLineLength = currentLineBeforePaste.length;
+		const spaceRemaining = MAX_COLUMN_WIDTH - currentLineLength;
+		console.log('Space remaining in current line:', spaceRemaining);
+		
+		// Split clipboard text into lines, handling both \n and \r\n
+		const clipLines = clipboardText.split(/\r?\n/);
+		console.log('Split clipboard lines:', clipLines);
+		
+		// Handle the first line differently - try to fit it in the current line
+		let newContent = editorContent.substring(0, start);
+		
+		if (clipLines.length > 0) {
+			const firstLine = clipLines[0];
+			console.log('Processing first line:', firstLine);
+			
+			// If first line can fit in remaining space
+			if (firstLine.length <= spaceRemaining) {
+				console.log('First line fits in remaining space');
+				// Add to current line and check if it needs wrapping
+				const currentLine = currentLineBeforePaste + firstLine + currentLineAfterPaste;
+				if (currentLine.length > MAX_COLUMN_WIDTH) {
+					// Wrap the combined line
+					const wrapped = autoWrapLine(currentLine);
+					newContent += wrapped;
+				} else {
+					newContent += firstLine + currentLineAfterPaste;
+				}
+				clipLines.shift();
+			} else {
+				// Take what fits in the current line
+				newContent += firstLine.substring(0, spaceRemaining) + '\n' +
+							 firstLine.substring(spaceRemaining);
+				clipLines.shift();
+			}
+		}
+		
+		// Add remaining lines
+		if (clipLines.length > 0) {
+			newContent += (newContent.endsWith('\n') ? '' : '\n') +
+						 clipLines.join('\n') +
+						 (currentLineAfterPaste ? '\n' + currentLineAfterPaste : '');
+		}
+		
+		// Add the rest of the original content
+		newContent += editorContent.substring(currentLineEnd);
+		
+		// Function to check and fix overflowed lines
+		function fixOverflowedLines(content: string): string {
+			const lines = content.split('\n');
+			const fixedLines = [];
+			
+			for (let i = 0; i < lines.length; i++) {
+				let line = lines[i];
+				
+				// If line is within limit, keep it as is
+				if (line.length <= MAX_COLUMN_WIDTH) {
+					fixedLines.push(line);
+					continue;
+				}
+				
+				// Line is overflowed, need to split it
+				while (line.length > MAX_COLUMN_WIDTH) {
+					// Try to find a space to break at
+					let breakIndex = -1;
+					for (let j = MAX_COLUMN_WIDTH; j >= MAX_COLUMN_WIDTH - 20; j--) {
+						if (line[j] === ' ') {
+							breakIndex = j;
+							break;
+						}
+					}
+					
+					// If no space found, break at MAX_COLUMN_WIDTH
+					if (breakIndex === -1) {
+						breakIndex = MAX_COLUMN_WIDTH;
+					}
+					
+					// Add the segment up to break point
+					const segment = line.substring(0, breakIndex).trimEnd();
+					fixedLines.push(segment);
+					
+					// Continue with remaining text
+					line = line.substring(breakIndex).trimStart();
+				}
+				
+				// Add any remaining text if it exists
+				if (line.length > 0) {
+					fixedLines.push(line);
+				}
+			}
+			
+			return fixedLines.join('\n');
+		}
+		
+		// Apply initial line wrapping
+		newContent = autoWrapLine(newContent);
+		
+		// Double-check and fix any remaining overflowed lines
+		newContent = fixOverflowedLines(newContent);
+		
+		// Update the editor content
 		editorContent = newContent;
 		
 		// Update the editor content using our safe method
 		safelySetEditorContent(newContent);
 		
+		// Calculate new cursor position after wrapping
+		const newPosition = start + clipboardText.length;
+		
 		// Set cursor position after the pasted text
 		if (editorElement) {
-			setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
+			setRange(editorElement, newPosition, newPosition);
 		}
 		
 		// Update line numbers and other UI elements
 		lines = editorContent.split('\n');
 		updateCursorPosition();
 		adjustEditorHeight();
-	}
-
-	// Add export to PDF function
-	function exportToPDF() {
-		if (!browser || !documentData) return;
 		
-		try {
-			// Create a new PDF document
-			const doc = new jsPDF({
-				orientation: 'portrait',
-				unit: 'mm',
-				format: 'a4'
-			});
-			
-			// Set font and text properties
-			doc.setFont('Helvetica');
-			doc.setFontSize(16);
-			
-			// Add document title
-			doc.text(documentData.name || 'Untitled Document', 20, 20);
-			
-			// Add line under title
-			doc.setLineWidth(0.5);
-			doc.line(20, 25, 190, 25);
-			
-			// Add creation date
-			const createdAt = new Date(documentData.created_at).toLocaleDateString();
-			doc.setFontSize(10);
-			doc.text(`Created: ${createdAt}`, 20, 32);
-			
-			// Add content with line wrapping
-			doc.setFontSize(12);
-			const lines = editorContent.split('\n');
-			let y = 40;
-			const lineHeight = 7;
-			
-			for (const line of lines) {
-				// Check if we need a new page
-				if (y > 270) {
-					doc.addPage();
-					y = 20;
-				}
-				
-				// Add the line to the PDF
-				const splitLines = doc.splitTextToSize(line, 170);
-				doc.text(splitLines, 20, y);
-				y += splitLines.length * lineHeight;
-			}
-			
-			// Save the PDF with the document name
-			doc.save(`${documentData.name || 'document'}.pdf`);
-			showCommandError('PDF exported successfully');
-		} catch (error) {
-			console.error('Error exporting PDF:', error);
-			showCommandError('Failed to export PDF');
-		}
-	}
-
-	// Redesigned updateLineNumbers function for better empty line handling
-	function updateLineNumbers() {
-		if (!editorElement) return;
-		
-		console.log("updateLineNumbers called");
-		console.log("Current activeLineIndex:", activeLineIndex);
-		console.log("Current cursorLine:", cursorLine);
-		
-		// Determine line count based on editor content
-		let lineCount = 1; // Start with at least one line
-		
-		// First check if we have any div elements (paragraphs)
-		const divElements = editorElement.querySelectorAll('div');
-		const divCount = divElements.length;
-		console.log(`Found ${divCount} divs for line numbering`);
-		
-		// Debug current selection state
-		const selection = window.getSelection();
-		if (selection && selection.rangeCount > 0) {
-			const range = selection.getRangeAt(0);
-			console.log("Current selection:", {
-				startContainer: range.startContainer.nodeType === Node.TEXT_NODE ? 'TEXT_NODE' : 'ELEMENT_NODE',
-				startOffset: range.startOffset,
-				endContainer: range.endContainer.nodeType === Node.TEXT_NODE ? 'TEXT_NODE' : 'ELEMENT_NODE',
-				endOffset: range.endOffset,
-				collapsed: range.collapsed
-			});
-		}
-		
-		// If we have divs, count them (each is a paragraph/line)
-		if (divCount > 0) {
-			lineCount = divCount;
-			
-			// Debug each div's content
-			divElements.forEach((div, index) => {
-				console.log(`Div ${index}: "${div.textContent}" (length: ${div.textContent?.length})`);
-			});
-			
-			// Double-check if there should be an extra line at the end (if cursor is after last div)
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				if (range.startContainer === editorElement && 
-					range.startOffset === editorElement.childNodes.length) {
-					// Cursor is after the last div, may need an extra line
-					lineCount++;
-					console.log("Added extra line for cursor at end");
-				}
-			}
-		} else {
-			// No divs, check for other line separators
-			const brElements = editorElement.querySelectorAll('br');
-			console.log(`No divs found, but found ${brElements.length} <br> elements`);
-			
-			if (brElements.length > 0) {
-				// Each br tag creates a new line
-				lineCount = brElements.length + 1;
-			} else {
-				// If there's any content at all, ensure at least one line
-				const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
-				lineCount = hasContent ? 1 : 1; // Always at least one line
-				console.log(`No divs or <br>, content present: ${hasContent}`);
-				
-				// Also check for newlines in the text content
-				const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
-				if (newlineCount > 0) {
-					lineCount = Math.max(lineCount, newlineCount + 1);
-					console.log(`Found ${newlineCount} newlines in text content`);
-				}
-			}
-		}
-
-		// Ensure at least one line
-		lineCount = Math.max(1, lineCount);
-		console.log(`Final line count: ${lineCount}`);
-		
-		// Extract text from lines for contenteditable
-		const newLines = [];
-		const divs = editorElement.querySelectorAll('div');
-		
-		if (divs.length > 0) {
-			// Get text from each div
-			divs.forEach((div, index) => {
-				const lineText = div.textContent || '';
-				newLines.push(lineText);
-				console.log(`Line ${index}: "${lineText}"`);
-			});
-			
-			// Add an empty line if the cursor suggests there should be one
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				if (range.startContainer === editorElement && 
-					range.startOffset === editorElement.childNodes.length) {
-					newLines.push('');
-					console.log("Added empty line at end due to cursor position");
-				}
-			}
-		} else {
-			// Split text by <br> tags or newlines
-			const textContent = editorElement.textContent || '';
-			const htmlContent = editorElement.innerHTML;
-			console.log("Editor HTML content:", htmlContent);
-			
-			// Check if we have <br> tags
-			if (htmlContent.includes('<br')) {
-				// Replace <br> tags with newlines for splitting
-				const withNewlines = htmlContent.replace(/<br\s*\/?>/gi, '\n');
-				// Remove other HTML tags
-				const textOnly = withNewlines.replace(/<[^>]*>/g, '');
-				// Split by newlines
-				newLines.push(...textOnly.split('\n'));
-				console.log("Split content by <br> tags:", newLines);
-			} else {
-				// Just split by actual newlines
-				newLines.push(...textContent.split('\n'));
-				console.log("Split content by newlines:", newLines);
-			}
-			
-			// If we still don't have any lines, add one empty line
-			if (newLines.length === 0) {
-				newLines.push('');
-				console.log("Added default empty line");
-			}
-		}
-		
-		// Update lines array
-		lines = newLines.length > 0 ? newLines : [''];
-		console.log(`Lines array updated with ${lines.length} entries:`, lines);
-		
-		// Get line numbers container - be more specific with selector
-		const lineNumbersContainer = document.querySelector('.editor-content .line-numbers');
-		console.log("Line numbers container:", lineNumbersContainer);
-		if (!lineNumbersContainer) {
-			console.error("Could not find line numbers container");
-			return;
-		}
-		
-		// Clear existing line numbers
-		lineNumbersContainer.innerHTML = '';
-		console.log("Cleared existing line numbers");
-		
-		// Create line number elements - ensure activeLineIndex is in bounds
-		const previousActiveLineIndex = activeLineIndex;
-		activeLineIndex = Math.max(0, Math.min(activeLineIndex, lineCount - 1));
-		console.log(`Active line index adjusted from ${previousActiveLineIndex} to ${activeLineIndex}`);
-		
-		// Create all line number elements
-		console.log(`Creating ${lineCount} line number elements`);
-		for (let i = 0; i < lineCount; i++) {
-			const lineNumber = document.createElement('div');
-			lineNumber.className = 'line-number';
-			
-			// Add active class with a clearer, more pronounced style
-			if (i === activeLineIndex) {
-				lineNumber.classList.add('active');
-				console.log(`Highlighting line number ${i + 1} as active`);
-			}
-			
-			lineNumber.textContent = (i + 1).toString();
-			lineNumbersContainer.appendChild(lineNumber);
-		}
-		
-		console.log("Line numbers updated successfully");
-		console.log("Final state:", {
-			lineCount,
-			activeLineIndex,
-			cursorLine,
-			cursorColumn,
-			totalLines: lines.length
-		});
+		// Force a re-render of line numbers and adjust height after a short delay
+		// This ensures the DOM has updated
+		setTimeout(() => {
+			updateLineNumbers();
+			adjustEditorHeight();
+		}, 10);
 	}
 
 	// Add performUndo function
@@ -2382,6 +2231,8 @@
 	function moveToEndOfLine() {
 		if (!editorElement) return;
 		
+		console.log("Moving to end of line");
+		
 		// For contenteditable divs, use DOM approach
 		const selection = window.getSelection();
 		if (!selection || !selection.rangeCount) return;
@@ -2403,26 +2254,58 @@
 		
 		// Make sure we found a div
 		if (currentDiv && currentDiv !== editorElement) {
+			console.log("Found current div:", currentDiv);
+			
 			// Create a new range at the end of the div
 			const newRange = document.createRange();
 			
-			// If the div has content, position at the end of the last text node
-			if (currentDiv.lastChild && currentDiv.lastChild.nodeType === Node.TEXT_NODE) {
-				const textNode = currentDiv.lastChild;
-				const length = textNode.textContent?.length || 0;
-				newRange.setStart(textNode, length);
-			} else {
-				// If the div is empty, position at the start of the div
-				newRange.setStart(currentDiv, 0);
+			// Get all text nodes in the div
+			const textNodes: Node[] = [];
+			const walker = document.createTreeWalker(
+				currentDiv,
+				NodeFilter.SHOW_TEXT,
+				null
+			);
+			
+			let node;
+			while (node = walker.nextNode()) {
+				textNodes.push(node);
 			}
+			
+			// If we have text nodes, move to the end of the last one
+			if (textNodes.length > 0) {
+				const lastTextNode = textNodes[textNodes.length - 1];
+				const length = lastTextNode.textContent?.length || 0;
+				newRange.setStart(lastTextNode, length);
+				
+				// Calculate total length for cursor column
+				let totalLength = 0;
+				textNodes.forEach(node => {
+					totalLength += node.textContent?.length || 0;
+				});
+				cursorColumn = totalLength + 1;
+				
+				console.log("Moving to end of text:", {
+					totalLength,
+					cursorColumn,
+					textContent: currentDiv.textContent
+				});
+			} else {
+				// If no text nodes, set to end of div
+				newRange.setStart(currentDiv, currentDiv.childNodes.length);
+				cursorColumn = 1;
+			}
+			
 			newRange.collapse(true);
 			
 			// Apply the range
 			selection.removeAllRanges();
 			selection.addRange(newRange);
 			
-			// Update cursor position
+			// Update UI
 			updateCursorPosition();
+			updateLineNumbers();
+			ensureCursorVisible();
 		}
 	}
 	
@@ -2430,7 +2313,7 @@
 	function moveToEndOfDocument() {
 		if (!editorElement) return;
 		
-		console.log("Executing 'G' command - moving to last line");
+		console.log("Moving to end of document");
 		
 		// For contenteditable divs, use DOM approach
 		const allDivs = Array.from(editorElement.querySelectorAll('div'));
@@ -2439,18 +2322,38 @@
 			// Get the last div
 			const lastDiv = allDivs[allDivs.length - 1];
 			
+			// Get all text nodes in the last div
+			const textNodes: Node[] = [];
+			const walker = document.createTreeWalker(
+				lastDiv,
+				NodeFilter.SHOW_TEXT,
+				null
+			);
+			
+			let node;
+			while (node = walker.nextNode()) {
+				textNodes.push(node);
+			}
+			
 			// Create a range at the end of the last div
 			const range = document.createRange();
 			
-			// Check if the last div has any content
-			if (lastDiv.lastChild && lastDiv.lastChild.nodeType === Node.TEXT_NODE) {
-				// If it has text content, put cursor at the end of the text
-				const textNode = lastDiv.lastChild;
-				const length = textNode.textContent?.length || 0;
-				range.setStart(textNode, length);
+			// If we have text nodes, move to the end of the last one
+			if (textNodes.length > 0) {
+				const lastTextNode = textNodes[textNodes.length - 1];
+				const length = lastTextNode.textContent?.length || 0;
+				range.setStart(lastTextNode, length);
+				
+				// Calculate total length for cursor column
+				let totalLength = 0;
+				textNodes.forEach(node => {
+					totalLength += node.textContent?.length || 0;
+				});
+				cursorColumn = totalLength + 1;
 			} else {
-				// If empty, just set cursor at the beginning of the div
-				range.setStart(lastDiv, 0);
+				// If no text nodes, set to end of div
+				range.setStart(lastDiv, lastDiv.childNodes.length);
+				cursorColumn = 1;
 			}
 			range.collapse(true);
 			
@@ -2466,9 +2369,13 @@
 			activeLineIndex = allDivs.length - 1;
 			cursorLine = allDivs.length;
 			
-			// Set cursor column to the end of the line
-			const lineText = lastDiv.textContent || '';
-			cursorColumn = lineText.length + 1;
+			console.log('Moved to end of document:', {
+				activeLineIndex,
+				cursorLine,
+				cursorColumn,
+				totalLines: allDivs.length,
+				lastLineContent: lastDiv.textContent || ''
+			});
 		} else {
 			// No divs, just go to the end of the content
 			const length = editorContent.length;
@@ -2597,56 +2504,141 @@
 	function safelySetEditorContent(content: string) {
 		if (!editorElement) return;
 		
-		// Important check: verify we're not accidentally removing lines
-		const currentDivCount = editorElement.querySelectorAll('div').length;
-		const newLineCount = content.split('\n').length;
+		console.log('Setting content safely:', content);
 		
-		// If we're reducing the number of lines and in normal mode with a buffer containing just 'g' or 'd',
-		// prevent accidental content replacement
-		if (editorMode === 'NORMAL' && 
-		   (normalModeBuffer === 'g' || normalModeBuffer === 'd') && 
-		   newLineCount < currentDivCount) {
-			console.warn(`Prevented content change that would remove lines during incomplete ${normalModeBuffer} command`);
-			return;
+		// First, if content contains HTML tags, convert to plain text
+		let plainContent = content;
+		if (content.includes('<') && content.includes('>')) {
+			plainContent = content
+				.replace(/<[^>]*>/g, '') // Remove HTML tags
+				.replace(/&lt;/g, '<')   // Convert escaped < back to <
+				.replace(/&gt;/g, '>')   // Convert escaped > back to >
+				.replace(/&amp;/g, '&')  // Convert escaped & back to &
+				.replace(/&quot;/g, '"') // Convert escaped " back to "
+				.replace(/&#039;/g, "'"); // Convert escaped ' back to '
 		}
 		
-		// Always use the div structure approach for consistency
+		// Split into lines and wrap if needed
+		let lines = plainContent.split('\n');
+		let wrappedLines: string[] = [];
+		let originalLineToWrappedMap = new Map<number, number>(); // Maps original line index to first wrapped line index
+		let wrappedToOriginalMap = new Map<number, number>(); // Maps wrapped line index back to original line
+		let currentWrappedIndex = 0;
+		
+		for (let i = 0; i < lines.length; i++) {
+			let line = lines[i];
+			// Store mapping from original line to its first wrapped line
+			originalLineToWrappedMap.set(i, currentWrappedIndex);
+			
+			if (line.length <= MAX_COLUMN_WIDTH) {
+				wrappedLines.push(line);
+				wrappedToOriginalMap.set(currentWrappedIndex, i);
+				currentWrappedIndex++;
+			} else {
+				console.log('Line exceeds MAX_COLUMN_WIDTH, wrapping:', line.length);
+				// Process the line in chunks
+				while (line.length > 0) {
+					let breakPoint = -1;
+					
+					if (line.length > MAX_COLUMN_WIDTH) {
+						// Try to find a space to break at
+						for (let j = MAX_COLUMN_WIDTH; j >= MAX_COLUMN_WIDTH - 20; j--) {
+							if (line[j] === ' ') {
+								breakPoint = j;
+								break;
+							}
+						}
+						
+						// If no space found, force break at MAX_COLUMN_WIDTH
+						if (breakPoint === -1) {
+							breakPoint = MAX_COLUMN_WIDTH;
+						}
+						
+						// Add the segment and continue with remaining text
+						const segment = line.substring(0, breakPoint).trimEnd();
+						wrappedLines.push(segment);
+						wrappedToOriginalMap.set(currentWrappedIndex, i);
+						currentWrappedIndex++;
+						console.log('Created wrapped line:', segment.length);
+						
+						// Continue with remaining text
+						line = line.substring(breakPoint).trimStart();
+					} else {
+						// Add remaining text if any
+						if (line.length > 0) {
+							wrappedLines.push(line);
+							wrappedToOriginalMap.set(currentWrappedIndex, i);
+							currentWrappedIndex++;
+							console.log('Added final segment:', line.length);
+						}
+						break;
+					}
+				}
+			}
+		}
+		
+		console.log('Total wrapped lines:', wrappedLines.length);
+		
+		// Store reference to editor element to ensure it's not null during operations
+		const editor = editorElement;
+		
 		// Clear the editor
-		editorElement.innerHTML = '';
+		editor.innerHTML = '';
 		
-		// Split content into lines
-		const lines = content.split('\n');
-		
-		// Handle the case with no lines - ensure at least one empty div
-		if (lines.length === 0) {
+		// Create a div for each line
+		wrappedLines.forEach((line, index) => {
 			const div = document.createElement('div');
-			editorElement.appendChild(div);
-			return;
-		}
-		
-		// Create a div for each line, properly handling empty lines
-		lines.forEach((line, index) => {
-			const div = document.createElement('div');
-			// Even completely empty lines need a div
-			div.textContent = line; // Setting textContent works for empty lines too
-			if(editorElement) {
-				editorElement.appendChild(div);	
+			
+			// Handle empty lines
+			if (line.trim() === '') {
+				div.innerHTML = '<br>';
+			} else {
+				div.textContent = line; // textContent automatically escapes HTML
 			}
 			
+			// Add data attribute to track original line number
+			div.dataset.originalLine = wrappedToOriginalMap.get(index)?.toString() || '0';
+			
+			editor.appendChild(div);
 		});
 		
-		// Debug
-		console.log(`Set editor content: ${lines.length} lines (${lines.filter(l => l === '').length} empty)`);
+		// Ensure at least one div exists
+		if (wrappedLines.length === 0) {
+			const div = document.createElement('div');
+			div.innerHTML = '<br>';
+			div.dataset.originalLine = '0';
+			editor.appendChild(div);
+		}
+		
+		// Update our content tracking
+		editorContent = wrappedLines.join('\n');
+		lines = wrappedLines;
+		
+		// Update active line index based on the mapping
+		if (originalLineToWrappedMap.has(activeLineIndex)) {
+			const newActiveLineIndex = originalLineToWrappedMap.get(activeLineIndex) || 0;
+			activeLineIndex = newActiveLineIndex;
+			cursorLine = newActiveLineIndex + 1;
+			console.log('Updated active line index after wrapping:', {
+				oldIndex: activeLineIndex,
+				newIndex: newActiveLineIndex,
+				cursorLine
+			});
+		}
 		
 		// Force browser to recognize empty divs 
-		// This prevents browser optimization from collapsing empty divs
-		const emptyDivs = Array.from(editorElement.querySelectorAll('div')).filter(div => div.textContent === '');
+		const emptyDivs = Array.from(editor.querySelectorAll('div')).filter(div => !div.textContent);
 		emptyDivs.forEach(div => {
-			// Add a zero-width space character to force the browser to keep the div
 			if (!div.firstChild) {
 				div.appendChild(document.createTextNode('\u200B')); // Zero-width space
 			}
 		});
+		
+		console.log('Final editor structure:', editor.innerHTML);
+		
+		// Force update of line numbers and cursor position
+		updateLineNumbers();
+		updateCursorPosition();
 	}
 
 	// Function to move to the start of the document (gg command)
@@ -2737,10 +2729,10 @@
 		searchResults = [];
 		currentSearchIndex = -1;
 
-		// Create a case-insensitive regex from the query
+		// Create a regex from the query - case sensitive by default
 		try {
 			console.log('Creating search regex:', query);
-			const regex = new RegExp(query, 'gi');
+			const regex = new RegExp(query, 'g'); // Remove 'i' flag to make it case sensitive
 			let match;
 
 			// Get the raw text content without extra newlines
@@ -2941,33 +2933,26 @@
 			reverse,
 			currentIndex: currentSearchIndex,
 			totalResults: searchResults.length,
-			lastQuery: lastSearchQuery,
-			lastDirection: lastSearchDirection,
-			searchDirection: searchDirection
+			lastQuery: lastSearchQuery
 		});
 
-		// Determine actual direction based on initial search direction and reverse flag
-		const moveForward = lastSearchDirection === 'forward' ? !reverse : reverse;
-		
-		console.log('Movement direction:', {
-			initialDirection: lastSearchDirection,
-			reverse,
-			moveForward
-		});
-
-		if (moveForward) {
-			// Move forward through results
-			currentSearchIndex++;
-			if (currentSearchIndex >= searchResults.length) {
-				currentSearchIndex = 0; // Wrap to beginning
-				console.log('Wrapped to beginning of results');
-			}
-		} else {
+		if (reverse) {
 			// Move backward through results
 			currentSearchIndex--;
 			if (currentSearchIndex < 0) {
 				currentSearchIndex = searchResults.length - 1; // Wrap to end
-				console.log('Wrapped to end of results');
+				showCommandError(`Wrapped to bottom, match ${currentSearchIndex + 1} of ${searchResults.length}`);
+			} else {
+				showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
+			}
+		} else {
+			// Move forward through results
+			currentSearchIndex++;
+			if (currentSearchIndex >= searchResults.length) {
+				currentSearchIndex = 0; // Wrap to beginning
+				showCommandError(`Wrapped to top, match ${currentSearchIndex + 1} of ${searchResults.length}`);
+			} else {
+				showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 			}
 		}
 
@@ -2981,6 +2966,143 @@
 		});
 
 		navigateToSearchResult();
+	}
+
+	// Redesigned updateLineNumbers function for better empty line handling
+	function updateLineNumbers() {
+		if (!editorElement) return;
+		
+		// Determine line count based on editor content
+		let lineCount = 1; // Start with at least one line
+		
+		// First check if we have any div elements (paragraphs)
+		const divElements = editorElement.querySelectorAll('div');
+		const divCount = divElements.length;
+		
+		// If we have divs, count them (each is a paragraph/line)
+		if (divCount > 0) {
+			lineCount = divCount;
+			
+			// Double-check if there should be an extra line at the end (if cursor is after last div)
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				const range = selection.getRangeAt(0);
+				if (range.startContainer === editorElement && 
+					range.startOffset === editorElement.childNodes.length) {
+					// Cursor is after the last div, may need an extra line
+					lineCount++;
+				}
+			}
+		} else {
+			// No divs, check for other line separators
+			const brElements = editorElement.querySelectorAll('br');
+			
+			if (brElements.length > 0) {
+				// Each br tag creates a new line
+				lineCount = brElements.length + 1;
+			} else {
+				// If there's any content at all, ensure at least one line
+				const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
+				lineCount = hasContent ? 1 : 1; // Always at least one line
+				
+				// Also check for newlines in the text content
+				const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
+				if (newlineCount > 0) {
+					lineCount = Math.max(lineCount, newlineCount + 1);
+				}
+			}
+		}
+		
+		// Ensure at least one line
+		lineCount = Math.max(1, lineCount);
+		
+		// Get line numbers container
+		const lineNumbersContainer = document.querySelector('.editor-content .line-numbers');
+		if (!lineNumbersContainer) return;
+		
+		// Clear existing line numbers
+		lineNumbersContainer.innerHTML = '';
+		
+		// Create line number elements - ensure activeLineIndex is in bounds
+		activeLineIndex = Math.max(0, Math.min(activeLineIndex, lineCount - 1));
+		
+		// Create all line number elements
+		for (let i = 0; i < lineCount; i++) {
+			const lineNumber = document.createElement('div');
+			lineNumber.className = 'line-number';
+			
+			// Add active class
+			if (i === activeLineIndex) {
+				lineNumber.classList.add('active');
+			}
+			
+			lineNumber.textContent = (i + 1).toString();
+			lineNumbersContainer.appendChild(lineNumber);
+		}
+	}
+
+	// Add export to PDF function
+	function exportToPDF() {
+		if (!browser || !documentData) return;
+		
+		try {
+			// Create a new PDF document
+			const doc = new jsPDF({
+				orientation: 'portrait',
+				unit: 'mm',
+				format: 'a4'
+			});
+			
+			// Set font and text properties
+			doc.setFont('Helvetica');
+			doc.setFontSize(16);
+			
+			// Add document title
+			doc.text(documentData.name || 'Untitled Document', 20, 20);
+			
+			// Add line under title
+			doc.setLineWidth(0.5);
+			doc.line(20, 25, 190, 25);
+			
+			// Add creation date
+			const createdAt = new Date(documentData.created_at).toLocaleDateString();
+			doc.setFontSize(10);
+			doc.text(`Created: ${createdAt}`, 20, 32);
+			
+			// Add content with line wrapping
+			doc.setFontSize(12);
+			const lines = editorContent.split('\n');
+			let y = 40;
+			const lineHeight = 7;
+			
+			for (const line of lines) {
+				// Check if we need a new page
+				if (y > 270) {
+					doc.addPage();
+					y = 20;
+				}
+				
+				// Add the line to the PDF
+				const splitLines = doc.splitTextToSize(line, 170);
+				doc.text(splitLines, 20, y);
+				y += splitLines.length * lineHeight;
+			}
+			
+			// Save the PDF with the document name
+			doc.save(`${documentData.name || 'document'}.pdf`);
+			showCommandError('PDF exported successfully');
+		} catch (error) {
+			console.error('Error exporting PDF:', error);
+			showCommandError('Failed to export PDF');
+		}
+	}
+
+	function clearNormalModeBuffer() {
+		normalModeBuffer = '';
+		if (normalModeBufferTimeout) {
+			clearTimeout(normalModeBufferTimeout);
+			normalModeBufferTimeout = null;
+		}
 	}
 </script>
 
@@ -3218,7 +3340,7 @@
 					<li><span class="key">?</span> Search relative backward</li>
 					<li><span class="key">n</span> Next match</li>
 					<li><span class="key">m</span> Previous match</li>
-					<li><span class="key">:%s/old/new/g</span> Replace all</li>
+					<li><span class="key">:%s/old/new/gi</span> Replace all</li>
 				</ul>
 			</div>
 

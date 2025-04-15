@@ -149,7 +149,7 @@
     position: relative;
     z-index: 1;
     padding: 0.25rem 0.5rem 0.25rem 0; /* Add padding to top, right and bottom */
-    margin-bottom: 0.15rem; /* Add a small gap between lines */
+    margin-bottom: 0.1250rem; /* Add a small gap between lines */
     transition: background-color 0.2s, color 0.2s, transform 0.1s;
     border-right: 2px solid transparent;
     display: flex;
