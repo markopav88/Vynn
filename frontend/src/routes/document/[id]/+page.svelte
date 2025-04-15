@@ -923,9 +923,23 @@
 			return;
 		}
 
+		// Handle Ctrl+B for bold formatting in any mode
+		if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+			event.preventDefault();
+			// Only apply bold if there's a selection
+			const selection = window.getSelection();
+			if (selection && !selection.isCollapsed) {
+				applyBoldFormatting();
+			} else if (editorMode === 'INSERT') {
+				// In insert mode, allow toggling bold mode even without selection
+				applyBoldFormatting();
+			}
+			return;
+		}
+
 		// Handle Ctrl+1-9 for document switching in any mode
 		if ((event.ctrlKey || event.metaKey) && /^[1-9]$/.test(event.key)) {
-			event.preventDefault();
+				event.preventDefault();
 			const index = parseInt(event.key) - 1;
 			if (projectDocuments && projectDocuments[index]) {
 				console.log(`Switching to document ${index + 1}:`, projectDocuments[index]);
@@ -934,7 +948,7 @@
 				console.log(`No document at index ${index + 1}`);
 				showCommandError(`No document ${index + 1} available`);
 			}
-			return;
+					return;
 		}
 
 		// Handle Escape key to exit any mode and return to NORMAL mode
@@ -992,6 +1006,192 @@
 				normalModeBufferTimeout = null;
 			}
 
+			// Allow text selection with Shift + arrow keys in normal mode
+			if (event.shiftKey && (
+				event.key === 'ArrowLeft' || 
+				event.key === 'ArrowRight' || 
+				event.key === 'ArrowUp' || 
+				event.key === 'ArrowDown' ||
+				event.key === 'h' ||
+				event.key === 'j' ||
+				event.key === 'k' ||
+				event.key === 'l'
+			)) {
+				// Let the browser handle the selection
+				return;
+			}
+
+			// Handle navigation keys in NORMAL mode only
+			if (event.key === 'h') {
+				event.preventDefault();
+				if (!editorElement) return;
+				const selection = window.getSelection();
+				if (!selection || !selection.rangeCount) return;
+				
+				const range = selection.getRangeAt(0);
+				console.log('Move Left (h) - Initial state:', {
+					activeLineIndex,
+					cursorLine,
+					cursorColumn
+				});
+
+				// Get the current div element
+				const allDivs = Array.from(editorElement.querySelectorAll('div'));
+				const currentDiv = allDivs[activeLineIndex];
+				if (!currentDiv) return;
+
+				// Get current position in the text
+				const textContent = currentDiv.textContent || '';
+				const currentTextNode = range.startContainer;
+				const currentOffset = range.startOffset;
+
+				console.log('Current text state:', {
+					textContent,
+					currentOffset,
+					nodeType: currentTextNode.nodeType
+				});
+
+				// If we're at the start of a text node
+				if (currentOffset > 0) {
+					// Move left within the current text node
+					const newRange = document.createRange();
+					newRange.setStart(currentTextNode, currentOffset - 1);
+					newRange.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(newRange);
+				} else if (currentTextNode.previousSibling) {
+					// Move to the end of the previous text node
+					const newRange = document.createRange();
+					newRange.setStart(currentTextNode.previousSibling, currentTextNode.previousSibling.textContent?.length || 0);
+					newRange.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(newRange);
+				}
+
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible();
+				
+				console.log('Move Left (h) - Final state:', {
+					activeLineIndex,
+					cursorLine,
+					cursorColumn
+				});
+				return;
+			} else if (event.key === 'l') {
+				event.preventDefault();
+				if (!editorElement) return;
+				const selection = window.getSelection();
+				if (!selection || !selection.rangeCount) return;
+				
+				const range = selection.getRangeAt(0);
+				console.log('Move Right (l) - Initial state:', {
+					activeLineIndex,
+					cursorLine,
+					cursorColumn
+				});
+
+				// Get the current div element
+				const allDivs = Array.from(editorElement.querySelectorAll('div'));
+				const currentDiv = allDivs[activeLineIndex];
+				if (!currentDiv) return;
+
+				// Get current position in the text
+				const textContent = currentDiv.textContent || '';
+				const currentTextNode = range.startContainer;
+				const currentOffset = range.startOffset;
+
+				console.log('Current text state:', {
+					textContent,
+					currentOffset,
+					nodeType: currentTextNode.nodeType,
+					textLength: currentTextNode.textContent?.length || 0
+				});
+
+				// If we're not at the end of the current text node
+				if (currentTextNode.nodeType === Node.TEXT_NODE && 
+					currentOffset < currentTextNode.textContent!.length) {
+					// Move right within the current text node
+					const newRange = document.createRange();
+					newRange.setStart(currentTextNode, currentOffset + 1);
+					newRange.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(newRange);
+				} else if (currentTextNode.nextSibling) {
+					// Move to the start of the next text node
+					const newRange = document.createRange();
+					newRange.setStart(currentTextNode.nextSibling, 0);
+					newRange.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(newRange);
+				}
+
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible();
+				
+				console.log('Move Right (l) - Final state:', {
+					activeLineIndex,
+					cursorLine,
+					cursorColumn
+				});
+				return;
+			} else if (event.key === 'k') {
+				event.preventDefault();
+				if (!editorElement) return;
+				const selection = window.getSelection();
+				if (!selection || !selection.rangeCount) return;
+				
+				if (activeLineIndex > 0) {
+					const allDivs = Array.from(editorElement.querySelectorAll('div'));
+					const targetDiv = allDivs[activeLineIndex - 1];
+					if (targetDiv) {
+						const range = document.createRange();
+						const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
+						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+							range.setStart(targetDiv.firstChild, targetColumn);
+						} else {
+							range.setStart(targetDiv, 0);
+						}
+						range.collapse(true);
+						selection.removeAllRanges();
+						selection.addRange(range);
+						activeLineIndex--;
+						updateCursorPosition();
+						updateLineNumbers();
+						ensureCursorVisible();
+					}
+				}
+				return;
+			} else if (event.key === 'j') {
+				event.preventDefault();
+				if (!editorElement) return;
+				const selection = window.getSelection();
+				if (!selection || !selection.rangeCount) return;
+				
+				const allDivs = Array.from(editorElement.querySelectorAll('div'));
+				if (activeLineIndex < allDivs.length - 1) {
+					const targetDiv = allDivs[activeLineIndex + 1];
+					if (targetDiv) {
+						const range = document.createRange();
+						const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
+						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+							range.setStart(targetDiv.firstChild, targetColumn);
+						} else {
+							range.setStart(targetDiv, 0);
+						}
+						range.collapse(true);
+						selection.removeAllRanges();
+						selection.addRange(range);
+						activeLineIndex++;
+						updateCursorPosition();
+						updateLineNumbers();
+						ensureCursorVisible();
+					}
+				}
+				return;
+			}
+
 			// Mode switching commands - these should clear the buffer immediately
 			if (event.key === 'i') {
 				clearNormalModeBuffer();
@@ -1013,21 +1213,21 @@
 			// Handle multi-key commands
 			if (event.key === 'd' || event.key === 'y' || event.key === 'g') {
 					normalModeBuffer += event.key;
-					event.preventDefault();
+				event.preventDefault();
 
 					// Check for complete commands
 					if (normalModeBuffer === 'dd') {
 						deleteCurrentLine();
 						clearNormalModeBuffer();
-						return;
+				return;
 					} else if (normalModeBuffer === 'yy') {
 						copyText();
 						clearNormalModeBuffer();
-						return;
+				return;
 					} else if (normalModeBuffer === 'gg') {
 						moveToStartOfDocument();
 						clearNormalModeBuffer();
-						return;
+				return;
 					}
 
 					// Set timeout to clear buffer if no matching command is completed
@@ -1036,9 +1236,9 @@
 						clearNormalModeBuffer();
 					}, 1000) as unknown as number;
 					
-					return;
+				return;
 			}
-
+          
 			// Single key commands that should execute immediately
 			if (event.key === 'G') {
 				event.preventDefault();
@@ -1060,8 +1260,8 @@
 				clearNormalModeBuffer();
 				findNextMatch(true); // Search backward
 				return;
-			}
-
+			} 
+			
 			// Single key commands - these should clear the buffer immediately
 			if (event.key === 'p' || event.key === 'u' ||
 				event.key === '0' || event.key === 'h' || 
@@ -1910,18 +2110,17 @@
 		}
 	}
 
-	// Add these formatting functions after the performRedo function
-	function applyBoldFormatting() {
-		if (document.queryCommandSupported('bold')) {
-			document.execCommand('bold', false);
-			showCommandError('Bold formatting applied');
-		}
-	}
-
 	function applyItalicFormatting() {
 		if (document.queryCommandSupported('italic')) {
 			document.execCommand('italic', false);
 			showCommandError('Italic formatting applied');
+		}
+	}
+
+	function applyBoldFormatting() {
+		if (document.queryCommandSupported('bold')) {
+			document.execCommand('bold', false);
+			showCommandError('Bold formatting applied');
 		}
 	}
 
@@ -2951,7 +3150,7 @@
 			if (currentSearchIndex >= searchResults.length) {
 				currentSearchIndex = 0; // Wrap to beginning
 				showCommandError(`Wrapped to top, match ${currentSearchIndex + 1} of ${searchResults.length}`);
-			} else {
+		} else {
 				showCommandError(`Match ${currentSearchIndex + 1} of ${searchResults.length}`);
 			}
 		}
@@ -3103,6 +3302,22 @@
 			clearTimeout(normalModeBufferTimeout);
 			normalModeBufferTimeout = null;
 		}
+	}
+
+	// Add helper function to get all text nodes
+	function getAllTextNodes(node: Node): Text[] {
+		const textNodes: Text[] = [];
+		const walker = document.createTreeWalker(
+			node,
+			NodeFilter.SHOW_TEXT,
+			null
+		);
+
+		let currentNode;
+		while (currentNode = walker.nextNode()) {
+			textNodes.push(currentNode as Text);
+		}
+		return textNodes;
 	}
 </script>
 
