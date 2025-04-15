@@ -937,6 +937,20 @@
 			return;
 		}
 
+		// Handle Ctrl+I for italic formatting in any mode
+		if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
+			event.preventDefault();
+			// Only apply italic if there's a selection
+			const selection = window.getSelection();
+			if (selection && !selection.isCollapsed) {
+				applyItalicFormatting();
+			} else if (editorMode === 'INSERT') {
+				// In insert mode, allow toggling italic mode even without selection
+				applyItalicFormatting();
+			}
+			return;
+		}
+
 		// Handle Ctrl+1-9 for document switching in any mode
 		if ((event.ctrlKey || event.metaKey) && /^[1-9]$/.test(event.key)) {
 				event.preventDefault();
@@ -2114,6 +2128,8 @@
 		if (document.queryCommandSupported('italic')) {
 			document.execCommand('italic', false);
 			showCommandError('Italic formatting applied');
+		} else {
+			showCommandError('Italic formatting not supported');
 		}
 	}
 
@@ -3552,6 +3568,7 @@
 				<h6>Styling</h6>
 				<ul>
 					<li><span class="key">Ctrl+b</span> Toggle Bold</li>
+					<li><span class="key">Ctrl+i</span> Toggle Italic</li>
 				</ul>
 			</div>
 			
