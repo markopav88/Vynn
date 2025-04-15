@@ -3547,6 +3547,13 @@
 					<li><span class="key">p</span> Paste from yank</li>
 				</ul>
 			</div>
+
+			<div class="commands-section">
+				<h6>Styling</h6>
+				<ul>
+					<li><span class="key">Ctrl+b</span> Toggle Bold</li>
+				</ul>
+			</div>
 			
 			<div class="commands-section">
 				<h6>Search & Replace</h6>
