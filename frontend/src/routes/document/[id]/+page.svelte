@@ -951,6 +951,20 @@
 			return;
 		}
 
+		// Handle Ctrl+U for underline formatting in any mode
+		if ((event.ctrlKey || event.metaKey) && event.key === 'u') {
+			event.preventDefault();
+			// Only apply underline if there's a selection
+			const selection = window.getSelection();
+			if (selection && !selection.isCollapsed) {
+				applyUnderlineFormatting();
+			} else if (editorMode === 'INSERT') {
+				// In insert mode, allow toggling underline mode even without selection
+				applyUnderlineFormatting();
+			}
+			return;
+		}
+
 		// Handle Ctrl+1-9 for document switching in any mode
 		if ((event.ctrlKey || event.metaKey) && /^[1-9]$/.test(event.key)) {
 				event.preventDefault();
@@ -2137,6 +2151,15 @@
 		if (document.queryCommandSupported('bold')) {
 			document.execCommand('bold', false);
 			showCommandError('Bold formatting applied');
+		}
+	}
+
+	function applyUnderlineFormatting() {
+		if (document.queryCommandSupported('underline')) {
+			document.execCommand('underline', false);
+			showCommandError('Underline formatting applied');
+		} else {
+			showCommandError('Underline formatting not supported');
 		}
 	}
 
@@ -3569,6 +3592,7 @@
 				<ul>
 					<li><span class="key">Ctrl+b</span> Toggle Bold</li>
 					<li><span class="key">Ctrl+i</span> Toggle Italic</li>
+					<li><span class="key">Ctrl+u</span> Toggle Underline</li>
 				</ul>
 			</div>
 			
