@@ -9,7 +9,7 @@ Neovim for Writers is an innovative text editor designed for writers who value e
 ## Key Features
 
 - **Vim-like Interface**
-  - Modal editing (Normal, Insert, Visual modes)
+  - Modal editing (Normal, Insert, Command modes)
   - Command palette with custom commands
   - Fully customizable keybindings
   - Distraction-free, keyboard-centric interface
