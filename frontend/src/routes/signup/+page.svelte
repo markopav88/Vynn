@@ -6,7 +6,7 @@
 	import logo from '$lib/assets/logo.png';
 	import Navbar from '$lib/components/Navbar.svelte';
 
-	import '$lib/assets/style/signup.css'
+	import '$lib/assets/style/signup.css';
 
 	let firstName = '';
 	let lastName = '';

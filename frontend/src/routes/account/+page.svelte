@@ -663,4 +663,4 @@
     .bg-green {
         background-color: var(--color-primary) !important;
     }
-</style> 
+</style>

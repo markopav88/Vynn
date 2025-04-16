@@ -540,12 +540,12 @@ export async function get_project_from_document(
 export async function toggle_star_document(document: Document): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${document.id}/star`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error toggling star status:', error);
@@ -559,12 +559,12 @@ export async function toggle_star_document(document: Document): Promise<boolean>
 export async function trash_document(document: Document): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${document.id}/trash`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error trashing document:', error);
@@ -578,12 +578,12 @@ export async function trash_document(document: Document): Promise<boolean> {
 export async function restore_document(document: Document): Promise<boolean> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/${document.id}/restore`;
-		
+
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
 			credentials: 'include'
 		});
-		
+
 		return response.ok;
 	} catch (error) {
 		console.error('Error restoring document:', error);
@@ -597,16 +597,16 @@ export async function restore_document(document: Document): Promise<boolean> {
 export async function get_starred_documents(): Promise<Document[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/starred`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch starred documents:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error fetching starred documents:', error);
@@ -620,16 +620,16 @@ export async function get_starred_documents(): Promise<Document[] | null> {
 export async function get_trashed_documents(): Promise<Document[] | null> {
 	try {
 		const apiUrl = `http://localhost:3001/api/document/trash`;
-		
+
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
 		});
-		
+
 		if (!response.ok) {
 			console.error('Failed to fetch trashed documents:', response.status);
 			return null;
 		}
-		
+
 		return await response.json();
 	} catch (error) {
 		console.error('Error fetching trashed documents:', error);
@@ -645,8 +645,8 @@ export async function get_shared_documents(): Promise<Document[] | null> {
 			method: 'GET',
 			credentials: 'include',
 			headers: {
-				'Content-Type': 'application/json',
-			},
+				'Content-Type': 'application/json'
+			}
 		});
 
 		if (!response.ok) {
