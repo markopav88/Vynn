@@ -1055,11 +1055,21 @@
 							}
 						}
 
-						// Restore the selection
-						range.extractContents();
-						span.remove();
-						selection.removeAllRanges();
-						selection.addRange(range);
+						// Restore the selection without removing the content
+						// First, save the content
+						const content = span.innerHTML;
+						// Replace span with its content
+						const fragment = document.createDocumentFragment();
+						while (span.firstChild) {
+							fragment.appendChild(span.firstChild);
+						}
+						span.parentNode?.replaceChild(fragment, span);
+						
+						// Reselect the text
+						if (selection && selection.rangeCount > 0) {
+							selection.removeAllRanges();
+							selection.addRange(range);
+						}
 					}
 				} catch (error) {
 					console.error('Error getting current color:', error);
@@ -1186,6 +1196,14 @@
 			if (normalModeBufferTimeout) {
 				clearTimeout(normalModeBufferTimeout);
 				normalModeBufferTimeout = null;
+			}
+
+			// Special handler for '0' key in NORMAL mode
+			if (event.key === '0') {
+				event.preventDefault();
+				clearNormalModeBuffer();
+				moveToStartOfLine(); // Call the function to move to start of line
+				return;
 			}
 
 			// Allow text selection with Shift + arrow keys in normal mode
@@ -1448,7 +1466,7 @@
 			if (
 				event.key === 'p' ||
 				event.key === 'u' ||
-				event.key === '0' ||
+				// 'event.key === '0' removed from here because we handle it specifically above
 				event.key === 'h' ||
 				event.key === 'j' ||
 				event.key === 'k' ||
@@ -1456,6 +1474,13 @@
 				event.key === 'N'
 			) {
 				clearNormalModeBuffer();
+			}
+
+			// Handle 'p' key in normal mode for paste
+			if (event.key === 'p') {
+				event.preventDefault();
+				pasteText();
+				return;
 			}
 
 			// Rest of your normal mode commands...
