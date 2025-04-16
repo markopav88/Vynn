@@ -24,6 +24,7 @@
 					const response = await fetch(imageUrl, { method: 'HEAD' });
 					if (response.ok) {
 						profileImage = imageUrl;
+						console.log('got image: ', imageUrl)
 					}
 				}
 			} catch (error) {
