@@ -18,6 +18,23 @@
     onMount(async () => {
         try {
             isLoggedIn = await check_auth();
+            
+            // Make sure the page is properly positioned
+            // This helps ensure the hero section is visible below the navbar
+            window.scrollTo(0, 0);
+            
+            // Ensure Bootstrap is initialized when navigating directly to this page
+            if (typeof window !== 'undefined') {
+                // Ensure the accordion is properly initialized after navigation
+                setTimeout(() => {
+                    // This timeout ensures Bootstrap has time to load
+                    if (window.bootstrap && window.bootstrap.Collapse) {
+                        document.querySelectorAll('.accordion-collapse').forEach(el => {
+                            new window.bootstrap.Collapse(el, { toggle: false });
+                        });
+                    }
+                }, 100);
+            }
         } catch (error) {
             console.error('Error checking authentication:', error);
         }
@@ -66,7 +83,7 @@
     
     <div class="container py-5">
         <div class="row justify-content-center mb-5">
-            <div class="col-lg-8 text-center">
+            <div class="col-lg-8 text-center mt-20">
                 <h1 class="fw-bold mb-4">Help & Support</h1>
                 <p class="fs-5 text-white-50 mb-5">
                     Need assistance with Vynn? Our support team is here to help.
@@ -301,5 +318,16 @@
         display: inline-block;
         font-size: 0.9em;
         padding: 2px 5px;
+    }
+
+    /* Fix for hero element positioning */
+    :global(.container.py-5) {
+        padding-top: 7rem !important; /* Ensure space for navbar */
+        transition: padding-top 0.2s ease;
+    }
+
+    /* Ensure proper page section spacing */
+    :global(.row.justify-content-center.mb-5) {
+        margin-top: 1rem;
     }
 </style> 
