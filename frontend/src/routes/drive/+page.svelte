@@ -1284,3 +1284,143 @@
 		}
 	}}
 />
+
+<!-- Add these styles -->
+<style>
+	/* Navbar fixed positioning */
+	:global(nav.navbar) {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 1100;
+	}
+
+	/* Remove focus outline */
+	.form-control:focus {
+		box-shadow: none;
+		border-color: #2f2f2f;
+	}
+
+	/* Add padding to account for fixed navbar */
+	.container-fluid {
+		padding-top: 70px; /* Height of navbar */
+	}
+
+	/* Sidebar fixed positioning */
+	.sidebar-column {
+		position: relative;
+		height: 100vh;
+		overflow: hidden;
+	}
+
+	.sidebar {
+		position: fixed;
+		width: inherit;
+		max-width: 16.666%; /* Same as col-md-2 */
+		height: calc(100vh - 70px); /* Subtract navbar height */
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
+		z-index: 1000;
+		top: 70px; /* Position below navbar */
+	}
+
+	.sidebar-bottom {
+		margin-top: auto;
+	}
+
+	/* Content column styling */
+	.content-column {
+		height: calc(100vh - 70px); /* Subtract navbar height */
+		overflow-y: auto;
+		margin-top: 70px; /* Add top margin to account for navbar */
+	}
+
+	/* Active nav styling */
+	.nav-link.active {
+		font-weight: 500;
+	}
+
+	/* Progress bar color */
+	.bg-green {
+		background-color: #198754;
+	}
+
+	/* Custom button styles */
+	.btn-green {
+		background-color: #198754;
+		border-color: #198754;
+		color: white;
+	}
+
+	.btn-green:hover {
+		background-color: #157347;
+		border-color: #146c43;
+		color: white;
+	}
+
+	.card {
+		position: relative;
+		overflow: visible;
+		transition: all 0.2s ease;
+	}
+
+	.card:hover {
+		transform: translateY(-2px);
+	}
+
+	.card-actions {
+		position: absolute;
+		top: 0.5rem;
+		right: 0.5rem;
+		display: flex;
+		gap: 0.5rem;
+		opacity: 0;
+		transition: opacity 0.2s ease;
+		z-index: 10;
+		background: rgba(0, 0, 0, 0.7);
+		padding: 0.25rem;
+		border-radius: 4px;
+	}
+
+	.card:hover .card-actions {
+		opacity: 1;
+	}
+
+	.action-icon {
+		background: none;
+		border: none;
+		padding: 0.25rem;
+		cursor: pointer;
+		color: var(--color-text-secondary);
+		transition: color 0.2s ease;
+		font-size: 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 4px;
+	}
+
+	.action-icon:hover {
+		color: var(--color-primary);
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.share-icon:hover {
+		color: var(--color-primary);
+	}
+
+	/* Ensure the card body doesn't overlap with the actions */
+	.card-body {
+		position: relative;
+		z-index: 1;
+	}
+
+	.delete-icon:hover {
+		color: var(--bs-danger) !important;
+		background: rgba(220, 53, 69, 0.1);
+	}
+</style>
