@@ -19,6 +19,7 @@ pub enum Error {
     UserIdUpdateError,
     ProfilePicError,
     ProfilePicSizeError,
+    PasswordValidationError,
 
     // Document Errors
     DocumentNotFoundError,
@@ -115,6 +116,9 @@ impl IntoResponse for Error {
             }
             Self::ProfilePicSizeError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "UNHANDLED_CLIENT_ERROR").into_response() 
+            }
+            Self::PasswordValidationError => {
+                (StatusCode::BAD_REQUEST, "PASSWORD_VALIDATION_ERROR").into_response() 
             }
         }
     }

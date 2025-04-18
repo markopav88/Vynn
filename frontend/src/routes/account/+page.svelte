@@ -119,7 +119,7 @@
                 errorMessage = 'Passwords do not match';
                 return;
             }
-            
+
             // Update user information
             if (name && email) {
                 const updated = await update_user(name, email, password);
