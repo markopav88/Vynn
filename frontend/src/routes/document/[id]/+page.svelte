@@ -3808,9 +3808,13 @@
 
 	// Simple onMount function that ensures all content is visible immediately
 	onMount(() => {
-		// Set flags immediately for visibility
-		navbarReady = true;
+		// Set document ready immediately for content
 		documentReady = true;
+		
+		// Delay navbar appearance to ensure page loads first
+		setTimeout(() => {
+			navbarReady = true;
+		}, 300); // 300ms delay ensures page is properly rendered
 	});
 </script>
 
@@ -3865,7 +3869,7 @@
 	
 	/* Use animations as enhancements only - with subtle movement */
 	:global(.fade-in-first) {
-		animation: fadeInSlightly 0.4s ease-out forwards 0s !important;
+		animation: fadeInNavbar 0.4s ease-out forwards 0s !important;
 	}
 
 	:global(.fade-in-second) {
@@ -3879,8 +3883,20 @@
 	:global(.fade-in-fourth) {
 		animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
 	}
+	
+	/* Special animation for navbar - starts completely invisible */
+	@keyframes fadeInNavbar {
+		from {
+			opacity: 0;
+			transform: translateY(5px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
 
-	/* Gentle fade with subtle movement */
+	/* Regular animation for other elements */
 	@keyframes fadeInSlightly {
 		from {
 			opacity: 0.9;
@@ -3896,8 +3912,8 @@
 <div class="editor-page">
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
 
-	<!-- Minimal Navbar with fade-in animation -->
-	<div class="navbar-container" class:fade-in-first={navbarReady}>
+	<!-- Minimal Navbar with fade-in animation - adding inline style to force initial invisibility -->
+	<div class="navbar-container" class:fade-in-first={navbarReady} style="opacity: 0;">
 		<nav class="navbar">
 			<a href="/drive" class="logo-link" aria-label="Go to Drive">
 				<div class="logo-container">
