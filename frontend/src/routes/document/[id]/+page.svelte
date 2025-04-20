@@ -3805,6 +3805,13 @@
 			}
 		});
 	}
+
+	// Simple onMount function that ensures all content is visible immediately
+	onMount(() => {
+		// Set flags immediately for visibility
+		navbarReady = true;
+		documentReady = true;
+	});
 </script>
 
 <svelte:head>
@@ -3814,6 +3821,77 @@
 {#each toasts as toast, i}
 	<Toast message={toast.message} type={toast.type} onClose={() => removeToast(i)} />
 {/each}
+
+<!-- Add this CSS to ensure the editor content starts at the right position -->
+<style>
+	:global(.editor-page) {
+		padding-top: 0 !important; /* Remove top padding since navbar is not fixed */
+		overflow-x: hidden;
+	}
+	
+	:global(.document-switcher) {
+		position: relative !important;
+		width: 90% !important;
+		max-width: 1400px !important;
+		margin: 0 auto 15px auto !important;
+		margin-top: 30px !important;
+		margin-bottom: -5px !important;
+		z-index: 100 !important;
+		background-color: transparent !important;
+		border: none !important;
+		display: flex !important; /* Always use flex layout */
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+
+	:global(.navbar), :global(.navbar-container) {
+		position: relative !important;
+		z-index: 1000 !important;
+		width: 100% !important;
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	:global(.editor-container) {
+		margin-top: 10px !important;
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	:global(.status-bar) {
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	/* Use animations as enhancements only - with subtle movement */
+	:global(.fade-in-first) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0s !important;
+	}
+
+	:global(.fade-in-second) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
+	}
+
+	:global(.fade-in-third) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
+	}
+
+	:global(.fade-in-fourth) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
+	}
+
+	/* Gentle fade with subtle movement */
+	@keyframes fadeInSlightly {
+		from {
+			opacity: 0.9;
+			transform: translateY(5px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+</style>
 
 <div class="editor-page">
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
@@ -3862,9 +3940,9 @@
 		</nav>
 	</div>
 
-	<!-- Project Document Switcher -->
+	<!-- Project Document Switcher with fade-in animation -->
 	{#if projectDocumentsLoaded}
-		<div class="document-switcher fade-in-second">
+		<div class="document-switcher" class:fade-in-second={navbarReady}>
 			{#if projectDocuments.length > 0}
 				{#each projectDocuments as doc, index}
 					<button
@@ -3886,7 +3964,7 @@
 	<!-- Editor Container with animation -->
 	<div class="editor-container" class:fade-in-third={documentReady}>
 		{#if loading}
-			<div class="loading">Loading document...</div>
+			<div class="loading"></div>
 		{:else if error}
 			<div class="error">Error loading document</div>
 		{:else}
@@ -3933,7 +4011,7 @@
 		{/if}
 	</div>
 
-	<!-- Fixed Status Bar - moved outside the editor wrapper -->
+	<!-- Fixed Status Bar with animation -->
 	<div class="status-bar" class:fade-in-fourth={documentReady}>
 		<div class="mode-indicator">
 			<span class="mode {editorMode ? editorMode.toLowerCase() : 'normal'}">{editorMode || 'NORMAL'}</span>

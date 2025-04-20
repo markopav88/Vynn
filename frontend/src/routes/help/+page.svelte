@@ -45,8 +45,9 @@
         }
     });
     
-    async function handleSubmit() {
+    async function handleSubmit(event: SubmitEvent) {
         try {
+            event.preventDefault();
             isSubmitting = true;
             errorMessage = '';
             successMessage = '';
@@ -54,21 +55,45 @@
             // Validate form
             if (!name.trim() || !email.trim() || !message.trim()) {
                 errorMessage = 'Please fill out all required fields';
+                isSubmitting = false;
                 return;
             }
             
-            // For now, we'll simulate sending the support request
-            // In a real implementation, you would call an API endpoint
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Create FormData object
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('email', email);
+            formData.append('subject', subject);
+            formData.append('message', message);
             
-            // Clear form data
-            name = '';
-            email = '';
-            subject = '';
-            message = '';
+            // Send to Formspree
+            const response = await fetch("https://formspree.io/f/mldrywqe", {
+                method: "POST",
+                body: formData,
+                headers: {
+                    Accept: "application/json",
+                }
+            });
             
-            // Show success message
-            successMessage = 'Your support request has been submitted. We will contact you soon.';
+            if (response.ok) {
+                // Clear form data
+                name = '';
+                email = '';
+                subject = '';
+                message = '';
+                
+                // Show success message
+                successMessage = 'Your support request has been submitted. We will contact you soon.';
+                
+                // Reset form after a delay if needed
+                setTimeout(() => {
+                    successMessage = '';
+                }, 5000);
+            } else {
+                // Handle error response
+                const errorData = await response.json();
+                errorMessage = errorData.error || 'Failed to submit the form. Please try again.';
+            }
             
         } catch (error) {
             console.error('Error submitting support request:', error);

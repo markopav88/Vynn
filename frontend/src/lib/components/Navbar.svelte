@@ -125,6 +125,20 @@
 <style>
 	nav {
 		border-bottom: none;
+		position: relative !important;
+		isolation: isolate; /* Create a stacking context to prevent backdrop-filter issues */
+		z-index: 1000 !important;
+		height: 60px !important;
+		min-height: 60px !important;
+		max-height: 60px !important;
+		padding-top: 0 !important;
+		padding-bottom: 0 !important;
+		display: flex;
+		align-items: center;
+		box-sizing: border-box;
+		background-color: rgba(10, 23, 33, 0.95);
+		width: 100% !important;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 	}
 
 	.navbar-brand span {
