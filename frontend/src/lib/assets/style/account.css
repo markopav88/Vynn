@@ -1,0 +1,55 @@
+:global(:root) {
+    --color-primary: #10b981;
+    --color-primary-dark: #059669;
+    --color-primary-light: #34d399;
+    --color-background: #121212;
+    --color-background-rgb: 18, 18, 18;
+}
+
+:global(.btn-green) {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+:global(.btn-green:hover) {
+    background-color: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+    color: white;
+}
+
+:global(.text-green) {
+    color: var(--color-primary) !important;
+}
+
+.list-group-item:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Nav tabs styling */
+.nav-tabs {
+    border-bottom-color: #343a40;
+}
+
+.nav-tabs .nav-link {
+    border: 1px solid transparent;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+    color: #6c757d;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: #343a40 #343a40 #343a40;
+    color: var(--color-primary);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--color-primary);
+    background-color: #212529;
+    border-color: #343a40 #343a40 #212529;
+}
+
+/* Badge styling */
+.bg-green {
+    background-color: var(--color-primary) !important;
+}

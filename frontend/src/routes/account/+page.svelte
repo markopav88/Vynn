@@ -4,6 +4,7 @@
     import { get_all_commands, get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/document';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
+    import '$lib/assets/style/account.css'
     
     let isLoggedIn = true;
     let isLoading = true;
@@ -118,7 +119,7 @@
                 errorMessage = 'Passwords do not match';
                 return;
             }
-            
+
             // Update user information
             if (name && email) {
                 const updated = await update_user(name, email, password);
@@ -542,12 +543,14 @@
                                                             <div class="btn-group btn-group-sm">
                                                                 <button 
                                                                     class="btn btn-success" 
+                                                                    aria-label="Close"
                                                                     on:click={() => saveKeybinding(command.command_id)}
                                                                 >
                                                                     <i class="bi bi-check"></i>
                                                                 </button>
                                                                 <button 
                                                                     class="btn btn-danger" 
+                                                                    aria-label="Close"
                                                                     on:click={cancelEditKeybinding}
                                                                 >
                                                                     <i class="bi bi-x"></i>
@@ -558,6 +561,7 @@
                                                                 <button 
                                                                     class="btn btn-outline-light" 
                                                                     title="Edit keybinding"
+                                                                    aria-label="Close"
                                                                     on:click={() => startEditKeybinding(command.command_id)}
                                                                 >
                                                                     <i class="bi bi-pencil"></i>
@@ -566,6 +570,7 @@
                                                                     <button 
                                                                         class="btn btn-outline-danger" 
                                                                         title="Reset to default"
+                                                                        aria-label="Close"
                                                                         on:click={() => resetKeybinding(command.command_id)}
                                                                     >
                                                                         <i class="bi bi-arrow-counterclockwise"></i>
@@ -606,61 +611,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    :global(:root) {
-        --color-primary: #10b981;
-        --color-primary-dark: #059669;
-        --color-primary-light: #34d399;
-        --color-background: #121212;
-        --color-background-rgb: 18, 18, 18;
-    }
-    
-    :global(.btn-green) {
-        background-color: var(--color-primary);
-        border-color: var(--color-primary);
-        color: white;
-    }
-    
-    :global(.btn-green:hover) {
-        background-color: var(--color-primary-dark);
-        border-color: var(--color-primary-dark);
-        color: white;
-    }
-    
-    :global(.text-green) {
-        color: var(--color-primary) !important;
-    }
-    
-    .list-group-item:hover {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-    }
-    
-    /* Nav tabs styling */
-    .nav-tabs {
-        border-bottom-color: #343a40;
-    }
-    
-    .nav-tabs .nav-link {
-        border: 1px solid transparent;
-        border-top-left-radius: 0.25rem;
-        border-top-right-radius: 0.25rem;
-        color: #6c757d;
-    }
-    
-    .nav-tabs .nav-link:hover {
-        border-color: #343a40 #343a40 #343a40;
-        color: var(--color-primary);
-    }
-    
-    .nav-tabs .nav-link.active {
-        color: var(--color-primary);
-        background-color: #212529;
-        border-color: #343a40 #343a40 #212529;
-    }
-    
-    /* Badge styling */
-    .bg-green {
-        background-color: var(--color-primary) !important;
-    }
-</style>
