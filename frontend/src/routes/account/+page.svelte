@@ -43,6 +43,19 @@
     let customKeybindings: Command[] = [];
     let nextCustomCommandId = -1; // Negative IDs for custom commands to avoid conflicts with predefined commands
     
+    // Available actions for custom keybindings
+    const availableActions = [
+        { id: 'toggleDarkMode', name: 'Toggle Dark Mode', description: 'Switch between light and dark themes' },
+        { id: 'saveAllDocuments', name: 'Save All Documents', description: 'Save all open documents' },
+        { id: 'focusSearch', name: 'Focus Search', description: 'Move cursor to search box' },
+        { id: 'toggleSplitView', name: 'Toggle Split View', description: 'Switch between single and split view layouts' },
+        { id: 'openRecentDocuments', name: 'Show Recent Documents', description: 'Display a list of recently accessed documents' },
+        { id: 'formatDocument', name: 'Format Document', description: 'Format the current document' },
+        { id: 'findReplace', name: 'Find & Replace', description: 'Open the find and replace dialog' },
+        { id: 'toggleSidebar', name: 'Toggle Sidebar', description: 'Show or hide the sidebar' },
+        { id: 'newDocument', name: 'New Document', description: 'Create a new document' },
+        { id: 'toggleFullscreen', name: 'Toggle Fullscreen', description: 'Enter or exit fullscreen mode' }
+    ];
     
     onMount(async () => {
         try {
