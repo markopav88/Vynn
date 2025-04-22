@@ -34,6 +34,15 @@
     let keybindingsErrorMessage = '';
     let editingKeybinding: number | null = null;
     let newKeybindingValue = '';
+    // Custom keybinding creation
+    let showCustomKeybindingForm = false;
+    let customCommandName = '';
+    let customCommandDescription = '';
+    let customKeybindingValue = '';
+    let customCommandAction = 'toggleDarkMode'; // Default action
+    let customKeybindings: Command[] = [];
+    let nextCustomCommandId = -1; // Negative IDs for custom commands to avoid conflicts with predefined commands
+    
     
     onMount(async () => {
         try {
