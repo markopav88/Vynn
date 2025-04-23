@@ -564,15 +564,18 @@
 			(event.currentTarget as HTMLElement).classList.remove('drag-over');
 		}
 
-		if (draggedDocument) {
-			// Check if document is already in the project
-			const currentDocs = projectDocumentsMap.get(project.id) || [];
-			if (currentDocs.includes(draggedDocument.id)) {
-				// Show warning toast
-				showToast(`Document "${draggedDocument.name}" is already in project "${project.name}"`, 'warning');
-				draggedDocument = null;
-				return;
-			}
+		if (!draggedDocument) return;
+		
+		const docToMove = draggedDocument; // Create a local reference that TypeScript knows is non-null
+		
+		// Check if document is already in the project
+		const currentDocs = projectDocumentsMap.get(project.id) || [];
+		if (currentDocs.includes(docToMove.id)) {
+			// Show warning toast
+			showToast(`Document "${docToMove.name}" is already in project "${project.name}"`, 'warning');
+			draggedDocument = null;
+			return;
+		}
 
 			// Add document to project
 			const success = await add_document_to_project(parseInt(project.id), draggedDocument.id);
