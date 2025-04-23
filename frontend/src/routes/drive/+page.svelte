@@ -122,6 +122,9 @@
 			sharedDocuments = sharedDocsResult || [];
 			sharedProjects = sharedProjsResult || [];
 
+			// Load project-document relationships for all projects
+			await loadAllProjectDocuments(projects);
+
 			// Initialize displayed documents
 			updateDisplayedDocuments();
 
@@ -134,13 +137,41 @@
 		}
 	});
 
+	// Function to load document associations for all projects
+	async function loadAllProjectDocuments(projectsList: Project[]) {
+		try {
+			// Create an array of promises to load documents for all projects
+			const promises = projectsList.map(async (project) => {
+				// Skip if already loaded
+				if (projectDocumentsMap.has(project.id)) return;
+				
+				const projectDocs = await get_project_documents(parseInt(project.id));
+				if (projectDocs) {
+					projectDocumentsMap.set(
+						project.id,
+						projectDocs.map((doc) => doc.id)
+					);
+				}
+			});
+
+			// Wait for all projects to load their documents
+			await Promise.all(promises);
+			
+			console.log('All project documents loaded:', projectDocumentsMap);
+		} catch (error) {
+			console.error('Error loading project documents:', error);
+		}
+	}
+
 	// Add this function to update displayed documents based on current view and filters
 	function updateDisplayedDocuments() {
 		if (currentProject && currentProject.id) {
 			// Show only documents in the current project
+			const projectDocs = projectDocumentsMap.get(currentProject.id) || [];
 			displayedDocuments = documents.filter(
-				(doc) => projectDocumentsMap.get(currentProject?.id ?? '')?.includes(doc.id) ?? false
+				(doc) => !doc.is_trashed && projectDocs.includes(doc.id)
 			);
+			console.log(`Showing ${displayedDocuments.length} documents for project ${currentProject.name}`);
 		} else if (activeCategory === 'starred') {
 			// Show only starred documents that are not trashed
 			displayedDocuments = starredDocuments.filter((doc) => !doc.is_trashed);
@@ -168,7 +199,7 @@
 				if (doc.is_trashed) return false;
 
 				// Check if document is in any project
-				for (const [_, projectDocs] of projectDocumentsMap) {
+				for (const [_, projectDocs] of projectDocumentsMap.entries()) {
 					if (projectDocs.includes(doc.id)) return false;
 				}
 
@@ -329,19 +360,26 @@
 		currentProject = project;
 		currentView = 'project';
 
-		// Load project documents if not already loaded
-		if (!projectDocumentsMap.has(project.id)) {
-			try {
-				const projectDocs = await get_project_documents(parseInt(project.id));
-				if (projectDocs) {
-					projectDocumentsMap.set(
-						project.id,
-						projectDocs.map((doc) => doc.id)
-					);
-				}
-			} catch (error) {
-				console.error('Error loading project documents:', error);
+		try {
+			// Always reload project documents to ensure we have latest data
+			const projectDocs = await get_project_documents(parseInt(project.id));
+			
+			if (projectDocs) {
+				// Update the project documents map with the most current data
+				projectDocumentsMap.set(
+					project.id,
+					projectDocs.map((doc) => doc.id)
+				);
+				console.log(`Loaded ${projectDocs.length} documents for project ${project.name}`);
+			} else {
+				console.warn(`No documents found for project ${project.name}`);
+				// Initialize with empty array if no documents found
+				projectDocumentsMap.set(project.id, []);
 			}
+		} catch (error) {
+			console.error(`Error loading documents for project ${project.name}:`, error);
+			// Initialize with empty array on error
+			projectDocumentsMap.set(project.id, []);
 		}
 
 		// Update displayed documents
@@ -564,37 +602,47 @@
 			(event.currentTarget as HTMLElement).classList.remove('drag-over');
 		}
 
-		if (draggedDocument) {
-			// Check if document is already in the project
-			const currentDocs = projectDocumentsMap.get(project.id) || [];
-			if (currentDocs.includes(draggedDocument.id)) {
-				// Show warning toast
-				showToast(`Document "${draggedDocument.name}" is already in project "${project.name}"`, 'warning');
-				draggedDocument = null;
-				return;
-			}
-
-			// Add document to project
-			const success = await add_document_to_project(parseInt(project.id), draggedDocument.id);
-
-			if (success) {
-				// Show success toast
-				showToast(`Document "${draggedDocument.name}" added to project "${project.name}"`, 'success');
-
-				// Update the project documents map
-				projectDocumentsMap.set(project.id, [...currentDocs, draggedDocument.id]);
-
-				// If we're currently viewing this project, update the displayed documents
-				if (currentProject && currentProject.id === project.id) {
-					updateDisplayedDocuments();
-				}
-			} else {
-				// Show error toast
-				showToast(`Failed to add document to project`, 'error');
-			}
-
+		if (!draggedDocument) return;
+		
+		const docToMove = draggedDocument; // Create a local reference that TypeScript knows is non-null
+		
+		// Check if document is already in the project
+		const currentDocs = projectDocumentsMap.get(project.id) || [];
+		if (currentDocs.includes(docToMove.id)) {
+			// Show warning toast
+			showToast(`Document "${docToMove.name}" is already in project "${project.name}"`, 'warning');
 			draggedDocument = null;
+			return;
 		}
+
+		// Add document to project
+		const success = await add_document_to_project(parseInt(project.id), docToMove.id);
+
+		if (success) {
+			// Show success toast
+			showToast(`Document "${docToMove.name}" moved to project "${project.name}"`, 'success');
+
+			// Update the project documents map to ensure persistence after refresh
+			projectDocumentsMap.set(project.id, [...currentDocs, docToMove.id]);
+
+			// If we're currently viewing in the main view (not in a project), 
+			// we should remove this document from displayed documents
+			if (!currentProject && activeCategory === 'all') {
+				displayedDocuments = displayedDocuments.filter(d => d.id !== docToMove.id);
+			}
+			// If we're currently viewing this project, update the displayed documents
+			else if (currentProject && currentProject.id === project.id) {
+				// Add the document to displayed documents if it's not already there
+				if (!displayedDocuments.find(d => d.id === docToMove.id)) {
+					displayedDocuments = [...displayedDocuments, docToMove];
+				}
+			}
+		} else {
+			// Show error toast
+			showToast(`Failed to move document to project`, 'error');
+		}
+
+		draggedDocument = null;
 	}
 
 	// Add function to return to main drive view

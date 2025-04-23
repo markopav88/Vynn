@@ -27,10 +27,27 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2
 };
+use std::sync::OnceLock;
 
 use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
+
+// Define a static variable to hold the default profile image data
+static DEFAULT_PROFILE_IMAGE: OnceLock<(Vec<u8>, String)> = OnceLock::new();
+
+// Function to get the default profile image data
+fn get_default_profile_image() -> (Vec<u8>, String) {
+    DEFAULT_PROFILE_IMAGE.get_or_init(|| {
+        // This is a small default profile image (a simple placeholder SVG)
+        // Hardcoded simple SVG data for a user avatar
+        let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" width=\"100\" height=\"100\"><circle cx=\"50\" cy=\"35\" r=\"25\" fill=\"#10B981\"/><circle cx=\"50\" cy=\"100\" r=\"40\" fill=\"#10B981\"/></svg>";
+        
+        let image_data = svg.as_bytes().to_vec();
+        let content_type = "image/svg+xml".to_string();
+        (image_data, content_type)
+    }).clone()
+}
 
 /// GET handler for retrieving a user by ID in cookies.
 /// Accessible via: GET /api/users/:id
@@ -138,7 +155,25 @@ pub async fn api_create_user(
 
     // Check if insertion was successful
     match result {
-        Ok(user) => Ok(Json(user)),
+        Ok(user) => {
+            // Add default profile image for the new user
+            let (default_image_data, default_content_type) = get_default_profile_image();
+            
+            // Insert the default profile image
+            let _image_result = sqlx::query!(
+                "INSERT INTO user_profile_images (user_id, image_data, content_type) 
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (user_id) DO NOTHING",
+                user.id,
+                default_image_data,
+                default_content_type
+            )
+            .execute(&pool)
+            .await;
+            
+            // Return the user info even if profile image insertion fails
+            Ok(Json(user))
+        },
         Err(e) => {
             println!("Error creating user: {:?}", e);
             Err(Error::UserCreationError)
@@ -478,7 +513,7 @@ pub async fn api_upload_profile_image(
 /// Accessible via: GET /api/users/:id/profile-image
 /// 
 /// This endpoint returns the binary image data with the appropriate content-type header.
-/// If the user has no profile image, it returns a 404 error.
+/// If the user has no profile image, it returns a default image.
 /// 
 /// The image can be used directly in HTML img tags:
 /// <img src="/api/users/1/profile-image" alt="User profile" />
@@ -513,7 +548,12 @@ pub async fn api_get_profile_image(
             // Ensure image_data is not empty
             if row.image_data.is_empty() {
                 println!("->> {:<12} - empty image data for user_id: {}", "ERROR", user_id);
-                return Err(Error::ProfilePicError);
+                // Return default image instead of error
+                let (default_image, default_content_type) = get_default_profile_image();
+                return Ok((
+                    [(axum::http::header::CONTENT_TYPE, default_content_type)],
+                    default_image
+                ));
             }
             
             println!("->> {:<12} - returning image with content type: {}", "SUCCESS", row.content_type);
@@ -525,8 +565,13 @@ pub async fn api_get_profile_image(
             ))
         },
         None => {
-            println!("->> {:<12} - no image found for user_id: {}", "ERROR", user_id);
-            Err(Error::UserNotFoundError)
+            println!("->> {:<12} - no image found for user_id: {}, returning default", "INFO", user_id);
+            // Return default image when no profile image exists
+            let (default_image, default_content_type) = get_default_profile_image();
+            Ok((
+                [(axum::http::header::CONTENT_TYPE, default_content_type)],
+                default_image
+            ))
         }
     }
 }
