@@ -329,19 +329,26 @@
 		currentProject = project;
 		currentView = 'project';
 
-		// Load project documents if not already loaded
-		if (!projectDocumentsMap.has(project.id)) {
-			try {
-				const projectDocs = await get_project_documents(parseInt(project.id));
-				if (projectDocs) {
-					projectDocumentsMap.set(
-						project.id,
-						projectDocs.map((doc) => doc.id)
-					);
-				}
-			} catch (error) {
-				console.error('Error loading project documents:', error);
+		try {
+			// Always reload project documents to ensure we have latest data
+			const projectDocs = await get_project_documents(parseInt(project.id));
+			
+			if (projectDocs) {
+				// Update the project documents map with the most current data
+				projectDocumentsMap.set(
+					project.id,
+					projectDocs.map((doc) => doc.id)
+				);
+				console.log(`Loaded ${projectDocs.length} documents for project ${project.name}`);
+			} else {
+				console.warn(`No documents found for project ${project.name}`);
+				// Initialize with empty array if no documents found
+				projectDocumentsMap.set(project.id, []);
 			}
+		} catch (error) {
+			console.error(`Error loading documents for project ${project.name}:`, error);
+			// Initialize with empty array on error
+			projectDocumentsMap.set(project.id, []);
 		}
 
 		// Update displayed documents
