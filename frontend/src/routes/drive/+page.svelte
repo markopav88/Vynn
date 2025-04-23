@@ -577,8 +577,8 @@
 			return;
 		}
 
-			// Add document to project
-			const success = await add_document_to_project(parseInt(project.id), draggedDocument.id);
+		// Add document to project
+		const success = await add_document_to_project(parseInt(project.id), docToMove.id);
 
 			if (success) {
 				// Show success toast
