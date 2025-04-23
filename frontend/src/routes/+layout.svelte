@@ -10,14 +10,17 @@
 	// things we want to be on every page
 	import '../app.css';
 	import { onMount } from 'svelte';
-
+	
 	// Define the props for the layout component
 	let { children } = $props();
 
 	onMount(() => {
-		import('bootstrap' as any);
+		// Only import Bootstrap on the client side
+		if (typeof window !== 'undefined') {
+			import('bootstrap');
+		}
 	});
 </script>
 
-<!-- Renders the current page -->
+<!-- Render the page content directly -->
 {@render children()}

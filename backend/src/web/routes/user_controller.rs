@@ -103,6 +103,37 @@ pub async fn api_create_user(
     if existing_user.is_some() {
         return Err(Error::EmailAlreadyExistsError);
     }
+    
+    // Validate password complexity
+    if payload.password.is_empty() {
+        println!("->> {:<12} - empty password not allowed", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // Password complexity requirements:
+    // 1. Minimum length of 8 characters
+    if payload.password.len() < 8 {
+        println!("->> {:<12} - password too short, minimum 8 characters required", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // 2. Contains at least one uppercase letter
+    if !payload.password.chars().any(|c| c.is_uppercase()) {
+        println!("->> {:<12} - password must contain at least one uppercase letter", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // 3. Contains at least one number
+    if !payload.password.chars().any(|c| c.is_numeric()) {
+        println!("->> {:<12} - password must contain at least one number", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // 4. Contains at least one special character
+    if !payload.password.chars().any(|c| !c.is_alphanumeric()) {
+        println!("->> {:<12} - password must contain at least one special character", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
 
     // Hash the password
     let salt = SaltString::generate(&mut OsRng);
@@ -168,15 +199,77 @@ pub async fn api_update_user(
     if user_id == None {
         return Err(Error::UserIdUpdateError);
     }
+    
+    // Validate password complexity
+    if payload.password.is_empty() {
+        // perform update without password
+        let result = sqlx::query!(
+            "UPDATE users
+            SET name = $1, email = $2
+            WHERE id = $3;",
+            payload.name,
+            payload.email,
+            user_id
+        )
+        .execute(&pool)
+        .await;
 
-    // perform update
+        // if the update doesnt affect any rows it failed
+        if result.unwrap().rows_affected() == 0 {
+            return Err(Error::UserNotFoundError);
+        }
+
+        // otherwise it passes
+        return Ok(Json(json!({
+            "result": {
+                "success": true
+            }
+        })));
+    }
+    
+    // Password complexity requirements:
+    // 1. Minimum length of 8 characters
+    if payload.password.len() < 8 {
+        println!("->> {:<12} - password too short, minimum 8 characters required", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // 2. Contains at least one uppercase letter
+    if !payload.password.chars().any(|c| c.is_uppercase()) {
+        println!("->> {:<12} - password must contain at least one uppercase letter", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // 3. Contains at least one number
+    if !payload.password.chars().any(|c| c.is_numeric()) {
+        println!("->> {:<12} - password must contain at least one number", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // 4. Contains at least one special character
+    if !payload.password.chars().any(|c| !c.is_alphanumeric()) {
+        println!("->> {:<12} - password must contain at least one special character", "ERROR");
+        return Err(Error::PasswordValidationError);
+    }
+    
+    // Hash the password before updating
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)
+        .map_err(|e| {
+            println!("->> {:<12} - password hashing error: {:?}", "ERROR", e);
+            Error::UserUpdateError
+        })?
+        .to_string();
+
+    // perform update with hashed password
     let result = sqlx::query!(
         "UPDATE users
          SET name = $1, email = $2, password = $3
          WHERE id = $4;",
         payload.name,
         payload.email,
-        payload.password,
+        password_hash,
         user_id
     )
     .execute(&pool)

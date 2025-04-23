@@ -652,14 +652,6 @@
 		updateDisplayedDocuments();
 	}
 
-	// Update category change handler to reset project view
-	function changeCategory(category: string) {
-		activeCategory = category;
-		currentProject = null;
-		currentView = 'drive';
-		updateDisplayedDocuments();
-	}
-
 	// Add this new function
 	function openShareModal(type: 'document' | 'project', id: number, title: string) {
 		shareModalType = type;

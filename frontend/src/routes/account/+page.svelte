@@ -4,6 +4,7 @@
     import { get_all_commands, get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/document';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
+    import '$lib/assets/style/account.css'
     
     let isLoggedIn = true;
     let isLoading = true;
@@ -178,7 +179,7 @@
                 errorMessage = 'Passwords do not match';
                 return;
             }
-            
+
             // Update user information
             if (name && email) {
                 const updated = await update_user(name, email, password);
@@ -1063,12 +1064,14 @@
                                                             <div class="btn-group btn-group-sm">
                                                                 <button 
                                                                     class="btn btn-success" 
+                                                                    aria-label="Close"
                                                                     on:click={() => saveKeybinding(command.command_id)}
                                                                 >
                                                                     <i class="bi bi-check"></i>
                                                                 </button>
                                                                 <button 
                                                                     class="btn btn-danger" 
+                                                                    aria-label="Close"
                                                                     on:click={cancelEditKeybinding}
                                                                 >
                                                                     <i class="bi bi-x"></i>
@@ -1079,6 +1082,7 @@
                                                                 <button 
                                                                     class="btn btn-outline-light" 
                                                                     title="Edit keybinding"
+                                                                    aria-label="Close"
                                                                     on:click={() => startEditKeybinding(command.command_id)}
                                                                 >
                                                                     <i class="bi bi-pencil"></i>
@@ -1087,6 +1091,7 @@
                                                                     <button 
                                                                         class="btn btn-outline-danger" 
                                                                         title="Reset to default"
+                                                                        aria-label="Close"
                                                                         on:click={() => resetKeybinding(command.command_id)}
                                                                     >
                                                                         <i class="bi bi-arrow-counterclockwise"></i>

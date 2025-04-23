@@ -3805,6 +3805,17 @@
 			}
 		});
 	}
+
+	// Simple onMount function that ensures all content is visible immediately
+	onMount(() => {
+		// Set document ready immediately for content
+		documentReady = true;
+		
+		// Delay navbar appearance to ensure page loads first
+		setTimeout(() => {
+			navbarReady = true;
+		}, 300); // 300ms delay ensures page is properly rendered
+	});
 </script>
 
 <svelte:head>
@@ -3815,11 +3826,94 @@
 	<Toast message={toast.message} type={toast.type} onClose={() => removeToast(i)} />
 {/each}
 
+<!-- Add this CSS to ensure the editor content starts at the right position -->
+<style>
+	:global(.editor-page) {
+		padding-top: 0 !important; /* Remove top padding since navbar is not fixed */
+		overflow-x: hidden;
+	}
+	
+	:global(.document-switcher) {
+		position: relative !important;
+		width: 90% !important;
+		max-width: 1400px !important;
+		margin: 0 auto 15px auto !important;
+		margin-top: 30px !important;
+		margin-bottom: -5px !important;
+		z-index: 100 !important;
+		background-color: transparent !important;
+		border: none !important;
+		display: flex !important; /* Always use flex layout */
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+
+	:global(.navbar), :global(.navbar-container) {
+		position: relative !important;
+		z-index: 1000 !important;
+		width: 100% !important;
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	:global(.editor-container) {
+		margin-top: 10px !important;
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	:global(.status-bar) {
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	/* Use animations as enhancements only - with subtle movement */
+	:global(.fade-in-first) {
+		animation: fadeInNavbar 0.4s ease-out forwards 0s !important;
+	}
+
+	:global(.fade-in-second) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
+	}
+
+	:global(.fade-in-third) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
+	}
+
+	:global(.fade-in-fourth) {
+		animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
+	}
+	
+	/* Special animation for navbar - starts completely invisible */
+	@keyframes fadeInNavbar {
+		from {
+			opacity: 0;
+			transform: translateY(5px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	/* Regular animation for other elements */
+	@keyframes fadeInSlightly {
+		from {
+			opacity: 0.9;
+			transform: translateY(5px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+</style>
+
 <div class="editor-page">
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
 
-	<!-- Minimal Navbar with fade-in animation -->
-	<div class="navbar-container" class:fade-in-first={navbarReady}>
+	<!-- Minimal Navbar with fade-in animation - adding inline style to force initial invisibility -->
+	<div class="navbar-container" class:fade-in-first={navbarReady} style="opacity: 0;">
 		<nav class="navbar">
 			<a href="/drive" class="logo-link" aria-label="Go to Drive">
 				<div class="logo-container">
@@ -3862,9 +3956,9 @@
 		</nav>
 	</div>
 
-	<!-- Project Document Switcher -->
+	<!-- Project Document Switcher with fade-in animation -->
 	{#if projectDocumentsLoaded}
-		<div class="document-switcher fade-in-second">
+		<div class="document-switcher" class:fade-in-second={navbarReady}>
 			{#if projectDocuments.length > 0}
 				{#each projectDocuments as doc, index}
 					<button
@@ -3886,8 +3980,8 @@
 	<!-- Editor Container with animation -->
 	<div class="editor-container" class:fade-in-third={documentReady}>
 		{#if loading}
-			<div class="loading">Loading document...</div>
-	{:else if error}
+			<div class="loading"></div>
+		{:else if error}
 			<div class="error">Error loading document</div>
 		{:else}
 			<!-- Previous document (for animation) -->
@@ -3933,7 +4027,7 @@
 		{/if}
 	</div>
 
-	<!-- Fixed Status Bar - moved outside the editor wrapper -->
+	<!-- Fixed Status Bar with animation -->
 	<div class="status-bar" class:fade-in-fourth={documentReady}>
 		<div class="mode-indicator">
 			<span class="mode {editorMode ? editorMode.toLowerCase() : 'normal'}">{editorMode || 'NORMAL'}</span>
@@ -4079,76 +4173,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	/* ... existing styles ... */
-
-	.color-picker {
-		position: fixed;
-		display: flex;
-		flex-direction: column;
-		padding: 10px;
-		background: rgba(15, 15, 15, 0.95);
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		border-radius: 6px;
-		z-index: 1000;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-		width: 280px;
-	}
-
-	.hue-slider-container {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		width: 100%;
-	}
-
-	.hue-slider {
-		-webkit-appearance: none;
-		appearance: none;
-		width: 100%;
-		height: 12px;
-		border-radius: 6px;
-		background: linear-gradient(
-			to right,
-			#ffffff 0%,
-			#ff0000 10%,
-			#ffff00 25%,
-			#00ff00 40%,
-			#00ffff 55%,
-			#0000ff 70%,
-			#ff00ff 85%,
-			#000000 95%,
-			#000000 100%
-		);
-		outline: none;
-		cursor: pointer;
-	}
-
-	.hue-slider::-webkit-slider-thumb {
-		-webkit-appearance: none;
-		appearance: none;
-		width: 16px;
-		height: 22px;
-		border-radius: 3px;
-		background: white;
-		cursor: pointer;
-		border: 1px solid rgba(0, 0, 0, 0.3);
-	}
-
-	.hue-slider::-moz-range-thumb {
-		width: 16px;
-		height: 22px;
-		border-radius: 3px;
-		background: white;
-		cursor: pointer;
-		border: 1px solid rgba(0, 0, 0, 0.3);
-	}
-
-	.color-slider-indicator {
-		height: 10px;
-		border-radius: 5px;
-		margin-top: -4px;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-	}
-</style>
