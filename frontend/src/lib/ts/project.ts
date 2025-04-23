@@ -341,7 +341,14 @@ export async function add_document_to_project(projectId: number, documentId: num
 			credentials: 'include'
 		});
 
-		return response.ok;
+		if (response.ok) {
+			// Log success for debugging
+			console.log(`Document ${documentId} successfully added to project ${projectId}`);
+			return true;
+		} else {
+			console.error(`Failed to add document ${documentId} to project ${projectId}:`, response.status);
+			return false;
+		}
 	} catch (error) {
 		console.error('Error adding document to project:', error);
 		return false;
