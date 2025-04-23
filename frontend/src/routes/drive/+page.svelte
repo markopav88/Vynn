@@ -587,13 +587,11 @@
 				// Update the project documents map
 				projectDocumentsMap.set(project.id, [...currentDocs, draggedDocument.id]);
 
-				// If we're currently viewing this project, update the displayed documents
-				if (currentProject && currentProject.id === project.id) {
-					updateDisplayedDocuments();
+			else if (currentProject && currentProject.id === project.id) {
+				// Add the document to displayed documents if it's not already there
+				if (!displayedDocuments.find(d => d.id === docToMove.id)) {
+					displayedDocuments = [...displayedDocuments, docToMove];
 				}
-			} else {
-				// Show error toast
-				showToast(`Failed to add document to project`, 'error');
 			}
 
 			draggedDocument = null;
