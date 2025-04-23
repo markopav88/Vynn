@@ -580,9 +580,9 @@
 		// Add document to project
 		const success = await add_document_to_project(parseInt(project.id), docToMove.id);
 
-			if (success) {
-				// Show success toast
-				showToast(`Document "${draggedDocument.name}" added to project "${project.name}"`, 'success');
+		if (success) {
+			// Show success toast
+			showToast(`Document "${docToMove.name}" moved to project "${project.name}"`, 'success');
 
 				// Update the project documents map
 				projectDocumentsMap.set(project.id, [...currentDocs, draggedDocument.id]);
