@@ -27,10 +27,19 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2
 };
+use std::sync::OnceLock;
 
 use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
+
+// Define a static variable to hold the default profile image data
+static DEFAULT_PROFILE_IMAGE: OnceLock<(Vec<u8>, String)> = OnceLock::new();
+
+// Function to get the default profile image data
+fn get_default_profile_image() -> (Vec<u8>, String) {
+    DEFAULT_PROFILE_IMAGE.get_or_init(|| {
+        // This is a small default profile image (a simple placeholder SVG)
         // Hardcoded simple SVG data for a user avatar
         let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" width=\"100\" height=\"100\"><circle cx=\"50\" cy=\"35\" r=\"25\" fill=\"#10B981\"/><circle cx=\"50\" cy=\"100\" r=\"40\" fill=\"#10B981\"/></svg>";
         
