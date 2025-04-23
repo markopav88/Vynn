@@ -991,12 +991,14 @@
                                                                     <button 
                                                                         class="btn btn-success" 
                                                                         on:click={() => saveKeybinding(command.command_id)}
+                                                                        aria-label="Save keybinding"
                                                                     >
                                                                         <i class="bi bi-check"></i>
                                                                     </button>
                                                                     <button 
                                                                         class="btn btn-danger" 
                                                                         on:click={cancelEditKeybinding}
+                                                                        aria-label="Cancel editing"
                                                                     >
                                                                         <i class="bi bi-x"></i>
                                                                     </button>
@@ -1007,6 +1009,7 @@
                                                                         class="btn btn-outline-light" 
                                                                         title="Edit keybinding"
                                                                         on:click={() => startEditKeybinding(command.command_id)}
+                                                                        aria-label="Edit binding"
                                                                     >
                                                                         <i class="bi bi-pencil"></i>
                                                                     </button>
@@ -1014,6 +1017,7 @@
                                                                         class="btn btn-outline-danger" 
                                                                         title="Remove custom keybinding"
                                                                         on:click={() => resetKeybinding(command.command_id)}
+                                                                        aria-label="Reset binding"
                                                                     >
                                                                         <i class="bi bi-trash"></i>
                                                                     </button>
@@ -1064,14 +1068,14 @@
                                                             <div class="btn-group btn-group-sm">
                                                                 <button 
                                                                     class="btn btn-success" 
-                                                                    aria-label="Close"
+                                                                    aria-label="Save keybinding"
                                                                     on:click={() => saveKeybinding(command.command_id)}
                                                                 >
                                                                     <i class="bi bi-check"></i>
                                                                 </button>
                                                                 <button 
                                                                     class="btn btn-danger" 
-                                                                    aria-label="Close"
+                                                                    aria-label="Cancel editing"
                                                                     on:click={cancelEditKeybinding}
                                                                 >
                                                                     <i class="bi bi-x"></i>
@@ -1082,7 +1086,7 @@
                                                                 <button 
                                                                     class="btn btn-outline-light" 
                                                                     title="Edit keybinding"
-                                                                    aria-label="Close"
+                                                                    aria-label="Edit keybinding"
                                                                     on:click={() => startEditKeybinding(command.command_id)}
                                                                 >
                                                                     <i class="bi bi-pencil"></i>
@@ -1091,7 +1095,7 @@
                                                                     <button 
                                                                         class="btn btn-outline-danger" 
                                                                         title="Reset to default"
-                                                                        aria-label="Close"
+                                                                        aria-label="Reset to default"
                                                                         on:click={() => resetKeybinding(command.command_id)}
                                                                     >
                                                                         <i class="bi bi-arrow-counterclockwise"></i>
@@ -1211,12 +1215,6 @@
         border-radius: 4px;
     }
     
-    thead.sticky-top {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-    
     /* Custom keybinding form */
     .card.bg-black {
         background-color: #121212;
@@ -1294,12 +1292,4 @@
         100% { background-color: transparent; }
     }
     
-    .keybindings-table tr.custom-keybinding.highlight-new-row {
-        animation: highlight-row 2.5s ease-out;
-        background-color: rgba(16, 185, 129, 0.05);
-    }
-    
-    .highlight-new-row {
-        animation: highlight-row 2.5s ease-out;
-    }
 </style>
