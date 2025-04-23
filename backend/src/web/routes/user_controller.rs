@@ -455,7 +455,12 @@ pub async fn api_get_profile_image(
             // Ensure image_data is not empty
             if row.image_data.is_empty() {
                 println!("->> {:<12} - empty image data for user_id: {}", "ERROR", user_id);
-                return Err(Error::ProfilePicError);
+                // Return default image instead of error
+                let (default_image, default_content_type) = get_default_profile_image();
+                return Ok((
+                    [(axum::http::header::CONTENT_TYPE, default_content_type)],
+                    default_image
+                ));
             }
             
             println!("->> {:<12} - returning image with content type: {}", "SUCCESS", row.content_type);
