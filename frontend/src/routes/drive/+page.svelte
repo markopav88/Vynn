@@ -134,6 +134,32 @@
 		}
 	});
 
+	// Function to load document associations for all projects
+	async function loadAllProjectDocuments(projectsList: Project[]) {
+		try {
+			// Create an array of promises to load documents for all projects
+			const promises = projectsList.map(async (project) => {
+				// Skip if already loaded
+				if (projectDocumentsMap.has(project.id)) return;
+				
+				const projectDocs = await get_project_documents(parseInt(project.id));
+				if (projectDocs) {
+					projectDocumentsMap.set(
+						project.id,
+						projectDocs.map((doc) => doc.id)
+					);
+				}
+			});
+
+			// Wait for all projects to load their documents
+			await Promise.all(promises);
+			
+			console.log('All project documents loaded:', projectDocumentsMap);
+		} catch (error) {
+			console.error('Error loading project documents:', error);
+		}
+	}
+
 	// Add this function to update displayed documents based on current view and filters
 	function updateDisplayedDocuments() {
 		if (currentProject && currentProject.id) {
