@@ -107,7 +107,25 @@ pub async fn api_create_user(
 
     // Check if insertion was successful
     match result {
-        Ok(user) => Ok(Json(user)),
+        Ok(user) => {
+            // Add default profile image for the new user
+            let (default_image_data, default_content_type) = get_default_profile_image();
+            
+            // Insert the default profile image
+            let _image_result = sqlx::query!(
+                "INSERT INTO user_profile_images (user_id, image_data, content_type) 
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (user_id) DO NOTHING",
+                user.id,
+                default_image_data,
+                default_content_type
+            )
+            .execute(&pool)
+            .await;
+            
+            // Return the user info even if profile image insertion fails
+            Ok(Json(user))
+        },
         Err(e) => {
             println!("Error creating user: {:?}", e);
             Err(Error::UserCreationError)
