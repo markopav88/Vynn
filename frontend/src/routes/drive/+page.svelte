@@ -584,18 +584,27 @@
 			// Show success toast
 			showToast(`Document "${docToMove.name}" moved to project "${project.name}"`, 'success');
 
-				// Update the project documents map
-				projectDocumentsMap.set(project.id, [...currentDocs, draggedDocument.id]);
+			// Update the project documents map
+			projectDocumentsMap.set(project.id, [...currentDocs, docToMove.id]);
 
+			// If we're currently viewing in the main view (not in a project), 
+			// we should remove this document from displayed documents
+			if (!currentProject && activeCategory === 'all') {
+				displayedDocuments = displayedDocuments.filter(d => d.id !== docToMove.id);
+			}
+			// If we're currently viewing this project, update the displayed documents
 			else if (currentProject && currentProject.id === project.id) {
 				// Add the document to displayed documents if it's not already there
 				if (!displayedDocuments.find(d => d.id === docToMove.id)) {
 					displayedDocuments = [...displayedDocuments, docToMove];
 				}
 			}
-
-			draggedDocument = null;
+		} else {
+			// Show error toast
+			showToast(`Failed to move document to project`, 'error');
 		}
+
+		draggedDocument = null;
 	}
 
 	// Add function to return to main drive view
