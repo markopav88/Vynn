@@ -168,7 +168,7 @@
 				if (doc.is_trashed) return false;
 
 				// Check if document is in any project
-				for (const [_, projectDocs] of projectDocumentsMap) {
+				for (const [_, projectDocs] of projectDocumentsMap.entries()) {
 					if (projectDocs.includes(doc.id)) return false;
 				}
 
