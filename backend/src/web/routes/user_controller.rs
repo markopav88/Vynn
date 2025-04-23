@@ -467,8 +467,13 @@ pub async fn api_get_profile_image(
             ))
         },
         None => {
-            println!("->> {:<12} - no image found for user_id: {}", "ERROR", user_id);
-            Err(Error::UserNotFoundError)
+            println!("->> {:<12} - no image found for user_id: {}, returning default", "INFO", user_id);
+            // Return default image when no profile image exists
+            let (default_image, default_content_type) = get_default_profile_image();
+            Ok((
+                [(axum::http::header::CONTENT_TYPE, default_content_type)],
+                default_image
+            ))
         }
     }
 }
