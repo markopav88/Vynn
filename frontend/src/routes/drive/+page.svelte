@@ -122,6 +122,9 @@
 			sharedDocuments = sharedDocsResult || [];
 			sharedProjects = sharedProjsResult || [];
 
+			// Load project-document relationships for all projects
+			await loadAllProjectDocuments(projects);
+
 			// Initialize displayed documents
 			updateDisplayedDocuments();
 
