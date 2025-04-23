@@ -167,9 +167,11 @@
 	function updateDisplayedDocuments() {
 		if (currentProject && currentProject.id) {
 			// Show only documents in the current project
+			const projectDocs = projectDocumentsMap.get(currentProject.id) || [];
 			displayedDocuments = documents.filter(
-				(doc) => projectDocumentsMap.get(currentProject?.id ?? '')?.includes(doc.id) ?? false
+				(doc) => !doc.is_trashed && projectDocs.includes(doc.id)
 			);
+			console.log(`Showing ${displayedDocuments.length} documents for project ${currentProject.name}`);
 		} else if (activeCategory === 'starred') {
 			// Show only starred documents that are not trashed
 			displayedDocuments = starredDocuments.filter((doc) => !doc.is_trashed);
@@ -620,7 +622,7 @@
 			// Show success toast
 			showToast(`Document "${docToMove.name}" moved to project "${project.name}"`, 'success');
 
-			// Update the project documents map
+			// Update the project documents map to ensure persistence after refresh
 			projectDocumentsMap.set(project.id, [...currentDocs, docToMove.id]);
 
 			// If we're currently viewing in the main view (not in a project), 
