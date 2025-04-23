@@ -7,9 +7,24 @@
 	position: relative;
 	overflow-y: auto; /* Allow vertical scrolling */
 	overflow-x: hidden; /* Prevent horizontal scrolling */
-	padding-top: 70px !important; /* Space for navbar height only */
+	padding-top: 70px;
 	padding-bottom: 50px; /* Keep space for status bar */
-	margin-top: 0 !important;
+	margin-top: 0;
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE and Edge */
+}
+
+.editor-page::-webkit-scrollbar {
+	display: none; /* Chrome, Safari, Opera */
+}
+
+html, body {
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE and Edge */
+}
+
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+	display: none; /* Chrome, Safari, Opera */
 }
 
 .background-image {
@@ -33,12 +48,12 @@
 	backdrop-filter: blur(5px);
 	-webkit-backdrop-filter: blur(5px);
 	height: 60px;
-	position: relative !important;
-	top: 0 !important;
-	left: 0 !important;
-	right: 0 !important;
+	position: relative;
+	top: 0;
+	left: 0;
+	right: 0;
 	width: 100%;
-	z-index: 2000 !important;
+	z-index: 2000;
 	border-bottom: 1px solid rgba(16, 185, 129, 0.3);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -89,6 +104,24 @@
 	overflow: visible; /* Allow content to expand */
 	padding-top: 20px !important;
 	margin-top: 20px !important; /* Reset the editor container margin since document switcher is now in the flow */
+	transition: height 0.2s ease;
+	min-height: calc(30 * 24px + 48px); /* MIN_LINES * LINE_HEIGHT + padding */
+	height: auto !important;
+	position: relative;
+	overflow: visible;
+	margin-bottom: 60px; /* Add space at the bottom to prevent jumping */
+}
+
+.editor-container:has(.editor-wrapper.left-exit),
+.editor-container:has(.editor-wrapper.right-exit),
+.editor-container:has(.editor-wrapper.left-enter),
+.editor-container:has(.editor-wrapper.right-enter) {
+	height: auto !important;
+	min-height: calc(30 * 24px + 48px); /* MIN_LINES * LINE_HEIGHT + padding */
+	position: relative !important;
+	overflow: visible !important;
+	transform: none !important;
+	transition: none !important;
 }
 
 .editor-wrapper {
@@ -118,20 +151,45 @@
 
 /* Exit animations */
 .editor-wrapper.left-exit {
-	animation: slideOutLeft 0.25s ease-in-out forwards;
+	animation: slideOutLeft 0.5s ease-in-out forwards;
+	position: absolute !important;
+	width: 100%;
+	max-width: 1400px;
+	margin: 0 auto;
+	z-index: 2;
+	height: auto !important;
+	transform-origin: center center;
 }
 
 .editor-wrapper.right-exit {
-	animation: slideOutRight 0.25s ease-in-out forwards;
+	animation: slideOutRight 0.5s ease-in-out forwards;
+	position: absolute !important;
+	width: 100%;
+	max-width: 1400px;
+	margin: 0 auto;
+	z-index: 2;
+	height: auto !important;
+	transform-origin: center center;
 }
 
 /* Enter animations */
 .editor-wrapper.left-enter {
-	animation: slideInRight 0.3s ease-out forwards;
+	animation: slideInRight 0.5s ease-in-out forwards;
+	width: 100%;
+	max-width: 1400px;
+	margin: 0 auto;
+	z-index: 1;
+	height: auto !important;
+	transform-origin: center center;
 }
 
 .editor-wrapper.right-enter {
-	animation: slideInLeft 0.3s ease-out forwards;
+	animation: slideInLeft 0.5s ease-in-out forwards;
+	width: 100%;
+	max-width: 1400px;
+	margin: 0 auto;
+	z-index: 1;
+	height: auto !important;
 }
 
 .editor-content {
@@ -300,10 +358,9 @@
 		filter: blur(0);
 	}
 	100% {
-		transform: translateX(-110%);
+		transform: translateX(-100px);
 		opacity: 0;
 		filter: blur(3px);
-		position: absolute;
 	}
 }
 
@@ -314,28 +371,17 @@
 		filter: blur(0);
 	}
 	100% {
-		transform: translateX(110%);
+		transform: translateX(100px);
 		opacity: 0;
 		filter: blur(3px);
-		position: absolute;
 	}
 }
 
 @keyframes slideInRight {
 	0% {
-		transform: translateX(110%);
+		transform: translateX(100px);
 		opacity: 0;
 		filter: blur(3px);
-	}
-	60% {
-		filter: blur(0);
-	}
-	75% {
-		transform: translateX(-1%);
-		opacity: 1;
-	}
-	90% {
-		transform: translateX(0.5%);
 	}
 	100% {
 		transform: translateX(0);
@@ -346,19 +392,9 @@
 
 @keyframes slideInLeft {
 	0% {
-		transform: translateX(-110%);
+		transform: translateX(-100px);
 		opacity: 0;
 		filter: blur(3px);
-	}
-	60% {
-		filter: blur(0);
-	}
-	75% {
-		transform: translateX(1%);
-		opacity: 1;
-	}
-	90% {
-		transform: translateX(-0.5%);
 	}
 	100% {
 		transform: translateX(0);
@@ -399,17 +435,16 @@
 	animation: none !important; /* Disable animations */
 }
 
-/* Add navbar container and animation styles */
 .navbar-container {
-	position: relative !important;
-	top: 0 !important;
-	left: 0 !important;
-	right: 0 !important;
-	z-index: 2000 !important;
+	position: relative;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 2000;
+	margin-top: -5px;
 	width: 100%;
 }
 
-/* Add styles for command mode */
 .command-container {
 	display: inline-flex;
 	align-items: center;
@@ -418,7 +453,7 @@
 	border: 1px solid rgba(16, 185, 129, 0.5);
 	border-radius: 4px;
 	padding: 2px 4px;
-	position: relative; /* For positioning the error message */
+	position: relative;
 }
 
 .command-prefix {
@@ -648,6 +683,7 @@
 
 /* Animation classes with improved timing and sequence - fade up effect */
 .fade-in-first {
+	opacity: 0;
 	animation: fadeUp 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards 0s;
 	will-change: opacity, transform;
 	animation-play-state: running !important;
@@ -863,77 +899,6 @@
 	font-weight: 500;
 }
 
-/* Add CSS for smoother document switching animation */
-.editor-wrapper.previous.left-exit {
-	animation: slideLeftExit 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
-}
-
-.editor-wrapper.current.left-enter {
-	animation: slideLeftEnter 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
-}
-
-.editor-wrapper.previous.right-exit {
-	animation: slideRightExit 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
-}
-
-.editor-wrapper.current.right-enter {
-	animation: slideRightEnter 0.4s cubic-bezier(0.3, 0.1, 0.3, 1) forwards;
-}
-
-@keyframes slideLeftExit {
-	from {
-		transform: translateX(0);
-		opacity: 1;
-		filter: blur(0);
-	}
-	to {
-		transform: translateX(-50px);
-		opacity: 0;
-		filter: blur(2px);
-	}
-}
-
-@keyframes slideLeftEnter {
-	from {
-		transform: translateX(50px);
-		opacity: 0;
-		filter: blur(2px);
-	}
-	to {
-		transform: translateX(0);
-		opacity: 1;
-		filter: blur(0);
-	}
-}
-
-@keyframes slideRightExit {
-	from {
-		transform: translateX(0);
-		opacity: 1;
-		filter: blur(0);
-	}
-	to {
-		transform: translateX(50px);
-		opacity: 0;
-		filter: blur(2px);
-	}
-}
-
-@keyframes slideRightEnter {
-	from {
-		transform: translateX(-50px);
-		opacity: 0;
-		filter: blur(2px);
-	}
-	to {
-		transform: translateX(0);
-		opacity: 1;
-		filter: blur(0);
-	}
-}
-
-/* Your existing styles remain unchanged */
-
 /* Add styles for contenteditable editor */
 .editor-contenteditable {
 	position: relative;
@@ -961,6 +926,7 @@
 	height: auto !important;
 	position: relative;
 	overflow: visible;
+	margin-bottom: 60px; /* Add space at the bottom to prevent jumping */
 }
 
 /* Update the editor wrapper to grow with content */
@@ -1007,6 +973,10 @@
 	height: auto !important;
 	overflow-y: auto;
 	position: relative;
+	padding-bottom: 50px; /* Keep space for status bar */
+	margin-top: 0 !important;
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE and Edge */
 }
 
 /* Make status bar stay at the bottom of the viewport */
@@ -1150,3 +1120,34 @@
 	margin-top: -4px;
 	border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+/* Also hide scrollbars in any scrollable editor elements */
+.editor-contenteditable,
+.editor-content,
+.line-numbers,
+.editor-wrapper {
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE and Edge */
+}
+
+.editor-contenteditable::-webkit-scrollbar,
+.editor-content::-webkit-scrollbar,
+.line-numbers::-webkit-scrollbar,
+.editor-wrapper::-webkit-scrollbar {
+	display: none; /* Chrome, Safari, Opera */
+}
+
+/* Add spacer for animations */
+.animation-spacer {
+	display: block;
+	width: 100%;
+	height: var(--animation-height, 0) !important;
+	background: transparent;
+	visibility: hidden;
+	margin: 0;
+	padding: 0;
+	opacity: 0;
+	position: relative;
+}
+
+/* When animating, we need the container to maintain its height and width */

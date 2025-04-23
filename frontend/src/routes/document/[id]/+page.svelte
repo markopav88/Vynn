@@ -187,13 +187,11 @@
 				previousDocumentLines = [...lines];
 				previousActiveLineIndex = activeLineIndex;
 
-				// Store current editor height for smooth animation
-				if (editorElement && editorElement.parentElement) {
-					animationHeight = Math.max(editorElement.parentElement.offsetHeight, editorElement.scrollHeight);
-				}
-
-				// Start animation
+				// Start animation without modifying any dimensions
 				isAnimating = true;
+
+				// Prevent scrolling during animation
+				document.documentElement.style.overflow = 'hidden';
 
 				// Update document ID in URL without full page reload
 				window.history.pushState({}, '', `/document/${docId}`);
@@ -310,14 +308,31 @@
 
 				// Wait for animation to complete before resetting animation state
 				setTimeout(() => {
+					// Reset animation variables
 					isAnimating = false;
 					slideDirection = '';
 					previousDocumentContent = '';
 					previousDocumentLines = [];
-					animationHeight = 0;
-					// Adjust textarea height
-					setTimeout(adjustEditorHeight, 0);
-				}, 400); // Match this with the CSS animation duration (400ms now)
+					
+					// Reset wrapper sizing constraints from animation
+					const currentWrapper = document.querySelector('.editor-wrapper.current') as HTMLElement;
+					if (currentWrapper) {
+						// Clear minHeight to let it resize naturally
+						currentWrapper.style.minHeight = '';
+						currentWrapper.style.position = 'relative';
+					}
+					
+					// Restore scrolling
+					document.documentElement.style.overflow = '';
+					
+					// Gently adjust editor height after animation completes
+					setTimeout(() => {
+						// Smoothly adjust the editor height to match content
+						if (editorElement) {
+							adjustEditorHeight();
+						}
+					}, 50);
+				}, 500); // Match this with the CSS animation duration (0.5s)
 
 				return;
 			}
@@ -325,7 +340,7 @@
 			// If document not preloaded, navigate to it the traditional way
 			console.log(`Document not preloaded, navigating to /document/${docId}`);
 
-			window.location.href = `/document/${docId}`;
+					window.location.href = `/document/${docId}`;
 		} catch (error) {
 			console.error('Error switching document:', error);
 			isAnimating = false;
@@ -3808,13 +3823,25 @@
 
 	// Simple onMount function that ensures all content is visible immediately
 	onMount(() => {
+		console.log('Document page mounted, setting documentReady');
 		// Set document ready immediately for content
 		documentReady = true;
 		
-		// Delay navbar appearance to ensure page loads first
+		// Use a simple timeout to delay the navbar appearance
 		setTimeout(() => {
+			console.log('Setting navbarReady to true');
 			navbarReady = true;
-		}, 300); // 300ms delay ensures page is properly rendered
+			console.log('navbarReady is now:', navbarReady);
+			
+			// Log the navbar container opacity after a short delay
+			setTimeout(() => {
+				const navbarContainer = document.querySelector('.navbar-container');
+				if (navbarContainer) {
+					console.log('Navbar container style:', navbarContainer.getAttribute('style'));
+					console.log('Navbar container opacity:', window.getComputedStyle(navbarContainer).opacity);
+				}
+			}, 100);
+		}, 300);
 	});
 </script>
 
@@ -3826,94 +3853,12 @@
 	<Toast message={toast.message} type={toast.type} onClose={() => removeToast(i)} />
 {/each}
 
-<!-- Add this CSS to ensure the editor content starts at the right position -->
-<style>
-	:global(.editor-page) {
-		padding-top: 0 !important; /* Remove top padding since navbar is not fixed */
-		overflow-x: hidden;
-	}
-	
-	:global(.document-switcher) {
-		position: relative !important;
-		width: 90% !important;
-		max-width: 1400px !important;
-		margin: 0 auto 15px auto !important;
-		margin-top: 30px !important;
-		margin-bottom: -5px !important;
-		z-index: 100 !important;
-		background-color: transparent !important;
-		border: none !important;
-		display: flex !important; /* Always use flex layout */
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-
-	:global(.navbar), :global(.navbar-container) {
-		position: relative !important;
-		z-index: 1000 !important;
-		width: 100% !important;
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	:global(.editor-container) {
-		margin-top: 10px !important;
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	:global(.status-bar) {
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	/* Use animations as enhancements only - with subtle movement */
-	:global(.fade-in-first) {
-		animation: fadeInNavbar 0.4s ease-out forwards 0s !important;
-	}
-
-	:global(.fade-in-second) {
-		animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
-	}
-
-	:global(.fade-in-third) {
-		animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
-	}
-
-	:global(.fade-in-fourth) {
-		animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
-	}
-	
-	/* Special animation for navbar - starts completely invisible */
-	@keyframes fadeInNavbar {
-		from {
-			opacity: 0;
-			transform: translateY(5px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	/* Regular animation for other elements */
-	@keyframes fadeInSlightly {
-		from {
-			opacity: 0.9;
-			transform: translateY(5px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-</style>
 
 <div class="editor-page">
 	<div class="background-image" style="background-image: url({backgroundImage})"></div>
 
-	<!-- Minimal Navbar with fade-in animation - adding inline style to force initial invisibility -->
-	<div class="navbar-container" class:fade-in-first={navbarReady} style="opacity: 0;">
+	<!-- Minimal Navbar with fade-in animation -->
+	<div class="navbar-container" class:fade-in-first={navbarReady} class:navbar-ready={navbarReady} style="opacity: {navbarReady ? 1 : 0}; transition: opacity 0.6s ease-out;">
 		<nav class="navbar">
 			<a href="/drive" class="logo-link" aria-label="Go to Drive">
 				<div class="logo-container">
@@ -3986,42 +3931,36 @@
 		{:else}
 			<!-- Previous document (for animation) -->
 			{#if isAnimating && previousDocumentContent}
-				<div
-					class="editor-wrapper previous {slideDirection}-exit"
-					style={animationHeight ? `height: ${animationHeight}px` : ''}
-				>
+				<div class="editor-wrapper previous {slideDirection}-exit">
 					<div class="editor-content">
 						<div class="line-numbers">
 							{#each previousDocumentLines as line, i}
 								<div class="line-number {i === previousActiveLineIndex ? 'active' : ''}">{i + 1}</div>
 							{/each}
+						</div>
+						<div class="editor-contenteditable">{@html previousDocumentContent}</div>
+					</div>
 				</div>
-						<div class="editor-contenteditable">{previousDocumentContent}</div>
-			</div>
-		</div>
-	{/if}
+			{/if}
 
 			<!-- Current document -->
-			<div
-				class="editor-wrapper current {isAnimating ? `${slideDirection}-enter` : ''}"
-				style={animationHeight ? `height: ${animationHeight}px` : ''}
-			>
+			<div class="editor-wrapper current {isAnimating ? `${slideDirection}-enter` : ''}">
 				<div class="editor-content">
 					<div class="line-numbers">
 						<!-- Line numbers now managed through JS for better synchronization -->
 					</div>
-						<div 
-							bind:this={editorElement}
-							class="editor-contenteditable" 
-							contenteditable="true"
-							on:keydown={handleKeyDown}
-							on:input={handleInput}
-							on:paste={handlePaste}
-							spellcheck="false"
-							role="textbox"
-							aria-multiline="true"
-							tabindex="0"
-						></div>
+					<div 
+						bind:this={editorElement}
+						class="editor-contenteditable" 
+						contenteditable="true"
+						on:keydown={handleKeyDown}
+						on:input={handleInput}
+						on:paste={handlePaste}
+						spellcheck="false"
+						role="textbox"
+						aria-multiline="true"
+						tabindex="0"
+					></div>
 				</div>
 			</div>
 		{/if}
@@ -4169,7 +4108,103 @@
 					tabindex="-1"
 				/>
 				<div class="color-slider-indicator" style="background-color: {selectedColor}"></div>
-</div>
+			</div>
 		</div>
 	{/if}
 </div>
+
+<style>
+	:global(.editor-page) {
+		padding-top: 0 !important;
+		overflow-x: hidden;
+	}
+	
+	/* Hide all scrollbars globally */
+	:global(*) {
+		scrollbar-width: none !important; /* Firefox */
+		-ms-overflow-style: none !important; /* IE and Edge */
+	}
+	
+	:global(*::-webkit-scrollbar) {
+		display: none !important; /* Chrome, Safari, Opera */
+		width: 0 !important;
+		background: transparent !important;
+	}
+	
+	:global(.document-switcher) {
+		position: relative !important;
+		width: 90% !important;
+		max-width: 1400px !important;
+		margin: 0 auto 15px auto !important;
+		margin-top: 30px !important;
+		margin-bottom: -5px !important;
+		z-index: 100 !important;
+		background-color: transparent !important;
+		border: none !important;
+		display: flex !important; 
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+
+	:global(.navbar), :global(.navbar-container) {
+		position: relative !important;
+		z-index: 1000 !important;
+		width: 100% !important;
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	:global(.editor-container) {
+		margin-top: 10px !important;
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	:global(.status-bar) {
+		opacity: 0.9 !important; /* Higher initial opacity */
+		transform: translateY(5px); /* Match animation start state */
+	}
+	
+	/* Use animations as enhancements only - with subtle movement */
+	:global(.fade-in-first) {
+		animation: fadeInNavbar 0.6s ease-out forwards !important;
+		opacity: 1 !important; /* Force opacity to 1 when this class is applied */
+		will-change: opacity, transform;
+		backface-visibility: hidden;
+	}
+
+	:global(.fade-in-second) {
+			animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
+	}
+
+	:global(.fade-in-third) {
+			animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
+	}
+
+	:global(.fade-in-fourth) {
+			animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
+	}
+	
+	/* Special animation for navbar - starts completely invisible */
+	@keyframes fadeInNavbar {
+		from {
+			/* Only animate transform, not opacity */
+			transform: translateY(5px);
+		}
+		to {
+			/* Only animate transform, not opacity */
+			transform: translateY(0);
+		}
+	}
+
+	/* Regular animation for other elements */
+	@keyframes fadeInSlightly {
+		from {
+			opacity: 0.9;
+			transform: translateY(5px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+</style>

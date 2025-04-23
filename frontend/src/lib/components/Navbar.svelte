@@ -125,19 +125,19 @@
 <style>
 	nav {
 		border-bottom: none;
-		position: relative !important;
-		isolation: isolate; /* Create a stacking context to prevent backdrop-filter issues */
-		z-index: 1000 !important;
-		height: 60px !important;
-		min-height: 60px !important;
-		max-height: 60px !important;
-		padding-top: 0 !important;
-		padding-bottom: 0 !important;
+		position: relative;
+		isolation: isolate;
+		z-index: 1000;
+		height: 60px;
+		min-height: 60px;
+		max-height: 60px;
+		padding-top: 0;
+		padding-bottom: 0;
 		display: flex;
 		align-items: center;
 		box-sizing: border-box;
 		background-color: rgba(10, 23, 33, 0.95);
-		width: 100% !important;
+		width: 100%;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 	}
 
@@ -149,11 +149,11 @@
 	/* Ensure navbar stays horizontal on all screen sizes */
 	@media (max-width: 992px) {
 		.navbar-collapse {
-			display: flex !important;
+			display: flex;
 		}
 
 		.navbar-nav {
-			flex-direction: row !important;
+			flex-direction: row;
 		}
 
 		.nav-item {
@@ -161,7 +161,6 @@
 		}
 	}
 
-	/* Adjust spacing on very small screens */
 	@media (max-width: 576px) {
 		.nav-item {
 			margin-left: 0.5rem !important;
@@ -188,23 +187,4 @@
 		box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
 	}
 
-	/* Add these styles to your Navbar component */
-	.nav-link {
-		color: rgba(255, 255, 255, 0.8) !important;
-		transition: color 0.2s ease;
-		cursor: pointer;
-	}
-
-	.nav-link:hover {
-		color: var(--color-primary) !important;
-	}
-
-	/* Prevent any hover-based navigation */
-	a {
-		pointer-events: auto;
-	}
-
-	a:hover {
-		text-decoration: none;
-	}
 </style>
