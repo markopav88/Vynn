@@ -420,7 +420,7 @@ pub async fn api_upload_profile_image(
 /// Accessible via: GET /api/users/:id/profile-image
 /// 
 /// This endpoint returns the binary image data with the appropriate content-type header.
-/// If the user has no profile image, it returns a 404 error.
+/// If the user has no profile image, it returns a default image.
 /// 
 /// The image can be used directly in HTML img tags:
 /// <img src="/api/users/1/profile-image" alt="User profile" />
