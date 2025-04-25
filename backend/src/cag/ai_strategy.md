@@ -57,3 +57,61 @@
 
 ### Conclusion:
 **CAG** is the best fit here as it allows the system to **dynamically retrieve and adjust** the documents in the context of the chat as the user works on their current document. It allows the AI to understand which documents are most relevant, seamlessly integrating them into the conversation, and providing much more **context-aware and intelligent responses**.
+
+### 3. Steps in Using Embeddings for Document Retrieval
+
+Now, let's go through how you would implement embeddings in your document editing app for the chat-based context.
+
+#### **Step 1: Preprocess Documents**
+
+1. **Text Extraction**: 
+   - Extract text from the documents the user wants to include in the chat. This may include PDFs, Word documents, or plain text files.
+   - Clean the text by removing unnecessary characters, stopwords, and normalizing it (e.g., lowercasing).
+
+2. **Chunking**: 
+   - Large documents may need to be divided into smaller "chunks" (e.g., paragraphs, sentences, or even smaller units). This is important because embedding models often have token limits, and it's more efficient to work with smaller pieces of text.
+   - Each chunk will be converted into its own embedding, allowing you to index smaller portions of a document.
+
+#### **Step 2: Generate Embeddings**
+
+1. **Model Selection**: 
+   - Choose an embedding model. You can use pre-trained models like:
+     - **OpenAI Embeddings (text-embedding-ada-002)**: A model from OpenAI that generates high-quality embeddings for texts.
+     - **BERT (Bidirectional Encoder Representations from Transformers)**: A deep learning model that generates contextualized embeddings.
+     - **Sentence-BERT**: A modification of BERT specifically designed to generate sentence or document embeddings.
+   
+2. **Embedding Generation**:
+   - Pass each chunk of text through the embedding model. The model will output a **vector** representing the semantic meaning of that chunk. For example, a chunk like "Research on climate change" might result in a vector like `[0.45, -0.87, 0.22, ...]`.
+
+#### **Step 3: Index the Embeddings for Efficient Retrieval**
+
+1. **Vector Indexing**: 
+   - Store these embeddings in a database or search engine designed for vector data. Common choices include:
+     - **FAISS (Facebook AI Similarity Search)**: A highly efficient library for similarity search of dense vectors.
+     - **Pinecone**: A managed service that allows you to index and search vectors with high performance.
+     - **Elasticsearch** (with vector search capabilities): A more traditional search engine that can also handle vector searches.
+
+2. **Metadata**: 
+   - Along with each embedding, store metadata about the original chunk (e.g., document ID, paragraph number, or any other identifier). This metadata will help you trace the embedding back to its source if the user wants to see the original text.
+
+#### **Step 4: Retrieve Relevant Content Using Embeddings**
+
+1. **User Query**:
+   - When a user asks a question or requests an edit, you generate the embedding for the user's input (i.e., the query) in the same way as you did for the document chunks.
+
+2. **Similarity Search**:
+   - Perform a **vector similarity search** to find the most relevant chunks in your index. This is usually done by calculating the cosine similarity between the user query embedding and the embeddings of the document chunks. Cosine similarity measures how similar two vectors are, with higher values indicating more similarity.
+
+   - For example, if the user asks, "Can you rephrase the introduction of my proposal?" the system will compare the embedding of the query to the embeddings of all the document chunks, finding the most relevant ones.
+
+3. **Retrieve and Display**:
+   - Once you retrieve the relevant chunks based on similarity, you can send them back to the user in the chat. This allows the user to see content from their documents that is most related to their request.
+
+#### **Step 5: Update the Document**
+
+1. **Contextual Suggestions**:
+   - Once relevant content is retrieved, the AI can use that information to provide **suggestions** or **edits** based on the context provided by the documents.
+   - For example, if the user is editing a proposal, the AI can use the retrieved content from a research paper to suggest improvements in the introduction or match the style of the paper.
+
+2. **Interactive Editing**:
+   - As the user interacts with the chat, the AI may continue to pull in content from the documents that remain contextually relevant to the conversation. This makes the conversation more dynamic and personalized to the user's project.

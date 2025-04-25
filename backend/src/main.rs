@@ -5,6 +5,7 @@ mod db;
 mod error;
 mod models;
 mod web;
+mod cag;
 
 use axum::middleware;
 

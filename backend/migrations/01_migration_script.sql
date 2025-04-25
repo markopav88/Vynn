@@ -13,6 +13,8 @@ DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS user_profile_images;
 
+CREATE EXTENSION IF NOT EXISTS vector; -- Use PGVECTOR
+
 -- Create users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
