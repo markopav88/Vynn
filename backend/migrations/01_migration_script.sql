@@ -43,8 +43,12 @@ CREATE TABLE documents (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_starred BOOLEAN DEFAULT FALSE,
     is_trashed BOOLEAN DEFAULT FALSE,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    embedding vector(384)
 );
+
+-- Create vector index for similarity search
+CREATE INDEX document_embedding_idx ON documents USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- Create junction table for many-to-many relationship
 CREATE TABLE document_projects (

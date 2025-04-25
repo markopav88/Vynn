@@ -115,3 +115,13 @@ Now, let's go through how you would implement embeddings in your document editin
 
 2. **Interactive Editing**:
    - As the user interacts with the chat, the AI may continue to pull in content from the documents that remain contextually relevant to the conversation. This makes the conversation more dynamic and personalized to the user's project.
+
+
+
+**Feature List**
+Chatbot for Writing Help
+Smart Autocorrect & Autocomplete
+AI Outline & Structuring Helper
+Research Assistance
+Tone & Sentiment Feedback
+Writing Progress Tracker
