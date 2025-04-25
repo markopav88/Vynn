@@ -24,6 +24,7 @@ multipart = "0.18.0"
 rust-bert = "0.20.0"
 pgvector = "0.3.0"
 lazy_static = "1.4.0"
+langchain = "0.2.0"
 
 [dev-dependencies]
 anyhow = "1"

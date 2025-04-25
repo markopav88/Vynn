@@ -210,3 +210,33 @@ SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
 
 -- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+
+-- Create tables for AI writing assistant functionality
+
+-- Writing assistant sessions table
+CREATE TABLE writing_assistant_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id INT REFERENCES documents(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL DEFAULT 'New Writing Session',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Writing assistant messages table
+CREATE TABLE writing_assistant_messages (
+    id SERIAL PRIMARY KEY,
+    session_id INT NOT NULL REFERENCES writing_assistant_sessions(id) ON DELETE CASCADE,
+    role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for faster queries
+CREATE INDEX idx_writing_messages_session_id ON writing_assistant_messages(session_id);
+CREATE INDEX idx_writing_sessions_user_id ON writing_assistant_sessions(user_id);
+CREATE INDEX idx_writing_sessions_document_id ON writing_assistant_sessions(document_id);
+
+-- Set initial sequence values for writing assistant tables
+SELECT setval('writing_assistant_sessions_id_seq', 1, false);
+SELECT setval('writing_assistant_messages_id_seq', 1, false);
