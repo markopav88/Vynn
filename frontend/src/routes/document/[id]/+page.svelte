@@ -991,13 +991,6 @@
 			return;
 		}
 
-		// Handle Ctrl+/ for command cheat sheet in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
-			event.preventDefault();
-			showCommands = !showCommands;
-			return;
-		}
-
 		// Handle Escape key to exit any mode and return to NORMAL mode
 		if (event.key === 'Escape') {
 			editorMode = 'NORMAL';
@@ -1090,6 +1083,23 @@
 			if (event.key === 'ArrowDown') {
 				event.preventDefault();
 				moveDown();
+				return;
+			}
+
+			if (event.key === '/') {
+				event.preventDefault();
+				enterCommandMode('/'); // Enter command mode with forward search prefix
+				return;
+			}
+			if (event.key === '?') {
+				event.preventDefault();
+				enterCommandMode('?'); // Enter command mode with backward search prefix
+				return;
+			}
+
+			if (event.key === ':') {
+				event.preventDefault();
+				enterCommandMode(':'); // Enter command mode with colon prefix
 				return;
 			}
 
@@ -3586,10 +3596,29 @@
 			console.debug('Executing moveToStartOfDocument command');
 			moveToStartOfDocument(); // Call the existing function
 		},
+		toggleCommandSheet: () => {
+			console.debug('Executing toggleCommandSheet command');
+			showCommands = !showCommands;
+		},
+		findNextMatch: () => {
+			console.debug('Executing findNextMatch command');
+			findNextMatch(false); // false for forward
+		},
+		findPreviousMatch: () => {
+			console.debug('Executing findPreviousMatch command');
+			findNextMatch(true); // true for reverse
+		},
 	};
 
 	// Global keyboard event handler for keybindings
 	function handleKeybindingKeyDown(event: KeyboardEvent) {
+        // --- ADDED: Prevent bindings in COMMAND mode ---
+        if (editorMode === 'COMMAND') {
+            // Don't process any keybindings while in command/search input mode
+            return; 
+        }
+        // --- END ADDED ---
+
 		// If color picker is open, don't handle any keybindings
 		// Let the color picker handle its own keyboard events
 		if (showColorPicker) {

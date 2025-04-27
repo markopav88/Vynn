@@ -47,6 +47,9 @@ export interface CommandFunctions {
     switchToDocument9?: () => void;
     moveToEndOfDocument?: () => void;
     moveToStartOfDocument?: () => void;
+    toggleCommandSheet?: () => void;
+    findNextMatch?: () => void;
+    findPreviousMatch?: () => void;
     [key: string]: (() => void) | undefined;
 }
 
@@ -135,6 +138,24 @@ export class keybindings {
                 ctrlDown: false,
                 shiftDown: false,
             },
+            toggleCommandSheet: {
+                keyDown: "/",
+                altDown: false,
+                ctrlDown: true,
+                shiftDown: false,
+            },
+            findNextMatch: {
+                keyDown: "n",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
+            findPreviousMatch: {
+                keyDown: "m",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
             switchToDocument1: {
                 keyDown: "1",
                 altDown: false,
@@ -216,6 +237,9 @@ export class keybindings {
         20: 'moveToEndOfLine',
         21: 'moveToEndOfDocument',
         22: 'moveToStartOfDocument',
+        23: 'toggleCommandSheet',
+        24: 'findNextMatch',
+        25: 'findPreviousMatch',
     };
     
     // Command name to function name mapping
@@ -233,6 +257,9 @@ export class keybindings {
         'moveToEndOfLine': 'moveToEndOfLine',
         'moveToEndOfDocument': 'moveToEndOfDocument',
         'moveToStartOfDocument': 'moveToStartOfDocument',
+        'toggleCommandSheet': 'toggleCommandSheet',
+        'findNextMatch': 'findNextMatch',
+        'findPreviousMatch': 'findPreviousMatch',
         'switchToDocument1': 'switchToDocument1',
         'switchToDocument2': 'switchToDocument2',
         'switchToDocument3': 'switchToDocument3',
