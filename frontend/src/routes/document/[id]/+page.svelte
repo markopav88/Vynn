@@ -4317,7 +4317,7 @@
 	<!-- Add commands cheat sheet overlay -->
 	<div class="commands-overlay" class:show-commands={showCommands}>
 		<div class="commands-header">
-			<h5>Command Reference</h5>
+				<h5>Command Reference</h5>
 			<button class="commands-close" on:click={() => (showCommands = false)} aria-label="Close commands reference"
 				>×</button
 			>

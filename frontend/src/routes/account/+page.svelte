@@ -4,7 +4,6 @@
     import { get_all_commands, get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/document';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
-    import '$lib/assets/style/account.css'
     
     let isLoggedIn = true;
     let isLoading = true;
@@ -1291,5 +1290,4 @@
         50% { background-color: rgba(16, 185, 129, 0.2); }
         100% { background-color: transparent; }
     }
-    
 </style>

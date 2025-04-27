@@ -1149,5 +1149,3 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	opacity: 0;
 	position: relative;
 }
-
-/* When animating, we need the container to maintain its height and width */
