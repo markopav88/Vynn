@@ -1098,47 +1098,6 @@
 			}
 			return;
 		}
-		// Handle Ctrl+I for italic formatting in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
-			event.preventDefault();
-			// Only apply italic if there's a selection
-			const selection = window.getSelection();
-			if (selection && !selection.isCollapsed) {
-				applyItalicFormatting();
-			} else if (editorMode === 'INSERT') {
-				// In insert mode, allow toggling italic mode even without selection
-				applyItalicFormatting();
-			}
-			return;
-		}
-
-		// Handle Ctrl+U for underline formatting in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'u') {
-			event.preventDefault();
-			// Only apply underline if there's a selection
-			const selection = window.getSelection();
-			if (selection && !selection.isCollapsed) {
-				applyUnderlineFormatting();
-			} else if (editorMode === 'INSERT') {
-				// In insert mode, allow toggling underline mode even without selection
-				applyUnderlineFormatting();
-			}
-			return;
-		}
-
-		// Handle Ctrl+1-9 for document switching in any mode
-		if ((event.ctrlKey || event.metaKey) && /^[1-9]$/.test(event.key)) {
-			event.preventDefault();
-			const index = parseInt(event.key) - 1;
-			if (projectDocuments && projectDocuments[index]) {
-				console.log(`Switching to document ${index + 1}:`, projectDocuments[index]);
-				switchDocument(projectDocuments[index].id);
-			} else {
-				console.log(`No document at index ${index + 1}`);
-				showCommandError(`No document ${index + 1} available`);
-			}
-			return;
-		}
 
 		// Handle Escape key to exit any mode and return to NORMAL mode
 		if (event.key === 'Escape') {
@@ -2325,87 +2284,6 @@
 		}
 	}
 
-	function applyItalicFormatting() {
-		if (document.queryCommandSupported('italic')) {
-			document.execCommand('italic', false);
-			showCommandError('Italic formatting applied');
-		} else {
-			showCommandError('Italic formatting not supported');
-		}
-	}
-
-	function applyBoldFormatting(event: KeyboardEvent) {
-		// Prevent default behavior first
-		event.preventDefault();
-
-		// Check if bold command is supported
-		if (!document.queryCommandSupported('bold')) {
-			showCommandError('Bold formatting not supported');
-			return;
-		}
-
-		// Get the current selection
-		const selection = window.getSelection();
-		
-		// Apply bold if there's a selection or if we're in INSERT mode
-		if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
-			document.execCommand('bold', false);
-			showCommandError('Bold formatting applied');
-		}
-	}
-
-	function applyUnderlineFormatting() {
-		if (document.queryCommandSupported('underline')) {
-			// Apply the underline command
-			document.execCommand('underline', false);
-			
-			// Fix the case where we have multiple colored sections within a single underline
-			if (editorElement) {
-				// Find any u elements with multiple font children
-				const underlineElements = editorElement.querySelectorAll('u');
-				
-				for (const uElem of underlineElements) {
-					const fontElements = uElem.querySelectorAll('font');
-					
-					// If we have multiple font elements inside a single u tag
-					if (fontElements.length > 1) {
-						// Create a document fragment to hold our new structure
-						const fragment = document.createDocumentFragment();
-						
-						// For each font element, restructure to font > u
-						Array.from(fontElements).forEach(fontElem => {
-							const color = fontElem.getAttribute('color');
-							const content = fontElem.innerHTML;
-							
-							// Create new structure with font wrapping u
-							const newFont = document.createElement('font');
-							if (color) newFont.setAttribute('color', color);
-							
-							const newU = document.createElement('u');
-							newU.innerHTML = content;
-							
-							newFont.appendChild(newU);
-							fragment.appendChild(newFont);
-						});
-						
-						// Replace the old structure with our fixed one
-						if (uElem.parentNode) {
-							uElem.parentNode.replaceChild(fragment, uElem);
-						}
-					}
-				}
-			}
-			
-			showCommandError('Underline formatting applied');
-		} else {
-			showCommandError('Underline formatting not supported');
-		}
-	}
-
-	function applyIndentation() {
-			document.execCommand('indent', false);
-			showCommandError('Indentation applied');
-	}
 
 	function applyTextColor(color: string) {
 		if (document.queryCommandSupported('foreColor')) {
@@ -3843,7 +3721,7 @@
 		}, 300);
 	});
 	
-	// Define our command functions object with just bold for now
+	// Define our command functions object with formatting commands
 	const commandFunctions: CommandFunctions = {
 		applyBoldFormatting: () => {
 			console.debug('Executing bold formatting command');
@@ -3856,6 +3734,170 @@
 			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
 				document.execCommand('bold', false);
 				showCommandError('Bold formatting applied');
+			}
+		},
+		applyItalicFormatting: () => {
+			console.debug('Executing italic formatting command');
+			if (!document.queryCommandSupported('italic')) {
+				showCommandError('Italic formatting not supported');
+				return;
+			}
+
+			const selection = window.getSelection();
+			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
+				document.execCommand('italic', false);
+				showCommandError('Italic formatting applied');
+			}
+		},
+		applyUnderlineFormatting: () => {
+			console.debug('Executing underline formatting command');
+			if (!document.queryCommandSupported('underline')) {
+				showCommandError('Underline formatting not supported');
+				return;
+			}
+
+			const selection = window.getSelection();
+			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
+				document.execCommand('underline', false);
+				
+				// Fix the case where we have multiple colored sections within a single underline
+				if (editorElement) {
+					// Find any u elements with multiple font children
+					const underlineElements = editorElement.querySelectorAll('u');
+					
+					for (const uElem of underlineElements) {
+						const fontElements = uElem.querySelectorAll('font');
+						
+						// If we have multiple font elements inside a single u tag
+						if (fontElements.length > 1) {
+							// Create a document fragment to hold our new structure
+							const fragment = document.createDocumentFragment();
+							
+							// For each font element, restructure to font > u
+							Array.from(fontElements).forEach(fontElem => {
+								const color = fontElem.getAttribute('color');
+								const content = fontElem.innerHTML;
+								
+								// Create new structure with font wrapping u
+								const newFont = document.createElement('font');
+								if (color) newFont.setAttribute('color', color);
+								
+								const newU = document.createElement('u');
+								newU.innerHTML = content;
+								
+								newFont.appendChild(newU);
+								fragment.appendChild(newFont);
+							});
+							
+							// Replace the old structure with our fixed one
+							if (uElem.parentNode) {
+								uElem.parentNode.replaceChild(fragment, uElem);
+							}
+						}
+					}
+				}
+				
+				showCommandError('Underline formatting applied');
+			}
+		},
+		// Add document switching commands
+		switchToDocument1: () => {
+			console.debug('Switching to document 1');
+			const index = 0;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 1:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 1`);
+				showCommandError(`No document 1 available`);
+			}
+		},
+		switchToDocument2: () => {
+			console.debug('Switching to document 2');
+			const index = 1;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 2:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 2`);
+				showCommandError(`No document 2 available`);
+			}
+		},
+		switchToDocument3: () => {
+			console.debug('Switching to document 3');
+			const index = 2;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 3:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 3`);
+				showCommandError(`No document 3 available`);
+			}
+		},
+		switchToDocument4: () => {
+			console.debug('Switching to document 4');
+			const index = 3;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 4:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 4`);
+				showCommandError(`No document 4 available`);
+			}
+		},
+		switchToDocument5: () => {
+			console.debug('Switching to document 5');
+			const index = 4;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 5:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 5`);
+				showCommandError(`No document 5 available`);
+			}
+		},
+		switchToDocument6: () => {
+			console.debug('Switching to document 6');
+			const index = 5;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 6:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 6`);
+				showCommandError(`No document 6 available`);
+			}
+		},
+		switchToDocument7: () => {
+			console.debug('Switching to document 7');
+			const index = 6;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 7:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 7`);
+				showCommandError(`No document 7 available`);
+			}
+		},
+		switchToDocument8: () => {
+			console.debug('Switching to document 8');
+			const index = 7;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 8:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 8`);
+				showCommandError(`No document 8 available`);
+			}
+		},
+		switchToDocument9: () => {
+			console.debug('Switching to document 9');
+			const index = 8;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 9:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 9`);
+				showCommandError(`No document 9 available`);
 			}
 		}
 	};

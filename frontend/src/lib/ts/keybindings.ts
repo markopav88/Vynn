@@ -26,6 +26,8 @@ interface CommandIdMap {
 // Command functions interface
 export interface CommandFunctions {
     applyBoldFormatting?: () => void;
+    applyItalicFormatting?: () => void;
+    applyUnderlineFormatting?: () => void;
     moveLeft?: () => void;
     moveRight?: () => void;
     moveUp?: () => void;
@@ -51,6 +53,18 @@ export class keybindings {
         return {
             bold: {
                 keyDown: "b",
+                altDown: false,
+                ctrlDown: true,
+                shiftDown: false,
+            },
+            italic: {
+                keyDown: "i",
+                altDown: false,
+                ctrlDown: true,
+                shiftDown: false,
+            },
+            underline: {
+                keyDown: "u",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
@@ -139,24 +153,28 @@ export class keybindings {
     // Command ID to name mapping
     static commandIdToName: CommandIdMap = {
         1: 'bold',
-        2: 'moveLeft',
-        3: 'moveRight',
-        4: 'moveUp',
-        5: 'moveDown',
-        6: 'switchToDocument1',
-        7: 'switchToDocument2',
-        8: 'switchToDocument3',
-        9: 'switchToDocument4',
-        10: 'switchToDocument5',
-        11: 'switchToDocument6',
-        12: 'switchToDocument7',
-        13: 'switchToDocument8',
-        14: 'switchToDocument9',
+        2: 'italic',
+        3: 'underline',
+        4: 'moveLeft',
+        5: 'moveRight',
+        6: 'moveUp',
+        7: 'moveDown',
+        8: 'switchToDocument1',
+        9: 'switchToDocument2',
+        10: 'switchToDocument3',
+        11: 'switchToDocument4',
+        12: 'switchToDocument5',
+        13: 'switchToDocument6',
+        14: 'switchToDocument7',
+        15: 'switchToDocument8',
+        16: 'switchToDocument9',
     };
     
     // Command name to function name mapping
     static commandToFunctionMap: Record<string, string> = {
         'bold': 'applyBoldFormatting',
+        'italic': 'applyItalicFormatting',
+        'underline': 'applyUnderlineFormatting',
         'moveLeft': 'moveLeft',
         'moveRight': 'moveRight',
         'moveUp': 'moveUp',
