@@ -399,6 +399,16 @@
 		}
 	}
 
+	// --- ADD Function Definition Here ---
+	function exitInsertMode() {
+		editorMode = 'NORMAL';
+		showCommandError('-- NORMAL --'); // Optional feedback
+		clearNormalModeBuffer(); // Clear any pending sequence
+		// Optionally return focus to the editor if needed
+		// if (editorElement) editorElement.focus(); 
+	}
+	// --- END ADDED Function ---
+
 	// Function to handle command input
 	function handleCommandInput() {}
 
@@ -1004,16 +1014,17 @@
 
 	// Special handler for Enter key to fix line counting issues
 	function handleKeyDown(event: KeyboardEvent) {
-		if (!event) return;
+		console.log(`KeyDown event: {key: '${event.key}', ctrlKey: ${event.ctrlKey}, metaKey: ${event.metaKey}, shiftKey: ${event.shiftKey}, showColorPicker: ${showColorPicker}}`);
+
+		// Log the currently active binding for underline for debugging
+		console.log('Active underline binding:', keybindings.activeBindings.underline);
+
+		if (showColorPicker) {
+			handleColorPickerKeyDown(event);
+			return;
+		}
 
 		preventBrowserDefaults(event);
-
-		console.log('KeyDown event:', {
-			key: event.key,
-			ctrlKey: event.ctrlKey,
-			metaKey: event.metaKey,
-			showColorPicker: showColorPicker
-		});
 
 		// If color picker is open, handle its navigation
 		if (showColorPicker) {
@@ -1078,45 +1089,25 @@
 			return;
 		}
 
-		// INSERT MODE: Allow typing but handle minimal key commands
+		// INSERT MODE: Delegate to the specific handler
 		if (editorMode === 'INSERT') {
-			clearNormalModeBuffer();
-			// Handle arrow keys in any mode - update line highlighting with better timing
-			if (
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight'
-			) {
-			// Let browser handle actual cursor movement
-				// Then update our position tracking with two phases to ensure accuracy
-			setTimeout(() => {
-				updateCursorPosition();
-				updateLineNumbers();
-
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 10);
-			}, 0);
-			}
-
-			// For all other keys in INSERT mode, just let the default behavior occur
+			handleInsertModeKeyDown(event);
+			// After handling specific keys (like Escape or formatting), 
+			// update UI for regular typing
 			setTimeout(() => {
 				updateCursorPosition();
 				updateLineNumbers();
 				ensureCursorVisible();
 			}, 0);
-
-			return;
+			return; // Return after handling INSERT mode
 		}
 
 		// NORMAL MODE: Handle editor commands
 		if (editorMode === 'NORMAL') {
 			// Clear any existing buffer timeout
 			if (normalModeBufferTimeout) {
-				clearTimeout(normalModeBufferTimeout);
-				normalModeBufferTimeout = null;
+					clearTimeout(normalModeBufferTimeout);
+					normalModeBufferTimeout = null;
 			}
 
 			// Allow text selection with Shift + arrow keys in normal mode
@@ -4144,6 +4135,64 @@
 				ensureCursorVisible();
 			}
 		}
+	}
+
+	function handleInsertModeKeyDown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			exitInsertMode(); // Assuming exitInsertMode is defined in the outer scope
+			event.preventDefault();
+			return;
+		}
+
+		// --- This is the logic that should be present ---
+
+		// Explicitly check for formatting shortcuts in INSERT mode
+		const eventInput = {
+			kd: event.key.toLowerCase(), // Temporary lowercase key for comparison
+			altDown: event.altKey,
+			ctrlDown: event.ctrlKey,
+			shiftDown: event.shiftKey
+		};
+
+		const bindings = keybindings.activeBindings;
+
+		// *** Helper function defined INSIDE handleInsertModeKeyDown ***
+		const checkBinding = (binding: KeyboardInput | undefined): boolean => {
+			if (!binding) return false;
+			return (
+				binding.keyDown.toLowerCase() === eventInput.kd && // Compare lowercase key
+				binding.altDown === eventInput.altDown &&
+				binding.ctrlDown === eventInput.ctrlDown &&
+				binding.shiftDown === eventInput.shiftDown
+			);
+		};
+		// *** End of checkBinding definition ***
+
+		// Now use the helper function
+		if (bindings.bold && checkBinding(bindings.bold)) {
+			console.log('Applying bold formatting in INSERT mode');
+			commandFunctions.applyBoldFormatting?.();
+			event.preventDefault();
+			return;
+		}
+
+		if (bindings.italic && checkBinding(bindings.italic)) {
+			console.log('Applying italic formatting in INSERT mode');
+			commandFunctions.applyItalicFormatting?.();
+			event.preventDefault();
+			return;
+		}
+
+		if (bindings.underline && checkBinding(bindings.underline)) {
+			console.log('Applying underline formatting in INSERT mode');
+			commandFunctions.applyUnderlineFormatting?.();
+			event.preventDefault();
+			return;
+		}
+
+		// --- End of the logic to add ---
+
+		// If not a handled shortcut, let default input handling occur
 	}
 </script>
 
