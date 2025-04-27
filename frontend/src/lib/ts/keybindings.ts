@@ -28,6 +28,7 @@ export interface CommandFunctions {
     applyBoldFormatting?: () => void;
     applyItalicFormatting?: () => void;
     applyUnderlineFormatting?: () => void;
+    openColorPicker?: () => void;
     moveLeft?: () => void;
     moveRight?: () => void;
     moveUp?: () => void;
@@ -65,6 +66,12 @@ export class keybindings {
             },
             underline: {
                 keyDown: "u",
+                altDown: false,
+                ctrlDown: true,
+                shiftDown: false,
+            },
+            openColorPicker: {
+                keyDown: "f",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
@@ -155,19 +162,20 @@ export class keybindings {
         1: 'bold',
         2: 'italic',
         3: 'underline',
-        4: 'moveLeft',
-        5: 'moveRight',
-        6: 'moveUp',
-        7: 'moveDown',
-        8: 'switchToDocument1',
-        9: 'switchToDocument2',
-        10: 'switchToDocument3',
-        11: 'switchToDocument4',
-        12: 'switchToDocument5',
-        13: 'switchToDocument6',
-        14: 'switchToDocument7',
-        15: 'switchToDocument8',
-        16: 'switchToDocument9',
+        4: 'openColorPicker',
+        5: 'moveLeft',
+        6: 'moveRight',
+        7: 'moveUp',
+        8: 'moveDown',
+        9: 'switchToDocument1',
+        10: 'switchToDocument2',
+        11: 'switchToDocument3',
+        12: 'switchToDocument4',
+        13: 'switchToDocument5',
+        14: 'switchToDocument6',
+        15: 'switchToDocument7',
+        16: 'switchToDocument8',
+        17: 'switchToDocument9',
     };
     
     // Command name to function name mapping
@@ -175,6 +183,7 @@ export class keybindings {
         'bold': 'applyBoldFormatting',
         'italic': 'applyItalicFormatting',
         'underline': 'applyUnderlineFormatting',
+        'openColorPicker': 'openColorPicker',
         'moveLeft': 'moveLeft',
         'moveRight': 'moveRight',
         'moveUp': 'moveUp',

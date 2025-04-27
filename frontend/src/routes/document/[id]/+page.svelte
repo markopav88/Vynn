@@ -999,106 +999,6 @@
 			return;
 		}
 
-		// Handle Ctrl+F for color picker in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
-			console.log('Ctrl+F detected, checking selection');
-			event.preventDefault();
-			const selection = window.getSelection();
-			console.log('Selection:', {
-				exists: !!selection,
-				isCollapsed: selection?.isCollapsed,
-				editorMode: editorMode
-			});
-
-			if (selection && (!selection.isCollapsed || editorMode === 'INSERT')) {
-				// Position the color picker relative to the editor
-				if (editorElement) {
-					const editorRect = editorElement.getBoundingClientRect();
-					const cursorX = editorRect.left + Math.min(200, editorRect.width * 0.3);
-					const cursorY = editorRect.top + Math.min(150, editorRect.height * 0.2);
-
-					colorPickerPosition = {
-						x: Math.max(0, Math.min(cursorX, window.innerWidth - 320)),
-						y: Math.max(0, Math.min(cursorY, window.innerHeight - 450))
-					};
-					console.log('Setting color picker position with editor rect:', {
-						editorRect,
-						cursorX,
-						cursorY,
-						colorPickerPosition,
-						windowSize: {
-							width: window.innerWidth,
-							height: window.innerHeight
-						}
-					});
-				}
-
-				// Initialize color picker with default black color
-				hue = 0;
-				saturation = 100;
-				lightness = 50;
-				updateColorFromHSL();
-
-				// Try to get the current selection color if possible
-				try {
-					const selection = window.getSelection();
-					if (selection && selection.rangeCount > 0) {
-						const range = selection.getRangeAt(0);
-						const span = document.createElement('span');
-						range.surroundContents(span);
-
-						// Get computed color
-						const computedColor = window.getComputedStyle(span).color;
-						if (computedColor) {
-							// Parse RGB color
-							const rgb = computedColor.match(/\d+/g);
-							if (rgb && rgb.length >= 3) {
-								rgbColor = {
-									r: parseInt(rgb[0]),
-									g: parseInt(rgb[1]),
-									b: parseInt(rgb[2])
-								};
-
-								// Update hex and HSL
-								hexColor = rgbToHex(rgbColor.r, rgbColor.g, rgbColor.b);
-								const hsl = rgbToHsl(rgbColor.r, rgbColor.g, rgbColor.b);
-								hue = hsl[0];
-								// For slider, always use full saturation and medium lightness
-								saturation = 100;
-								lightness = 50;
-
-								selectedColor = rgbToHex(...hslToRgb(hue, saturation / 100, lightness / 100));
-							}
-						}
-
-						// Restore the selection without removing the content
-						// First, save the content
-						const content = span.innerHTML;
-						// Replace span with its content
-						const fragment = document.createDocumentFragment();
-						while (span.firstChild) {
-							fragment.appendChild(span.firstChild);
-						}
-						span.parentNode?.replaceChild(fragment, span);
-						
-						// Reselect the text
-						if (selection && selection.rangeCount > 0) {
-							selection.removeAllRanges();
-							selection.addRange(range);
-						}
-					}
-				} catch (error) {
-					console.error('Error getting current color:', error);
-				}
-
-				showColorPicker = true;
-				console.log('Color picker opened');
-			} else {
-				console.log('Color picker not opened: no valid selection or not in INSERT mode');
-			}
-			return;
-		}
-
 		// Handle Escape key to exit any mode and return to NORMAL mode
 		if (event.key === 'Escape') {
 			editorMode = 'NORMAL';
@@ -1838,7 +1738,7 @@
 					}
 
 					// Set up color picker listeners
-					setupColorPickerListeners();
+
 				}, 100);
 			}, 150);
 		} catch (e) {
@@ -3684,19 +3584,6 @@
 		return [Math.round(h), s, l];
 	}
 
-	// Function to set up color picker event listeners
-	function setupColorPickerListeners() {
-		// Add click outside handlers for closing modals
-		window.addEventListener('click', (event) => {
-			// Handle clicks outside the color picker
-			if (showColorPicker && event.target instanceof Node) {
-				const colorPickerEl = document.querySelector('.color-picker');
-				if (colorPickerEl && !colorPickerEl.contains(event.target)) {
-					showColorPicker = false;
-				}
-			}
-		});
-	}
 
 	// Simple onMount function that ensures all content is visible immediately
 	onMount(() => {
@@ -3899,14 +3786,24 @@
 				console.log(`No document at index 9`);
 				showCommandError(`No document 9 available`);
 			}
+		},
+		openColorPicker: () => {
+			console.debug('Opening color picker');
+			showColorPicker = true;
 		}
 	};
 
 	// Global keyboard event handler for keybindings
 	function handleKeybindingKeyDown(event: KeyboardEvent) {
+		// If color picker is open, don't handle any keybindings
+		// Let the color picker handle its own keyboard events
+		if (showColorPicker) {
+			return;
+		}
+
 		console.debug('Keyboard event received:', {
 			key: event.key,
-			altKey: event.altKey,
+			altDown: event.altKey,
 			ctrlDown: event.ctrlKey,
 			shiftDown: event.shiftKey
 		});
@@ -3927,6 +3824,35 @@
 			console.debug('Command was executed successfully');
 		} else {
 			console.debug('No matching keybinding found for:', mapKey);
+		}
+	}
+
+	// Handle color picker keyboard events
+	function handleColorPickerKeyDown(event: KeyboardEvent) {
+		if (!showColorPicker) return;
+
+		switch(event.key) {
+			case 'Escape':
+				event.preventDefault();
+				showColorPicker = false;
+				break;
+			case 'Enter':
+				event.preventDefault();
+				if (selectedColor) {
+					applyTextColor(selectedColor);
+					showColorPicker = false;
+				}
+				break;
+			case 'ArrowLeft':
+			case 'h':
+				event.preventDefault();
+				// Handle color selection movement left
+				break;
+			case 'ArrowRight':
+			case 'l':
+				event.preventDefault();
+				// Handle color selection movement right
+				break;
 		}
 	}
 
@@ -4202,7 +4128,7 @@
 	</div>
 
 	{#if showColorPicker}
-		<div class="color-picker" style="left: {colorPickerPosition.x}px; top: {colorPickerPosition.y}px;">
+		<div class="color-picker" style="position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);">
 			<div class="hue-slider-container">
 				<input
 					type="range"
