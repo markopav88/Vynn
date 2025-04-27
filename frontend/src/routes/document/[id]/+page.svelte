@@ -3582,6 +3582,10 @@
 			console.debug('Executing moveToEndOfDocument command');
 			moveToEndOfDocument(); // Call the existing function
 		},
+		moveToStartOfDocument: () => {
+			console.debug('Executing moveToStartOfDocument command');
+			moveToStartOfDocument(); // Call the existing function
+		},
 	};
 
 	// Global keyboard event handler for keybindings

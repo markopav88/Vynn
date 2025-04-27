@@ -46,6 +46,7 @@ export interface CommandFunctions {
     switchToDocument8?: () => void;
     switchToDocument9?: () => void;
     moveToEndOfDocument?: () => void;
+    moveToStartOfDocument?: () => void;
     [key: string]: (() => void) | undefined;
 }
 
@@ -128,6 +129,12 @@ export class keybindings {
                 ctrlDown: false,
                 shiftDown: true,
             },
+            moveToStartOfDocument: {
+                keyDown: "g",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
             switchToDocument1: {
                 keyDown: "1",
                 altDown: false,
@@ -208,6 +215,7 @@ export class keybindings {
         19: 'moveToStartOfLine',
         20: 'moveToEndOfLine',
         21: 'moveToEndOfDocument',
+        22: 'moveToStartOfDocument',
     };
     
     // Command name to function name mapping
@@ -224,6 +232,7 @@ export class keybindings {
         'moveToStartOfLine': 'moveToStartOfLine',
         'moveToEndOfLine': 'moveToEndOfLine',
         'moveToEndOfDocument': 'moveToEndOfDocument',
+        'moveToStartOfDocument': 'moveToStartOfDocument',
         'switchToDocument1': 'switchToDocument1',
         'switchToDocument2': 'switchToDocument2',
         'switchToDocument3': 'switchToDocument3',
