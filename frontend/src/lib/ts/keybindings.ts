@@ -50,7 +50,11 @@ export interface CommandFunctions {
     toggleCommandSheet?: () => void;
     findNextMatch?: () => void;
     findPreviousMatch?: () => void;
-    [key: string]: (() => void) | undefined;
+    deleteSelectedText?: () => void;
+    yankText?: () => void;
+    deleteLine?: () => void;
+    pasteText?: () => Promise<void>;
+    [key: string]: (() => void | Promise<void>) | undefined;
 }
 
 export class keybindings {
@@ -156,6 +160,30 @@ export class keybindings {
                 ctrlDown: false,
                 shiftDown: false,
             },
+            deleteSelectedText: {
+                keyDown: "x",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
+            yankText: {
+                keyDown: "y",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
+            deleteLine: {
+                keyDown: "d",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
+            pasteText: {
+                keyDown: "p",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
             switchToDocument1: {
                 keyDown: "1",
                 altDown: false,
@@ -240,6 +268,10 @@ export class keybindings {
         23: 'toggleCommandSheet',
         24: 'findNextMatch',
         25: 'findPreviousMatch',
+        26: 'deleteSelectedText',
+        27: 'yankText',
+        28: 'deleteLine',
+        29: 'pasteText',
     };
     
     // Command name to function name mapping
@@ -260,6 +292,10 @@ export class keybindings {
         'toggleCommandSheet': 'toggleCommandSheet',
         'findNextMatch': 'findNextMatch',
         'findPreviousMatch': 'findPreviousMatch',
+        'deleteSelectedText': 'deleteSelectedText',
+        'yankText': 'yankText',
+        'deleteLine': 'deleteCurrentLine',
+        'pasteText': 'pasteText',
         'switchToDocument1': 'switchToDocument1',
         'switchToDocument2': 'switchToDocument2',
         'switchToDocument3': 'switchToDocument3',
