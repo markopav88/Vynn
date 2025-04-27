@@ -9,6 +9,7 @@
 	import { get_project_documents } from '$lib/ts/project';
 	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
 	import Toast from '$lib/components/Toast.svelte';
+	import { keybindings, keybindingMap, type CommandFunctions } from '$lib/ts/keybindings';
 
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
@@ -1097,21 +1098,6 @@
 			}
 			return;
 		}
-
-		// Handle Ctrl+B for bold formatting in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
-			event.preventDefault();
-			// Only apply bold if there's a selection
-			const selection = window.getSelection();
-			if (selection && !selection.isCollapsed) {
-				applyBoldFormatting();
-			} else if (editorMode === 'INSERT') {
-				// In insert mode, allow toggling bold mode even without selection
-				applyBoldFormatting();
-			}
-			return;
-		}
-
 		// Handle Ctrl+I for italic formatting in any mode
 		if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
 			event.preventDefault();
@@ -2348,8 +2334,21 @@
 		}
 	}
 
-	function applyBoldFormatting() {
-		if (document.queryCommandSupported('bold')) {
+	function applyBoldFormatting(event: KeyboardEvent) {
+		// Prevent default behavior first
+		event.preventDefault();
+
+		// Check if bold command is supported
+		if (!document.queryCommandSupported('bold')) {
+			showCommandError('Bold formatting not supported');
+			return;
+		}
+
+		// Get the current selection
+		const selection = window.getSelection();
+		
+		// Apply bold if there's a selection or if we're in INSERT mode
+		if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
 			document.execCommand('bold', false);
 			showCommandError('Bold formatting applied');
 		}
@@ -3842,6 +3841,71 @@
 				}
 			}, 100);
 		}, 300);
+	});
+	
+	// Define our command functions object with just bold for now
+	const commandFunctions: CommandFunctions = {
+		applyBoldFormatting: () => {
+			console.debug('Executing bold formatting command');
+			if (!document.queryCommandSupported('bold')) {
+				showCommandError('Bold formatting not supported');
+				return;
+			}
+
+			const selection = window.getSelection();
+			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
+				document.execCommand('bold', false);
+				showCommandError('Bold formatting applied');
+			}
+		}
+	};
+
+	// Global keyboard event handler for keybindings
+	function handleKeybindingKeyDown(event: KeyboardEvent) {
+		console.debug('Keyboard event received:', {
+			key: event.key,
+			altKey: event.altKey,
+			ctrlDown: event.ctrlKey,
+			shiftDown: event.shiftKey
+		});
+
+		// Convert event to our input format for debugging
+		const input = keybindingMap.keyEventToInput(event);
+		const mapKey = keybindingMap.getMapKey(input);
+		console.debug('Converted to map key:', mapKey);
+
+		// Check active bindings for debugging
+		console.debug('Current active bindings:', keybindings.activeBindings);
+
+		// Try to handle the input
+		const wasHandled = keybindingMap.handleKeyboardInput(event, commandFunctions);
+		console.debug('Keyboard input was handled:', wasHandled);
+
+		if (wasHandled) {
+			console.debug('Command was executed successfully');
+		} else {
+			console.debug('No matching keybinding found for:', mapKey);
+		}
+	}
+
+	onMount(() => {
+		console.debug('Component mounted, initializing keybindings');
+		
+		// Initialize keybindings
+		keybindings.fetchAndUpdateBindings()
+			.then(() => {
+				console.debug('Keybindings initialized:', keybindings.activeBindings);
+				window.addEventListener('keydown', handleKeybindingKeyDown);
+			})
+			.catch((error) => {
+				console.error('Error initializing keybindings:', error);
+			});
+
+		// Return cleanup function
+		return () => {
+			console.debug('Cleaning up keyboard event listener');
+			window.removeEventListener('keydown', handleKeybindingKeyDown);
+		};
 	});
 </script>
 

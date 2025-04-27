@@ -174,18 +174,37 @@ export class keybindings {
     
     // Helper function to parse keybinding string from backend
     static parseKeybindingString(keybinding: string): KeyboardInput {
-        const parts = keybinding.split('+');
+        // First split by spaces and join with + to normalize the format
+        const normalizedKeybinding = keybinding.toLowerCase().split(' ').join('+');
+        
+        // Now split by + to separate modifiers from key
+        const parts = normalizedKeybinding.split('+');
+        
+        // The last part is always the key
         const keyDown = parts[parts.length - 1].trim();
+        
         let ctrlDown = false;
         let altDown = false;
         let shiftDown = false;
         
-        // Check for modifiers
-        parts.forEach(part => {
+        // Check for modifiers in all parts except the last one
+        parts.slice(0, -1).forEach(part => {
             const mod = part.trim().toLowerCase();
             if (mod === 'ctrl' || mod === 'control') ctrlDown = true;
             if (mod === 'alt') altDown = true;
             if (mod === 'shift') shiftDown = true;
+        });
+        
+        console.debug('Parsed keybinding:', {
+            original: keybinding,
+            normalized: normalizedKeybinding,
+            parts,
+            result: {
+                keyDown,
+                altDown,
+                ctrlDown,
+                shiftDown
+            }
         });
         
         return {
