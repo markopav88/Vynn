@@ -193,9 +193,9 @@ ON CONFLICT DO NOTHING;
 -- Insert Default Commands
 INSERT INTO commands(command_id, command_name, command_description, default_keybinding)
 VALUES 
-(1, 'Bold Selected', 'Bolds The Selected Text', 'Ctrl, B'),
-(2, 'Italic Selected', 'Italics The Selected Text', 'Ctrl, I'),
-(3, 'Underline Selected', 'Underline The Selected Text', 'Ctrl, U');
+(1, 'Bold', 'Bolds The Selected Text', 'Ctrl, B'),
+(2, 'Italic', 'Italics The Selected Text', 'Ctrl, I'),
+(3, 'Underline', 'Underline The Selected Text', 'Ctrl, U');
 
 -- Give User 1 Some Custom Keybindings
 INSERT INTO user_keybindings(user_id, command_id, keybinding)
@@ -214,7 +214,7 @@ SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
 -- Create tables for AI writing assistant functionality
 
 -- Writing assistant sessions table
-CREATE TABLE writing_assistant_sessions (
+CREATE TABLE IF NOT EXISTS writing_assistant_sessions (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     document_id INT REFERENCES documents(id) ON DELETE SET NULL,
@@ -224,7 +224,7 @@ CREATE TABLE writing_assistant_sessions (
 );
 
 -- Writing assistant messages table
-CREATE TABLE writing_assistant_messages (
+CREATE TABLE IF NOT EXISTS writing_assistant_messages (
     id SERIAL PRIMARY KEY,
     session_id INT NOT NULL REFERENCES writing_assistant_sessions(id) ON DELETE CASCADE,
     role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
@@ -233,9 +233,9 @@ CREATE TABLE writing_assistant_messages (
 );
 
 -- Indexes for faster queries
-CREATE INDEX idx_writing_messages_session_id ON writing_assistant_messages(session_id);
-CREATE INDEX idx_writing_sessions_user_id ON writing_assistant_sessions(user_id);
-CREATE INDEX idx_writing_sessions_document_id ON writing_assistant_sessions(document_id);
+CREATE INDEX IF NOT EXISTS idx_writing_messages_session_id ON writing_assistant_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_writing_sessions_user_id ON writing_assistant_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_writing_sessions_document_id ON writing_assistant_sessions(document_id);
 
 -- Set initial sequence values for writing assistant tables
 SELECT setval('writing_assistant_sessions_id_seq', 1, false);

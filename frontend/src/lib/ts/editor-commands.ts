@@ -9,10 +9,14 @@
 / normalModeKeybindings: Const Mapping containing all valid NORMAL mode commands
 / documentCommands: Const Mapping containing all movement commands between documents
 / ctrlKeybindings: Const Mapper of Cntrl Bindings
+/ KeyboardInput: Type definition for keyboard input state
+/ keyboardInputMap: Mapping from KeyboardInput states to command functions
+/ CommandKeybinding: Object that associates command names with configurable keybindings
 / getCursorRect: Function to get cursor rectangle
 / switchToDocumentByIndex: Helper Function to switch to a document by index
 / handleNormalModeKeydown: Function to handle NORMAL key press
 / executeCommand: Function to execute a command
+/ fetchCommandKeybindings: Function to retrieve command keybindings from backend
 */
 
 // Define command types
@@ -22,6 +26,7 @@ export type EditorCommand = {
 	description: string;
 	execute: (editor: any) => void;
 };
+
 
 // Define movement commands
 export const movementCommands: Record<string, EditorCommand> = {
@@ -318,3 +323,4 @@ export function executeCommand(commandId: string, editor: HTMLTextAreaElement): 
 
 	return false;
 }
+
