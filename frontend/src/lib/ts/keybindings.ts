@@ -34,6 +34,8 @@ export interface CommandFunctions {
     moveRight?: () => void;
     moveUp?: () => void;
     moveDown?: () => void;
+    moveToStartOfLine?: () => void;
+    moveToEndOfLine?: () => void;
     switchToDocument1?: () => void;
     switchToDocument2?: () => void;
     switchToDocument3?: () => void;
@@ -106,6 +108,18 @@ export class keybindings {
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
+            },
+            moveToStartOfLine: {
+                keyDown: "0",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: false,
+            },
+            moveToEndOfLine: {
+                keyDown: "$",
+                altDown: false,
+                ctrlDown: false,
+                shiftDown: true,
             },
             switchToDocument1: {
                 keyDown: "1",
@@ -184,6 +198,8 @@ export class keybindings {
         16: 'switchToDocument8',
         17: 'switchToDocument9',
         18: 'enterInsertMode',
+        19: 'moveToStartOfLine',
+        20: 'moveToEndOfLine',
     };
     
     // Command name to function name mapping
@@ -197,6 +213,8 @@ export class keybindings {
         'moveRight': 'moveRight',
         'moveUp': 'moveUp',
         'moveDown': 'moveDown',
+        'moveToStartOfLine': 'moveToStartOfLine',
+        'moveToEndOfLine': 'moveToEndOfLine',
         'switchToDocument1': 'switchToDocument1',
         'switchToDocument2': 'switchToDocument2',
         'switchToDocument3': 'switchToDocument3',

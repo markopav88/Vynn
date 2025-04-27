@@ -1057,14 +1057,6 @@
 				normalModeBufferTimeout = null;
 			}
 
-			// Special handler for '0' key in NORMAL mode
-			if (event.key === '0') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				moveToStartOfLine(); // Call the function to move to start of line
-				return;
-			}
-
 			// Allow text selection with Shift + arrow keys in normal mode
 			if (
 				event.shiftKey &&
@@ -1079,6 +1071,12 @@
 			) {
 				return; // Let browser handle selection
 			}
+
+			// For any other key in NORMAL mode that wasn't handled above 
+			// or by the keybinding system (which runs separately via window listener),
+			// prevent the default browser action (e.g., inserting characters).
+			// Note: The keybinding system should ideally call preventDefault itself if it handles a key.
+			event.preventDefault(); 
 
 		}
 	}
@@ -3550,6 +3548,14 @@
 		moveDown: () => {
 			console.debug('Executing moveDown command');
 			moveDown(); // Call the existing function
+		},
+		moveToStartOfLine: () => { // Add this function
+			console.debug('Executing moveToStartOfLine command');
+			moveToStartOfLine(); // Call the existing function
+		},
+		moveToEndOfLine: () => { // Add this function
+			console.debug('Executing moveToEndOfLine command');
+			moveToEndOfLine(); // Call the existing function
 		},
 	};
 
