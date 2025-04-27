@@ -1072,6 +1072,27 @@
 				return; // Let browser handle selection
 			}
 
+			if (event.key === 'ArrowLeft') {
+				event.preventDefault();
+				moveLeft();
+				return;
+			}
+			if (event.key === 'ArrowRight') {
+				event.preventDefault();
+				moveRight();
+				return;
+			}
+			if (event.key === 'ArrowUp') {
+				event.preventDefault();
+				moveUp();
+				return;
+			}
+			if (event.key === 'ArrowDown') {
+				event.preventDefault();
+				moveDown();
+				return;
+			}
+
 			// For any other key in NORMAL mode that wasn't handled above 
 			// or by the keybinding system (which runs separately via window listener),
 			// prevent the default browser action (e.g., inserting characters).
@@ -3556,6 +3577,10 @@
 		moveToEndOfLine: () => { // Add this function
 			console.debug('Executing moveToEndOfLine command');
 			moveToEndOfLine(); // Call the existing function
+		},
+		moveToEndOfDocument: () => {
+			console.debug('Executing moveToEndOfDocument command');
+			moveToEndOfDocument(); // Call the existing function
 		},
 	};
 
