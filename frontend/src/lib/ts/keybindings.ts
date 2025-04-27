@@ -13,9 +13,9 @@ export type KeyboardInput = {
 
 // Interface for returning keybinding data from backend
 interface BackendKeybinding {
-    user_id: number;
-    command_id: number;
-    keybinding: string;
+	user_id: number;
+	command_id: number;
+	keybinding: string;
 }
 
 // Command IDs mapped to their names for lookups
@@ -384,7 +384,7 @@ export class keybindings {
             });
             
             console.log("Updated keybindings:", this.activeBindings);
-        } catch (error) {
+	} catch (error) {
             console.error("Error fetching and updating keybindings:", error);
         }
     }
@@ -465,8 +465,8 @@ export class keybindingMap {
             event.preventDefault(); // Prevent default browser behavior
             map[mapKey]();
             return true;
-        }
-        
-        return false;
+	}
+	
+	return false;
     }
 }

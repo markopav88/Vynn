@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { get_current_user, update_user, upload_profile_image, get_profile_image_url } from '$lib/ts/user';
     import { get_all_commands, get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/document';
+    import { keybindings, type KeyboardInput } from '$lib/ts/keybindings';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
     
@@ -94,6 +95,23 @@
     
     // Metadata for custom keybindings (not stored in Command object)
     let customKeybindingsMetadata: Map<number, { actionId: string }> = new Map();
+    
+    // --- ADD HELPER FUNCTION --- 
+    // Helper function to format KeyboardInput into a display string
+    function formatKeybindingInput(input: KeyboardInput): string {
+        let parts: string[] = [];
+        if (input.ctrlDown) parts.push('Ctrl');
+        if (input.altDown) parts.push('Alt');
+        if (input.shiftDown) parts.push('Shift');
+        // Handle special keys or capitalize regular keys
+        let key = input.keyDown;
+        if (key.length === 1) key = key.toUpperCase(); 
+        // Handle specific key names if needed (e.g., '$' to '$ ')
+        if (key === '$ ') key = '$'; // Example correction if needed
+        parts.push(key);
+        return parts.join('+');
+    }
+    // --- END HELPER FUNCTION ---
     
     onMount(async () => {
         try {
@@ -228,26 +246,49 @@
         try {
             isLoadingKeybindings = true;
             keybindingsErrorMessage = '';
-            
-            // Load commands and user keybindings in parallel
-            const [cmdResult, keyResult] = await Promise.all([
-                get_all_commands(),
-                get_all_keybindings()
-            ]);
-            
-            if (cmdResult) {
-                commands = cmdResult;
+            commands = []; // Reset commands list
+
+            // Fetch only user-specific keybindings
+            const userKeybindingsResult = await get_all_keybindings();
+
+            // Get defaults and mappings from keybindings.ts
+            const defaultBindings = keybindings.defaultBindings();
+            const commandIdMap = keybindings.commandIdToName;
+            // Create an inverted map: commandName -> commandId
+            const commandNameToId = Object.fromEntries(Object.entries(commandIdMap).map(([id, name]) => [name, parseInt(id)]));
+
+            let loadedCommands: Command[] = [];
+
+            // Build command list directly from defaultBindings and mappings
+            Object.entries(defaultBindings).forEach(([commandName, bindingInput]) => {
+                const commandId = commandNameToId[commandName];
+                if (commandId) {
+                    const defaultKeyString = formatKeybindingInput(bindingInput);
+                    // Generate a basic description based on the command name
+                    const description = `Action: ${commandName.replace(/([A-Z])/g, ' $1').trim()}`;
+                    const newCommand = new Command(
+                        commandId,
+                        commandName,
+                        description,
+                        defaultKeyString
+                    );
+                    loadedCommands.push(newCommand);
+                } else {
+                    console.warn(`Command "${commandName}" defined in defaults but has no corresponding ID in commandIdToName map.`);
+                }
+            });
+
+            // Sort commands alphabetically by command name
+            loadedCommands.sort((a, b) => a.command_name.localeCompare(b.command_name));
+            commands = loadedCommands; // Update the Svelte state variable
+
+            // Handle user keybindings
+            if (userKeybindingsResult) {
+                userKeybindings = userKeybindingsResult;
             } else {
-                keybindingsErrorMessage = 'Failed to load commands';
-            }
-            
-            if (keyResult) {
-                userKeybindings = keyResult;
-            } else {
-                // If user doesn't have custom keybindings yet, that's fine
                 userKeybindings = [];
             }
-            
+
         } catch (error) {
             console.error('Error loading keybindings:', error);
             keybindingsErrorMessage = 'Failed to load keybindings';
@@ -258,15 +299,15 @@
     
     // Get the current keybinding for a command
     function getKeybinding(commandId: number): string {
-        // First check if the user has a custom keybinding
         const customKeybinding = userKeybindings.find(kb => kb.command_id === commandId);
         if (customKeybinding) {
             return customKeybinding.keybinding;
         }
-        
-        // Otherwise, return the default keybinding
+
+        // Find the command in the combined list (backend + added defaults)
         const command = commands.find(cmd => cmd.command_id === commandId);
-        return command ? command.default_keybinding : '';
+        // Use the stored default_keybinding from the Command object
+        return command ? command.default_keybinding : ''; 
     }
     
     // Start editing a keybinding
@@ -322,9 +363,10 @@
             keybindingsErrorMessage = '';
             keybindingsSuccessMessage = '';
             
-            const result = await delete_keybinding(commandId);
-            
-            if (result) {
+            // Now expects true/false
+            const success = await delete_keybinding(commandId); 
+
+            if (success) { // Check for true explicitly
                 // Remove from user keybindings
                 userKeybindings = userKeybindings.filter(kb => kb.command_id !== commandId);
                 
@@ -335,6 +377,9 @@
                     editingKeybinding = null;
                     newKeybindingValue = '';
                 }
+                
+                // Force reactivity update for the table display
+                commands = [...commands];
             } else {
                 keybindingsErrorMessage = 'Failed to reset keybinding';
             }
@@ -462,12 +507,7 @@
             customKeybindingValue = keys.join('+');
         }
     }
-    
-    // Get all commands (predefined + custom)
-    function getAllCommands() {
-        return [...commands, ...customKeybindings];
-    }
-    
+
     // Use a suggested command as a starting point for a custom command
     function useSuggestedCommand(command: { name: string, description: string, keybinding: string, actionId: string }) {
         console.log("Adding suggested command:", command);
@@ -923,8 +963,8 @@
                                     </div>
                                 {/if}
                                 
-                                <!-- Keybindings table with max height for scrolling -->
-                                <div class="table-responsive keybindings-table" style="max-height: 500px; overflow-y: auto;">
+                                <!-- Keybindings table (Remove inline style for max-height and overflow) -->
+                                <div class="table-responsive keybindings-table">
                                     <!-- Debug counts to ensure commands are being added -->
                                     <div class="text-muted mb-2 small">
                                         Total commands: {commands.length + customKeybindings.length} 
@@ -937,7 +977,6 @@
                                                 <th>Command</th>
                                                 <th>Description</th>
                                                 <th>Keybinding</th>
-                                                <th>Action</th>
                                                 <th>Controls</th>
                                             </tr>
                                         </thead>
@@ -972,17 +1011,6 @@
                                                                     {formatKeybinding(command.default_keybinding)}
                                                                 </span>
                                                             {/if}
-                                                        </td>
-                                                        <td>
-                                                            <select 
-                                                                class="form-select form-select-sm bg-dark text-white border-secondary" 
-                                                                value={getActionIdForCommand(command.command_id)}
-                                                                on:change={(e) => updateCustomKeybindingAction(command.command_id, e.currentTarget.value)}
-                                                            >
-                                                                {#each availableActions as action}
-                                                                    <option value={action.id}>{action.name}</option>
-                                                                {/each}
-                                                            </select>
                                                         </td>
                                                         <td>
                                                             {#if editingKeybinding === command.command_id}
@@ -1058,9 +1086,6 @@
                                                                 <span class="badge rounded-pill bg-green ms-2">Custom</span>
                                                             {/if}
                                                         {/if}
-                                                    </td>
-                                                    <td>
-                                                        <span class="text-muted small">System action</span>
                                                     </td>
                                                     <td>
                                                         {#if editingKeybinding === command.command_id}
