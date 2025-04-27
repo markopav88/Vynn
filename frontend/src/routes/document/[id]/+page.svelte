@@ -7,7 +7,6 @@
 	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
 	import { get_project_documents } from '$lib/ts/project';
-	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
 	import Toast from '$lib/components/Toast.svelte';
 	import { keybindings, keybindingMap, type CommandFunctions } from '$lib/ts/keybindings';
 
@@ -963,25 +962,25 @@
 				showColorPicker = false;
 				return;
 			}
-			if (event.key === 'ArrowLeft') {
+			if (event.key === 'ArrowLeft' || event.key === 'h') {
 				event.preventDefault();
 				hue = (hue - 5 + 365) % 365; // Wrap around when going below 0
 				updateColorFromHueOnly();
 				return;
 			}
-			if (event.key === 'ArrowRight') {
+			if (event.key === 'ArrowRight' || event.key === 'l') {
 				event.preventDefault();
 				hue = (hue + 5) % 365; // Wrap around when exceeding 365
 				updateColorFromHueOnly();
 				return;
 			}
-			if (event.key === 'ArrowUp') {
+			if (event.key === 'ArrowUp' || event.key === 'k') {
 				event.preventDefault();
 				hue = (hue + 15) % 365; // Larger jump up with wrap around
 				updateColorFromHueOnly();
 				return;
 			}
-			if (event.key === 'ArrowDown') {
+			if (event.key === 'ArrowDown' || event.key === 'j') {
 				event.preventDefault();
 				hue = (hue - 15 + 365) % 365; // Larger jump down with wrap around
 				updateColorFromHueOnly();
@@ -1078,273 +1077,9 @@
 					event.key === 'k' ||
 					event.key === 'l')
 			) {
-				// Let the browser handle the selection
-				return;
+				return; // Let browser handle selection
 			}
 
-			// Handle navigation keys in NORMAL mode only
-				if (event.key === 'h') {
-				event.preventDefault();
-				if (!editorElement) return;
-					const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-						const range = selection.getRangeAt(0);
-				console.log('Move Left (h) - Initial state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-
-				// Get the current div element
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				const currentDiv = allDivs[activeLineIndex];
-				if (!currentDiv) return;
-
-				// Get current position in the text
-				const textContent = currentDiv.textContent || '';
-				const currentTextNode = range.startContainer;
-				const currentOffset = range.startOffset;
-
-				console.log('Current text state:', {
-					textContent,
-					currentOffset,
-					nodeType: currentTextNode.nodeType
-				});
-
-				// If we're at the start of a text node
-						if (currentOffset > 0) {
-					// Move left within the current text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode, currentOffset - 1);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				} else if (currentTextNode.previousSibling) {
-					// Move to the end of the previous text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode.previousSibling, currentTextNode.previousSibling.textContent?.length || 0);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				}
-
-						updateCursorPosition();
-						updateLineNumbers();
-				ensureCursorVisible();
-
-				console.log('Move Left (h) - Final state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-					return;
-				} else if (event.key === 'l') {
-				event.preventDefault();
-				if (!editorElement) return;
-					const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-						const range = selection.getRangeAt(0);
-				console.log('Move Right (l) - Initial state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-
-				// Get the current div element
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				const currentDiv = allDivs[activeLineIndex];
-				if (!currentDiv) return;
-
-				// Get current position in the text
-				const textContent = currentDiv.textContent || '';
-				const currentTextNode = range.startContainer;
-				const currentOffset = range.startOffset;
-
-				console.log('Current text state:', {
-					textContent,
-					currentOffset,
-					nodeType: currentTextNode.nodeType,
-					textLength: currentTextNode.textContent?.length || 0
-				});
-
-				// If we're not at the end of the current text node
-				if (currentTextNode.nodeType === Node.TEXT_NODE && currentOffset < currentTextNode.textContent!.length) {
-					// Move right within the current text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode, currentOffset + 1);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				} else if (currentTextNode.nextSibling) {
-					// Move to the start of the next text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode.nextSibling, 0);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				}
-
-						updateCursorPosition();
-						updateLineNumbers();
-				ensureCursorVisible();
-
-				console.log('Move Right (l) - Final state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-					return;
-				} else if (event.key === 'k') {
-				event.preventDefault();
-				if (!editorElement) return;
-				const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-				if (activeLineIndex > 0) {
-					const allDivs = Array.from(editorElement.querySelectorAll('div'));
-					const targetDiv = allDivs[activeLineIndex - 1];
-					if (targetDiv) {
-						const range = document.createRange();
-						const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
-						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
-							range.setStart(targetDiv.firstChild, targetColumn);
-						} else {
-							range.setStart(targetDiv, 0);
-						}
-						range.collapse(true);
-						selection.removeAllRanges();
-						selection.addRange(range);
-						activeLineIndex--;
-						updateCursorPosition();
-						updateLineNumbers();
-						ensureCursorVisible();
-					}
-				}
-					return;
-				} else if (event.key === 'j') {
-				event.preventDefault();
-				if (!editorElement) return;
-				const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				if (activeLineIndex < allDivs.length - 1) {
-					const targetDiv = allDivs[activeLineIndex + 1];
-					if (targetDiv) {
-						const range = document.createRange();
-						const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
-						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
-							range.setStart(targetDiv.firstChild, targetColumn);
-						} else {
-							range.setStart(targetDiv, 0);
-						}
-						range.collapse(true);
-						selection.removeAllRanges();
-						selection.addRange(range);
-						activeLineIndex++;
-						updateCursorPosition();
-						updateLineNumbers();
-						ensureCursorVisible();
-				}
-				}
-				return;
-			}
-
-			// Mode switching commands - these should clear the buffer immediately
-			if (event.key === 'i') {
-				clearNormalModeBuffer();
-					editorMode = 'INSERT';
-					event.preventDefault();
-					return;
-			} else if (event.key === ':' || event.key === '/' || event.key === '?') {
-				clearNormalModeBuffer();
-				enterCommandMode(event.key);
-				event.preventDefault();
-				return;
-			} else if (event.key === '$') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				moveToEndOfLine();
-				return;
-			}
-
-			// Handle multi-key commands
-			if (event.key === 'd' || event.key === 'y' || event.key === 'g') {
-				normalModeBuffer += event.key;
-				event.preventDefault();
-
-				// Check for complete commands
-				if (normalModeBuffer === 'dd') {
-					deleteCurrentLine();
-					clearNormalModeBuffer();
-				return;
-				} else if (normalModeBuffer === 'yy') {
-					copyText();
-					clearNormalModeBuffer();
-				return;
-				} else if (normalModeBuffer === 'gg') {
-					moveToStartOfDocument();
-					clearNormalModeBuffer();
-				return;
-				}
-
-				// Set timeout to clear buffer if no matching command is completed
-				normalModeBufferTimeout = window.setTimeout(() => {
-					console.log('Buffer cleared by timeout:', normalModeBuffer);
-					clearNormalModeBuffer();
-				}, 1000) as unknown as number;
-
-				return;
-			}
-
-			// Single key commands that should execute immediately
-			if (event.key === 'G') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				moveToEndOfDocument();
-				return;
-			} else if (event.key === 'x') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				deleteHighlightedText();
-				return;
-			} else if (event.key === 'n') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				findNextMatch(false); // Search forward
-				return;
-			} else if (event.key === 'm') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				findNextMatch(true); // Search backward
-				return;
-			}
-
-			// Single key commands - these should clear the buffer immediately
-			if (
-				event.key === 'p' ||
-				event.key === 'u' ||
-				// 'event.key === '0' removed from here because we handle it specifically above
-				event.key === 'h' ||
-				event.key === 'j' ||
-				event.key === 'k' ||
-				event.key === 'l' ||
-				event.key === 'N'
-			) {
-				clearNormalModeBuffer();
-			}
-
-			// Handle 'p' key in normal mode for paste
-			if (event.key === 'p') {
-				event.preventDefault();
-				pasteText();
-				return;
-			}
-
-			// Rest of your normal mode commands...
-			// [Previous normal mode commands remain unchanged]
 		}
 	}
 
@@ -3790,7 +3525,32 @@
 		openColorPicker: () => {
 			console.debug('Opening color picker');
 			showColorPicker = true;
-		}
+		},
+		enterInsertMode: () => {
+			console.debug('Executing enter insert mode command');
+			if (editorMode !== 'INSERT') {
+				editorMode = 'INSERT';
+				showCommandError('-- INSERT --');
+				clearNormalModeBuffer();
+			}
+		},
+		// Add the movement functions here
+		moveLeft: () => {
+			console.debug('Executing moveLeft command');
+			moveLeft(); // Call the existing function
+		},
+		moveRight: () => {
+			console.debug('Executing moveRight command');
+			moveRight(); // Call the existing function
+		},
+		moveUp: () => {
+			console.debug('Executing moveUp command');
+			moveUp(); // Call the existing function
+		},
+		moveDown: () => {
+			console.debug('Executing moveDown command');
+			moveDown(); // Call the existing function
+		},
 	};
 
 	// Global keyboard event handler for keybindings
@@ -3875,6 +3635,398 @@
 			window.removeEventListener('keydown', handleKeybindingKeyDown);
 		};
 	});
+
+	// Movement functions
+	function moveLeft() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		const range = selection.getRangeAt(0);
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		
+		// If selection is not collapsed, move to the start of the selection first
+		if (!range.collapsed) {
+			range.collapse(true); // Collapse to the start
+			selection.removeAllRanges();
+			selection.addRange(range);
+			updateCursorPosition(); // Update state after collapsing
+			updateLineNumbers();
+			ensureCursorVisible();
+			return; // Let next key press handle actual movement
+		}
+		
+		const currentContainer = range.startContainer;
+		const currentOffset = range.startOffset;
+		const newRange = document.createRange();
+		let successfullyMoved = false;
+
+		if (currentOffset > 0) {
+			// Try moving one position back in the current node
+			try {
+				// If it's a text node, move within text
+				if (currentContainer.nodeType === Node.TEXT_NODE) {
+					newRange.setStart(currentContainer, currentOffset - 1);
+				} else {
+					// If it's an element node, select the node before the current offset
+					// This handles moving out of elements like <font> or <u> correctly
+					const nodeBefore = currentContainer.childNodes[currentOffset - 1];
+					newRange.setStartAfter(nodeBefore); // Position cursor after the previous node
+				}
+				successfullyMoved = true;
+			} catch (e) {
+				console.error('Error setting range in moveLeft (current node):', e, {container: currentContainer, offset: currentOffset});
+				return;
+			}
+		} else {
+			// At the start of the current container node
+			// Find the visually previous node we can move into
+			let nodeToMoveTo: Node | null = null;
+			let offsetInNode = 0;
+			let currentNode: Node | null = currentContainer;
+
+			// Traverse siblings first
+			while (currentNode && currentNode !== editorElement && currentNode.parentNode !== editorElement ) { 
+				if (currentNode.previousSibling) {
+					nodeToMoveTo = currentNode.previousSibling;
+					// Find the deepest last child that is a text node or an element node
+					while (nodeToMoveTo && (nodeToMoveTo.nodeType === Node.ELEMENT_NODE || nodeToMoveTo.nodeType === Node.TEXT_NODE) && nodeToMoveTo.lastChild) {
+						nodeToMoveTo = nodeToMoveTo.lastChild;
+					}
+					// Set position at the end of the found node
+					if (nodeToMoveTo && nodeToMoveTo.nodeType === Node.TEXT_NODE) {
+						offsetInNode = nodeToMoveTo.textContent?.length || 0;
+					} else if (nodeToMoveTo) { 
+						offsetInNode = nodeToMoveTo.childNodes.length;
+					} else { // Fallback if sibling is weird (comment etc.)
+						nodeToMoveTo = currentNode.previousSibling; 
+						offsetInNode = 0; 
+					}
+					break;
+				} else {
+					// No previous sibling, move up to parent
+					currentNode = currentNode.parentNode;
+				}
+			}
+
+			// If we didn't find a suitable sibling, or we reached the line div, move to the previous line
+			if (!nodeToMoveTo && activeLineIndex > 0) {
+				const prevDiv = allDivs[activeLineIndex - 1];
+				const textNodes = getAllTextNodes(prevDiv);
+
+				if (textNodes.length > 0) {
+					// If previous line has text, target the end of the last text node
+					nodeToMoveTo = textNodes[textNodes.length - 1];
+					offsetInNode = nodeToMoveTo.textContent?.length || 0;
+				} else {
+					// Previous line is empty or has only non-text nodes (<br>), target start of the div
+					nodeToMoveTo = prevDiv; 
+					offsetInNode = 0; 
+				}
+				
+				activeLineIndex--; // Update line index
+				// nodeToMoveTo and offsetInNode are now set
+			} else if (!nodeToMoveTo) {
+				// At the very beginning of the document or couldn't find sibling
+				return;
+			}
+
+			// Set the range based on the found node and offset
+			if (nodeToMoveTo) {
+				try {
+					const maxOffset = nodeToMoveTo.nodeType === Node.TEXT_NODE ? (nodeToMoveTo.textContent?.length || 0) : nodeToMoveTo.childNodes.length;
+					// Ensure offset is not negative and not exceeding maxOffset
+					const safeOffset = Math.max(0, Math.min(offsetInNode, maxOffset)); 
+					newRange.setStart(nodeToMoveTo, safeOffset);
+					successfullyMoved = true;
+				} catch (e) {
+					console.error('Error setting range in moveLeft (previous node/line):', e, { node: nodeToMoveTo, offset: offsetInNode });
+					// Attempt fallback: set to start of the node
+					try {
+						newRange.setStart(nodeToMoveTo, 0);
+						successfullyMoved = true;
+					} catch (fallbackError) {
+						console.error('Fallback setting range failed in moveLeft:', fallbackError);
+						return;
+					}
+				}
+			}
+		}
+
+		if (successfullyMoved) {
+			newRange.collapse(true);
+			selection.removeAllRanges();
+			selection.addRange(newRange);
+
+			updateCursorPosition();
+			updateLineNumbers();
+			ensureCursorVisible();
+		} else {
+			console.warn('MoveLeft command executed but no movement occurred.');
+		}
+	}
+
+	function moveRight() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		const range = selection.getRangeAt(0);
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+
+		// If selection is not collapsed, move to the end of the selection first
+		if (!range.collapsed) {
+			range.collapse(false); // Collapse to the end
+			selection.removeAllRanges();
+			selection.addRange(range);
+			updateCursorPosition(); // Update state after collapsing
+			updateLineNumbers();
+			ensureCursorVisible();
+			return; // Let next key press handle actual movement
+		}
+
+		const currentContainer = range.startContainer;
+		const currentOffset = range.startOffset;
+		const newRange = document.createRange();
+		let successfullyMoved = false;
+
+		// --- Start: Add check for empty line ---
+		const currentDiv = allDivs[activeLineIndex];
+		const lineIsEmpty = !currentDiv?.textContent || currentDiv.textContent.trim() === '' || currentDiv.textContent.trim() === '\u200B' || (currentDiv.childNodes.length === 1 && currentDiv.firstChild?.nodeName === 'BR');
+
+		if (lineIsEmpty && activeLineIndex < allDivs.length - 1) {
+			console.log('Moving right from empty line, calling moveDown()');
+			moveDown();
+			return;
+		}
+		// --- End: Add check for empty line ---
+
+		// Check if we can move forward within the current node
+		let canMoveInNode = false;
+		if (currentContainer.nodeType === Node.TEXT_NODE) {
+			canMoveInNode = currentOffset < (currentContainer.textContent?.length || 0);
+		} else { // Element node
+			canMoveInNode = currentOffset < currentContainer.childNodes.length;
+		}
+
+		if (canMoveInNode) {
+			// Move one position forward in the current node
+			try {
+				if (currentContainer.nodeType === Node.TEXT_NODE) {
+					newRange.setStart(currentContainer, currentOffset + 1);
+				} else {
+					// If element node, select the node *at* the current offset
+					const nodeAfter = currentContainer.childNodes[currentOffset];
+					newRange.setStartBefore(nodeAfter);
+				}
+				successfullyMoved = true;
+			} catch (e) {
+				console.error('Error setting range in moveRight (current node):', e, {container: currentContainer, offset: currentOffset});
+				return;
+			}
+		} else {
+			// At the end of the current container node
+			// Find the visually next node we can move into within the same line (div)
+			let nodeToMoveTo: Node | null = null;
+			let offsetInNode = 0;
+			let currentNode: Node | null = currentContainer;
+			let parentDiv: Node | null = currentNode;
+			while(parentDiv && parentDiv.parentNode && parentDiv.parentNode !== editorElement) {
+				parentDiv = parentDiv.parentNode;
+			}
+
+			while (currentNode && currentNode !== editorElement && currentNode !== parentDiv) { // Stop if we reach the editor or the line's div
+				if (currentNode.nextSibling) {
+					nodeToMoveTo = currentNode.nextSibling;
+					// Find the deepest first child that is a text node or element node
+					while (nodeToMoveTo && (nodeToMoveTo.nodeType === Node.ELEMENT_NODE || nodeToMoveTo.nodeType === Node.TEXT_NODE) && nodeToMoveTo.firstChild) {
+						nodeToMoveTo = nodeToMoveTo.firstChild;
+					}
+					offsetInNode = 0; // Start at the beginning of the next node
+					break;
+				} else {
+					// No next sibling, move up to parent
+					currentNode = currentNode.parentNode;
+				}
+			}
+
+			// If we found a next node within the same line
+			if (nodeToMoveTo) {
+				try {
+					const maxOffset = nodeToMoveTo.nodeType === Node.TEXT_NODE ? 0 : nodeToMoveTo.childNodes.length;
+					const safeOffset = Math.max(0, Math.min(offsetInNode, maxOffset));
+					newRange.setStart(nodeToMoveTo, safeOffset);
+					successfullyMoved = true;
+				} catch (e) {
+					console.error('Error setting range in moveRight (next node):', e, { node: nodeToMoveTo, offset: offsetInNode });
+					return;
+				}
+			} else {
+				// At the end of the line, attempt to move down if possible
+				if (activeLineIndex < allDivs.length - 1) {
+					console.log('Reached end of line, attempting moveDown()');
+					moveDown(); // Call moveDown to handle moving to the next line
+					return; // moveDown handles updates, so we return here
+				} else {
+					// At the very end of the document
+					return;
+				}
+			}
+		}
+
+		if (successfullyMoved) {
+			newRange.collapse(true);
+			selection.removeAllRanges();
+			selection.addRange(newRange);
+			updateCursorPosition();
+			updateLineNumbers();
+			ensureCursorVisible();
+		} else if (!successfullyMoved && activeLineIndex < allDivs.length - 1) {
+			// Fallback logging
+			console.warn('MoveRight reached end of line but moveDown was not called?');
+		}
+	}
+
+	function moveUp() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		if (activeLineIndex > 0) {
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			const targetDiv = allDivs[activeLineIndex - 1];
+			if (targetDiv) {
+				const range = document.createRange();
+				// Check if empty or just zero-width space
+				const lineIsEmpty = !targetDiv.textContent || targetDiv.textContent.trim() === '\u200B'; 
+
+				if (lineIsEmpty) {
+					// If target line is empty, place cursor at its start
+					range.setStart(targetDiv, 0);
+				} else {
+					// Line has content, try to maintain column
+					const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
+					if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+						range.setStart(targetDiv.firstChild, targetColumn);
+					} else {
+						// Fallback if first child isn't text (or line has complex nodes)
+						// We need a more robust way to find the node at the target column
+						let accumulatedOffset = 0;
+						let targetNode: Node | null = null;
+						let targetOffset = 0;
+						const walker = document.createTreeWalker(targetDiv, NodeFilter.SHOW_TEXT);
+						let currentNode: Node | null;
+						while ((currentNode = walker.nextNode())) {
+							const nodeLength = currentNode.textContent?.length || 0;
+							if (accumulatedOffset + nodeLength >= targetColumn) {
+								targetNode = currentNode;
+								targetOffset = targetColumn - accumulatedOffset;
+								break;
+							}
+							accumulatedOffset += nodeLength;
+						}
+						// If still no target node (e.g., column beyond actual text), use last text node
+						if (!targetNode) {
+							const allTextNodes = getAllTextNodes(targetDiv);
+							if (allTextNodes.length > 0) {
+								targetNode = allTextNodes[allTextNodes.length - 1];
+								targetOffset = targetNode.textContent?.length || 0;
+							} else {
+								// Fallback: start of the div if truly no text nodes
+								targetNode = targetDiv;
+								targetOffset = 0;
+							}
+						}
+						// Set the range
+						try {
+							range.setStart(targetNode, targetOffset);
+						} catch(e) {
+							console.error("Error setting range in moveUp fallback:", e, {targetNode, targetOffset});
+							range.setStart(targetDiv, 0); // Ultimate fallback
+						}
+					}
+				}
+
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				activeLineIndex--;
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible();
+			}
+		}
+	}
+
+	function moveDown() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		if (activeLineIndex < allDivs.length - 1) {
+			const targetDiv = allDivs[activeLineIndex + 1];
+			if (targetDiv) {
+				const range = document.createRange();
+				// Check if empty or just zero-width space
+				const lineIsEmpty = !targetDiv.textContent || targetDiv.textContent.trim() === '\u200B'; 
+
+				if (lineIsEmpty) {
+					// If target line is empty, place cursor at its start
+					range.setStart(targetDiv, 0);
+				} else {
+					// Line has content, try to maintain column
+					const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
+					if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+						range.setStart(targetDiv.firstChild, targetColumn);
+					} else {
+						// Fallback if first child isn't text (or line has complex nodes)
+						let accumulatedOffset = 0;
+						let targetNode: Node | null = null;
+						let targetOffset = 0;
+						const walker = document.createTreeWalker(targetDiv, NodeFilter.SHOW_TEXT);
+						let currentNode: Node | null;
+						while ((currentNode = walker.nextNode())) {
+							const nodeLength = currentNode.textContent?.length || 0;
+							if (accumulatedOffset + nodeLength >= targetColumn) {
+								targetNode = currentNode;
+								targetOffset = targetColumn - accumulatedOffset;
+								break;
+							}
+							accumulatedOffset += nodeLength;
+						}
+						// If still no target node, use last text node
+						if (!targetNode) {
+							const allTextNodes = getAllTextNodes(targetDiv);
+							if (allTextNodes.length > 0) {
+								targetNode = allTextNodes[allTextNodes.length - 1];
+								targetOffset = targetNode.textContent?.length || 0;
+							} else {
+								// Fallback: start of the div if truly no text nodes
+								targetNode = targetDiv;
+								targetOffset = 0;
+							}
+						}
+						// Set the range
+						try {
+							range.setStart(targetNode, targetOffset);
+						} catch(e) {
+							console.error("Error setting range in moveDown fallback:", e, {targetNode, targetOffset});
+							range.setStart(targetDiv, 0); // Ultimate fallback
+						}
+					}
+				}
+
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				activeLineIndex++;
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible();
+			}
+		}
+	}
 </script>
 
 <svelte:head>

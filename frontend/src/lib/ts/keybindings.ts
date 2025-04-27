@@ -29,6 +29,7 @@ export interface CommandFunctions {
     applyItalicFormatting?: () => void;
     applyUnderlineFormatting?: () => void;
     openColorPicker?: () => void;
+    enterInsertMode?: () => void;
     moveLeft?: () => void;
     moveRight?: () => void;
     moveUp?: () => void;
@@ -68,6 +69,12 @@ export class keybindings {
                 keyDown: "u",
                 altDown: false,
                 ctrlDown: true,
+                shiftDown: false,
+            },
+            enterInsertMode: {
+                keyDown: "i",
+                altDown: false,
+                ctrlDown: false,
                 shiftDown: false,
             },
             openColorPicker: {
@@ -176,6 +183,7 @@ export class keybindings {
         15: 'switchToDocument7',
         16: 'switchToDocument8',
         17: 'switchToDocument9',
+        18: 'enterInsertMode',
     };
     
     // Command name to function name mapping
@@ -184,6 +192,7 @@ export class keybindings {
         'italic': 'applyItalicFormatting',
         'underline': 'applyUnderlineFormatting',
         'openColorPicker': 'openColorPicker',
+        'enterInsertMode': 'enterInsertMode',
         'moveLeft': 'moveLeft',
         'moveRight': 'moveRight',
         'moveUp': 'moveUp',
