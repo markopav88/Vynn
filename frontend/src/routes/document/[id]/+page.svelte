@@ -6,6 +6,7 @@
 	import { browser } from '$app/environment';
 	import { get_document, update_document, get_project_from_document, setup_auto_save } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
+	import { get_project_documents } from '$lib/ts/project';
 	import Toast from '$lib/components/Toast.svelte';
 	import { keybindings, keybindingMap, type CommandFunctions, type KeyboardInput } from '$lib/ts/keybindings';
 
@@ -129,7 +130,7 @@
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
 			// Allow only specific browser shortcuts we want to keep
-			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'f', '/'];
+			const allowedKeys = ['c', 'v', 'a', 'z', 'y', '/'];
 			if (!allowedKeys.includes(event.key.toLowerCase())) {
 				event.preventDefault();
 			}
@@ -353,21 +354,40 @@
 			const projectInfo = await get_project_from_document(parseInt(documentId));
 
 			if (projectInfo && projectInfo.project_id) {
-				// Get all documents in this project - REMOVED call to non-existent function
-				// const documents = await get_project_documents(projectInfo.project_id);
-				const documents: any[] = []; // Initialize as empty for now
+				console.log(`Fetching documents for project ID: ${projectInfo.project_id}`); // Add log
+				// Fetch the actual documents for the project
+				const documents = await get_project_documents(projectInfo.project_id);
+				console.log(`Found ${documents ? documents.length : 0} documents in project`); // Add log
 
 				if (documents && documents.length > 0) {
-					// This block will likely not run now
 					projectDocuments = documents;
 					currentDocumentIndex = projectDocuments.findIndex((doc) => doc.id.toString() === documentId);
+					// Pre-populate the map for faster switching
+					projectDocumentsMap.clear(); // Clear previous map entries
 					projectDocuments.forEach((doc) => {
 						projectDocumentsMap.set(doc.id, doc);
 					});
-					documentData.project_name = projectInfo.project_name;
+					// Ensure project name is set if available
+					if(documentData) documentData.project_name = projectInfo.project_name;
+					console.log(`projectDocuments array updated. Current index: ${currentDocumentIndex}`); // Add log
+				} else {
+					// Handle case where project exists but has no documents (or only the current one)
+					projectDocuments = documentData ? [documentData] : []; // Show at least current doc if available
+					currentDocumentIndex = 0;
+					projectDocumentsMap.clear();
+					if(documentData) projectDocumentsMap.set(documentData.id, documentData);
+					console.log('Project has no other documents, showing only current.'); // Add log
 				}
+			} else {
+				// Document is not part of a project
+				projectDocuments = documentData ? [documentData] : [];
+				currentDocumentIndex = 0;
+				projectDocumentsMap.clear();
+				if(documentData) projectDocumentsMap.set(documentData.id, documentData);
+				console.log('Document is not part of a project.'); // Add log
 			}
 			projectDocumentsLoaded = true;
+			console.log('Finished loadProjectDocuments'); // Add log
 		} catch (error) {
 			console.error('Error loading project documents:', error);
 			projectDocumentsLoaded = true;
@@ -456,11 +476,19 @@
 
 	function formatKey(input: KeyboardInput): string {
 		let parts: string[] = [];
+		if (!input) return ''; // Add check for undefined input
+
 		if (input.ctrlDown) parts.push('Ctrl');
 		if (input.altDown) parts.push('Alt');
 		if (input.shiftDown) parts.push('Shift');
-		// Handle special keys or capitalize regular keys
-		parts.push(input.keyDown.length === 1 ? input.keyDown.toUpperCase() : input.keyDown);
+		
+		// Use kd property instead of keyDown
+		let key = input.kd; 
+		if (!key) return parts.join('+'); // Return early if key is missing
+
+		if (key.length === 1) key = key.toUpperCase(); 
+		// Handle specific key names if needed
+		parts.push(key); 
 		return parts.join('+');
 	}
 
@@ -2062,6 +2090,16 @@
 		} else {
 			showCommandError('Text color formatting not supported');
 		}
+		
+		// Ensure editor remains focused after applying color
+		if(editorElement) {
+			editorElement.focus();
+			// Update internal content state AFTER execCommand modifies the DOM
+			editorContent = getEditorContent(); 
+			// Explicitly update UI elements that might rely on content length/lines
+			updateLineNumbers();
+			adjustEditorHeight();
+		}
 	}
 
 	// Add this helper function to implement setSelectionRange for contenteditable divs
@@ -2496,20 +2534,13 @@
 		
 		console.log('Setting content safely:', content);
 
-		// First, if content contains HTML tags, convert to plain text
-		let plainContent = content;
-		if (content.includes('<') && content.includes('>')) {
-			plainContent = content
-				.replace(/<[^>]*>/g, '') // Remove HTML tags
-				.replace(/&lt;/g, '<') // Convert escaped < back to <
-				.replace(/&gt;/g, '>') // Convert escaped > back to >
-				.replace(/&amp;/g, '&') // Convert escaped & back to &
-				.replace(/&quot;/g, '"') // Convert escaped " back to "
-				.replace(/&#039;/g, "'"); // Convert escaped ' back to '
-		}
+		// REMOVED block that stripped HTML tags - Assume input 'content' 
+		// already represents lines separated by '\n'.
+		// let plainContent = content;
+		// if (content.includes('<') && content.includes('>')) { ... }
 
-		// Split into lines and wrap if needed
-		let lines = plainContent.split('\n');
+		// Split into lines directly from input content and wrap if needed
+		let lines = content.split('\n');
 		let wrappedLines: string[] = [];
 		let originalLineToWrappedMap = new Map<number, number>(); // Maps original line index to first wrapped line index
 		let wrappedToOriginalMap = new Map<number, number>(); // Maps wrapped line index back to original line
@@ -3456,6 +3487,9 @@
 		},
 		openColorPicker: () => {
 			console.debug('Opening color picker');
+			// Reset state on open for consistency
+			hue = 0; // Reset hue (e.g., to white)
+			updateColorFromHueOnly(); // Update selectedColor based on reset hue
 			showColorPicker = true;
 		},
 		enterInsertMode: () => {
@@ -3669,28 +3703,82 @@
 	function handleColorPickerKeyDown(event: KeyboardEvent) {
 		if (!showColorPicker) return;
 
-		switch(event.key) {
-			case 'Escape':
+		// Get dynamic movement keys (lowercase for comparison)
+		const leftKey = keybindings.activeBindings.moveLeft?.kd?.toLowerCase();
+		const rightKey = keybindings.activeBindings.moveRight?.kd?.toLowerCase();
+		const upKey = keybindings.activeBindings.moveUp?.kd?.toLowerCase();
+		const downKey = keybindings.activeBindings.moveDown?.kd?.toLowerCase();
+
+		const eventKeyLower = event.key.toLowerCase();
+		let handled = false;
+
+		switch(eventKeyLower) { // Switch on lowercase key
+			case 'escape':
 				event.preventDefault();
 				showColorPicker = false;
+				handled = true;
 				break;
-			case 'Enter':
+			case 'enter':
 				event.preventDefault();
 				if (selectedColor) {
 					applyTextColor(selectedColor);
-					showColorPicker = false;
+						showColorPicker = false;
 				}
+				handled = true;
 				break;
-			case 'ArrowLeft':
-			case 'h':
+			// Keep hardcoded arrow keys
+			case 'arrowleft':
 				event.preventDefault();
-				// Handle color selection movement left
-				break;
-			case 'ArrowRight':
-			case 'l':
+				hue = (hue - 5 + 365) % 365; 
+				updateColorFromHueOnly();
+				handled = true;
+				break; 
+			case 'arrowright':
 				event.preventDefault();
-				// Handle color selection movement right
+				hue = (hue + 5) % 365;
+				updateColorFromHueOnly();
+				handled = true;
 				break;
+			case 'arrowup':
+				event.preventDefault();
+				hue = (hue + 15) % 365; 
+				updateColorFromHueOnly();
+				handled = true;
+				break;
+			case 'arrowdown':
+				event.preventDefault();
+				hue = (hue - 15 + 365) % 365;
+				updateColorFromHueOnly();
+				handled = true;
+				break;
+			// Handle dynamic keys if not an arrow/escape/enter
+			default:
+				if (leftKey && eventKeyLower === leftKey) {
+					event.preventDefault();
+					hue = (hue - 5 + 365) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} else if (rightKey && eventKeyLower === rightKey) {
+					event.preventDefault();
+					hue = (hue + 5) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} else if (upKey && eventKeyLower === upKey) {
+					event.preventDefault();
+					hue = (hue + 15) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} else if (downKey && eventKeyLower === downKey) {
+					event.preventDefault();
+					hue = (hue - 15 + 365) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} 
+		}
+
+		// If the key wasn't handled by the switch or the dynamic checks, prevent default anyway
+		if (!handled) {
+			event.preventDefault(); 
 		}
 	}
 
@@ -4114,7 +4202,8 @@
 
 		// Explicitly check for formatting shortcuts in INSERT mode
 		const eventInput = {
-			kd: event.key.toLowerCase(), // Temporary lowercase key for comparison
+			// Use kd and ensure lowercase for comparison
+			kd: event.key.toLowerCase(), 
 			altDown: event.altKey,
 			ctrlDown: event.ctrlKey,
 			shiftDown: event.shiftKey
@@ -4125,11 +4214,12 @@
 		// *** Helper function defined INSIDE handleInsertModeKeyDown ***
 		const checkBinding = (binding: KeyboardInput | undefined): boolean => {
 			if (!binding) return false;
+			// Compare using kd
 			return (
-				binding.keyDown.toLowerCase() === eventInput.kd && // Compare lowercase key
+				binding.kd.toLowerCase() === eventInput.kd && // Compare lowercase key
 				binding.altDown === eventInput.altDown &&
-				binding.ctrlDown === eventInput.ctrlDown &&
-				binding.shiftDown === eventInput.shiftDown
+					binding.ctrlDown === eventInput.ctrlDown &&
+					binding.shiftDown === eventInput.shiftDown
 			);
 		};
 		// *** End of checkBinding definition ***
@@ -4155,18 +4245,72 @@
 			event.preventDefault();
 			return;
 		}
-
-		// --- End of the logic to add ---
-
-		// If not a handled shortcut, let default input handling occur
-	}
-
-	function handleCommand(command: string) {
-		// Ensure command prefix is included
-		if (!command.startsWith(':')) {
-			command = `:${command}`;
+		if (bindings.openColorPicker && checkBinding(bindings.openColorPicker)) {
+			console.log('Opening color picker in INSERT mode');
+			commandFunctions.openColorPicker?.();
+			event.preventDefault();
+			return;
 		}
-		// ... existing code ...
+		if (bindings.switchToDocument1 && checkBinding(bindings.switchToDocument1)) {
+			console.log('Switching to document 1 in INSERT mode');
+			commandFunctions.switchToDocument1?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument2 && checkBinding(bindings.switchToDocument2)) {
+			console.log('Switching to document 2 in INSERT mode');
+			commandFunctions.switchToDocument2?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument3 && checkBinding(bindings.switchToDocument3)) {
+			console.log('Switching to document 3 in INSERT mode');
+			commandFunctions.switchToDocument3?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument4 && checkBinding(bindings.switchToDocument4)) {
+			console.log('Switching to document 4 in INSERT mode');
+			commandFunctions.switchToDocument4?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument5 && checkBinding(bindings.switchToDocument5)) {
+			console.log('Switching to document 5 in INSERT mode');
+			commandFunctions.switchToDocument5?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument6 && checkBinding(bindings.switchToDocument6)) {
+			console.log('Switching to document 6 in INSERT mode');
+			commandFunctions.switchToDocument6?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument7 && checkBinding(bindings.switchToDocument7)) {
+			console.log('Switching to document 7 in INSERT mode');
+			commandFunctions.switchToDocument7?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument8 && checkBinding(bindings.switchToDocument8)) {
+			console.log('Switching to document 8 in INSERT mode');
+			commandFunctions.switchToDocument8?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument9 && checkBinding(bindings.switchToDocument9)) {
+			console.log('Switching to document 9 in INSERT mode');
+			commandFunctions.switchToDocument9?.();
+			event.preventDefault();
+			return;
+		} 
+		if (bindings.toggleCommandSheet && checkBinding(bindings.toggleCommandSheet)) {
+			console.log('Toggling command sheet in INSERT mode');
+			commandFunctions.toggleCommandSheet?.();
+			event.preventDefault();
+			return;
+		}
 	}
 </script>
 
@@ -4377,8 +4521,6 @@
 					<li><span class="key">{deleteLineKey}</span> Delete current line</li>
 					<li><span class="key">{yankKey}</span> Copy (Yank)</li>
 					<li><span class="key">{pasteKey}</span> Paste</li>
-					<li><span class="key">dd</span> Delete line (Sequence)</li>
-					<li><span class="key">yy</span> Copy line (Sequence)</li>
 				</ul>
 			</div>
 
@@ -4548,5 +4690,12 @@
 			opacity: 1;
 			transform: translateY(0);
 		}
+	}
+
+	/* Highlight newly added keybinding */
+	@keyframes highlight-row {
+		0% { background-color: rgba(16, 185, 129, 0.3); }
+		50% { background-color: rgba(16, 185, 129, 0.2); }
+		100% { background-color: transparent; }
 	}
 </style>

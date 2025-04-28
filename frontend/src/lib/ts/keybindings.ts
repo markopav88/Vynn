@@ -1,11 +1,11 @@
 // Function to get all commands from db
-import { get_all_keybindings } from './document';
+import { get_all_keybindings } from './account';
 
 
 export type ExecuteFunction = () => void;
 
 export type KeyboardInput = {
-    keyDown: string,
+    kd: string,
     altDown: boolean,
     ctrlDown: boolean,
     shiftDown: boolean,
@@ -65,175 +65,175 @@ export class keybindings {
     static defaultBindings(): Record<string, KeyboardInput> {
         return {
             bold: {
-                keyDown: "b",
+                kd: "b",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             italic: {
-                keyDown: "i",
+                kd: "i",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             underline: {
-                keyDown: "u",
+                kd: "u",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             enterInsertMode: {
-                keyDown: "i",
+                kd: "i",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             openColorPicker: {
-                keyDown: "f",
+                kd: "f",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             moveLeft: {
-                keyDown: "h",
+                kd: "h",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             moveRight: {
-                keyDown: "l",
+                kd: "l",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             moveUp: {
-                keyDown: "k",
+                kd: "k",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             moveDown: {
-                keyDown: "j",
+                kd: "j",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             moveToStartOfLine: {
-                keyDown: "0",
+                kd: "0",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             moveToEndOfLine: {
-                keyDown: "$",
+                kd: "$",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: true,
             },
             moveToEndOfDocument: {
-                keyDown: "G",
+                kd: "G",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: true,
             },
             moveToStartOfDocument: {
-                keyDown: "g",
+                kd: "g",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             toggleCommandSheet: {
-                keyDown: "/",
+                kd: "/",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             findNextMatch: {
-                keyDown: "n",
+                kd: "n",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             findPreviousMatch: {
-                keyDown: "m",
+                kd: "m",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             deleteSelectedText: {
-                keyDown: "x",
+                kd: "x",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             yankText: {
-                keyDown: "y",
+                kd: "y",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             deleteLine: {
-                keyDown: "d",
+                kd: "d",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             pasteText: {
-                keyDown: "p",
+                kd: "p",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: false,
             },
             switchToDocument1: {
-                keyDown: "1",
+                kd: "1",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument2: {
-                keyDown: "2",
+                kd: "2",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument3: {
-                keyDown: "3",
+                kd: "3",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument4: {
-                keyDown: "4",
+                kd: "4",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument5: {
-                keyDown: "5",
+                kd: "5",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument6: {
-                keyDown: "6",
+                kd: "6",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument7: {
-                keyDown: "7",
+                kd: "7",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument8: {
-                keyDown: "8",
+                kd: "8",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
             },
             switchToDocument9: {
-                keyDown: "9",
+                kd: "9",
                 altDown: false,
                 ctrlDown: true,
                 shiftDown: false,
@@ -316,7 +316,7 @@ export class keybindings {
         const parts = normalizedKeybinding.split('+');
         
         // The last part is always the key
-        const keyDown = parts[parts.length - 1].trim();
+        const kd = parts[parts.length - 1].trim();
         
         let ctrlDown = false;
         let altDown = false;
@@ -335,7 +335,7 @@ export class keybindings {
             normalized: normalizedKeybinding,
             parts,
             result: {
-                keyDown,
+                kd,
                 altDown,
                 ctrlDown,
                 shiftDown
@@ -343,7 +343,7 @@ export class keybindings {
         });
         
         return {
-            keyDown,
+            kd,
             altDown,
             ctrlDown,
             shiftDown
@@ -421,7 +421,7 @@ export class keybindingMap {
         
         // Generate keys for each active binding
         Object.entries(keybindings.activeBindings).forEach(([commandName, input]) => {
-            const key = `${input.keyDown}_${input.altDown}_${input.ctrlDown}_${input.shiftDown}`;
+            const key = `${input.kd}_${input.altDown}_${input.ctrlDown}_${input.shiftDown}`;
             
             // Get the function name associated with this command
             const functionName = keybindings.getFunctionNameByCommand(commandName);
@@ -443,7 +443,8 @@ export class keybindingMap {
     // Helper to convert a KeyboardEvent to our input format
     static keyEventToInput(event: KeyboardEvent): KeyboardInput {
         return {
-            keyDown: event.key,
+            // Convert key to lowercase for consistent matching
+            kd: event.key.toLowerCase(), 
             altDown: event.altKey,
             ctrlDown: event.ctrlKey,
             shiftDown: event.shiftKey
@@ -452,7 +453,8 @@ export class keybindingMap {
     
     // Helper to convert KeyboardInput to a map key
     static getMapKey(input: KeyboardInput): string {
-        return `${input.keyDown}_${input.altDown}_${input.ctrlDown}_${input.shiftDown}`;
+        // Ensure this uses the same lowercase key property (kd)
+        return `${input.kd}_${input.altDown}_${input.ctrlDown}_${input.shiftDown}`;
     }
     
     // Handle keyboard input

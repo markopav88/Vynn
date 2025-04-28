@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { get_current_user, update_user, upload_profile_image, get_profile_image_url } from '$lib/ts/user';
-    import { get_all_commands, get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/document';
+    import { get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/account';
     import { keybindings, type KeyboardInput } from '$lib/ts/keybindings';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
@@ -122,11 +122,16 @@
     // Helper function to format KeyboardInput into a display string
     function formatKeybindingInput(input: KeyboardInput): string {
         let parts: string[] = [];
+        if (!input) return ''; // Add check for undefined input
+
         if (input.ctrlDown) parts.push('Ctrl');
         if (input.altDown) parts.push('Alt');
         if (input.shiftDown) parts.push('Shift');
-        // Handle special keys or capitalize regular keys
-        let key = input.keyDown;
+        
+        // Use kd property instead of keyDown
+        let key = input.kd; 
+        if (!key) return parts.join('+'); // Return early if key is missing
+
         if (key.length === 1) key = key.toUpperCase(); 
         // Handle specific key names if needed (e.g., '$' to '$ ')
         if (key === '$ ') key = '$'; // Example correction if needed
@@ -495,21 +500,22 @@
         event.preventDefault();
         
         const keys: string[] = [];
+        let primaryKey = '';
         
         if (event.ctrlKey) keys.push('Ctrl');
         if (event.shiftKey) keys.push('Shift');
         if (event.altKey) keys.push('Alt');
-        if (event.metaKey) keys.push('Meta');
+        if (event.metaKey) keys.push('Meta'); // Consider if Meta should be allowed
         
         // Add the key if it's not a modifier key
         if (!['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
             // Format the key nicely
-            const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
-            keys.push(key);
+            primaryKey = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+            keys.push(primaryKey);
         }
         
-        // Only set the value if there's at least one modifier and one regular key
-        if (keys.length > 1) {
+        // Set the value if a primary key was pressed (even without modifiers)
+        if (primaryKey) { 
             newKeybindingValue = keys.join('+');
         }
     }
@@ -589,6 +595,7 @@
         event.preventDefault();
         
         const keys: string[] = [];
+        let primaryKey = '';
         
         if (event.ctrlKey) keys.push('Ctrl');
         if (event.shiftKey) keys.push('Shift');
@@ -598,13 +605,16 @@
         // Add the key if it's not a modifier key
         if (!['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
             // Format the key nicely
-            const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
-            keys.push(key);
+            primaryKey = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+            keys.push(primaryKey);
         }
         
-        // Only set the value if there's at least one modifier and one regular key
-        if (keys.length > 1) {
+        // Set the value if a primary key was pressed
+        if (primaryKey) {
             customKeybindingValue = keys.join('+');
+        } else {
+            // Optional: Clear or keep previous value if only modifiers are pressed
+            // customKeybindingValue = ''; 
         }
     }
 

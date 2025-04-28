@@ -193,9 +193,39 @@ ON CONFLICT DO NOTHING;
 -- Insert Default Commands
 INSERT INTO commands(command_id, command_name, command_description, default_keybinding)
 VALUES 
-(1, 'Bold', 'Bolds The Selected Text', 'Ctrl, B'),
-(2, 'Italic', 'Italics The Selected Text', 'Ctrl, I'),
-(3, 'Underline', 'Underline The Selected Text', 'Ctrl, U');
+(1, 'bold', 'Action: bold', 'Ctrl+B'),
+(2, 'italic', 'Action: italic', 'Ctrl+I'),
+(3, 'underline', 'Action: underline', 'Ctrl+U'),
+(4, 'openColorPicker', 'Action: open Color Picker', 'Ctrl+F'),
+(5, 'moveLeft', 'Action: move Left', 'H'),
+(6, 'moveRight', 'Action: move Right', 'L'),
+(7, 'moveUp', 'Action: move Up', 'K'),
+(8, 'moveDown', 'Action: move Down', 'J'),
+(9, 'switchToDocument1', 'Action: switch To Document1', 'Ctrl+1'),
+(10, 'switchToDocument2', 'Action: switch To Document2', 'Ctrl+2'),
+(11, 'switchToDocument3', 'Action: switch To Document3', 'Ctrl+3'),
+(12, 'switchToDocument4', 'Action: switch To Document4', 'Ctrl+4'),
+(13, 'switchToDocument5', 'Action: switch To Document5', 'Ctrl+5'),
+(14, 'switchToDocument6', 'Action: switch To Document6', 'Ctrl+6'),
+(15, 'switchToDocument7', 'Action: switch To Document7', 'Ctrl+7'),
+(16, 'switchToDocument8', 'Action: switch To Document8', 'Ctrl+8'),
+(17, 'switchToDocument9', 'Action: switch To Document9', 'Ctrl+9'),
+(18, 'enterInsertMode', 'Action: enter Insert Mode', 'I'),
+(19, 'moveToStartOfLine', 'Action: move To Start Of Line', '0'),
+(20, 'moveToEndOfLine', 'Action: move To End Of Line', 'Shift+$'),
+(21, 'moveToEndOfDocument', 'Action: move To End Of Document', 'Shift+G'),
+(22, 'moveToStartOfDocument', 'Action: move To Start Of Document', 'g'),
+(23, 'toggleCommandSheet', 'Action: toggle Command Sheet', 'Ctrl+/'),
+(24, 'findNextMatch', 'Action: find Next Match', 'N'),
+(25, 'findPreviousMatch', 'Action: find Previous Match', 'M'),
+(26, 'deleteSelectedText', 'Action: delete Selected Text', 'X'),
+(27, 'yankText', 'Action: yank Text', 'Y'),
+(28, 'deleteLine', 'Action: delete Line', 'D'),
+(29, 'pasteText', 'Action: paste Text', 'P')
+ON CONFLICT (command_id) DO UPDATE SET
+    command_name = EXCLUDED.command_name,
+    command_description = EXCLUDED.command_description,
+    default_keybinding = EXCLUDED.default_keybinding;
 
 -- Give User 1 Some Custom Keybindings
 INSERT INTO user_keybindings(user_id, command_id, keybinding)
