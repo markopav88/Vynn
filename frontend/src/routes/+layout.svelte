@@ -3,7 +3,6 @@
     It's used to define the layout of our pages.
     We can have global CSS, scripts, and other things here.
 -->
-
 <script lang="ts">
 	// Import the global CSS file
 	// Can import other global components here such as a Navbar, Footer, etc,

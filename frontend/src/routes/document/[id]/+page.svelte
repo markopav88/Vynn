@@ -4,10 +4,11 @@
 	import { page } from '$app/stores';
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
+	import Toast from '$lib/components/Toast.svelte';
+	
 	import { get_document, update_document, get_project_from_document, setup_auto_save } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
 	import { get_project_documents } from '$lib/ts/project';
-	import Toast from '$lib/components/Toast.svelte';
 	import { keybindings, keybindingMap, type CommandFunctions, type KeyboardInput } from '$lib/ts/keybindings';
 
 	import logo from '$lib/assets/logo.png';
@@ -15,9 +16,6 @@
 	import profileDefault from '$lib/assets/profile-image.png';
 
 	import '$lib/assets/style/document.css';
-
-	// Define a type that can be either HTMLDivElement or HTMLTextAreaElement
-	type EditorElement = HTMLDivElement;
 
 	// Document state
 	let documentId = $page.params.id;
@@ -84,53 +82,17 @@
 	// Add state for commands overlay
 	let showCommands = false;
 	let showColorPicker = false;
-	let colorPickerPosition = { x: 0, y: 0 };
-	let colorSpectrumElement: HTMLDivElement | null = null;
 
 	// User profile data
 	let userId: number | null = null;
 	let userProfileImage = profileDefault;
 
-	// Initialize editor element
-
-	let commandMode = false;
-
-	// Add at the top of the script where the other variable declarations are
-	let lastColumnPerLine: number[] = [];
-
-	// Add these two helper functions
-	function updateLastColumnForCurrentLine() {
-		// Ensure the array has enough entries
-		while (lastColumnPerLine.length < lines.length) {
-			lastColumnPerLine.push(0);
-		}
-		
-		// Get current cursor position
-		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return;
-		
-		const range = selection.getRangeAt(0);
-		const currentOffset = getTextOffset(range.startContainer, range.startOffset);
-		const textBeforeCursor = editorContent.substring(0, currentOffset);
-		const linesBeforeCursor = textBeforeCursor.split('\n');
-		const currentColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length;
-		
-		// Save current column for this line
-		lastColumnPerLine[activeLineIndex] = currentColumn;
-	}
-
-	function getSavedColumnForLine(lineIndex: number): number {
-		if (lineIndex >= 0 && lineIndex < lastColumnPerLine.length) {
-			return lastColumnPerLine[lineIndex];
-		}
-		return 0;
-	}
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
 			// Allow only specific browser shortcuts we want to keep
-			const allowedKeys = ['c', 'v', 'a', 'z', 'y', '/'];
+			const allowedKeys = ['c', 'v', 'a', 'z', 'y'];
 			if (!allowedKeys.includes(event.key.toLowerCase())) {
 				event.preventDefault();
 			}
@@ -707,99 +669,6 @@
 		}
 
 		return true;
-	}
-
-	// Function to handle normal mode key sequences
-	function handleNormalModeSequence(key: string) {
-		// Add the key to the buffer
-		normalModeBuffer += key;
-		console.log('Buffer:', normalModeBuffer);
-
-		// Clear any existing timeout
-		if (normalModeBufferTimeout) {
-			clearTimeout(normalModeBufferTimeout);
-		}
-
-		// Set a timeout to clear the buffer after a delay
-		normalModeBufferTimeout = setTimeout(() => {
-			// Important: make sure we don't trigger any content changes by the buffer clearing
-			const oldBuffer = normalModeBuffer;
-			normalModeBuffer = '';
-			console.log(`Buffer "${oldBuffer}" cleared by timeout without taking action`);
-			
-			// Update cursor position and line numbers to reflect current state
-			if (editorElement) {
-				// Safely update position without changing content
-				updateCursorPosition();
-				updateLineNumbers();
-			}
-		}, 800); // 800ms timeout for multi-key commands
-
-		// Explicitly log and return false for incomplete sequences
-		if (normalModeBuffer === 'g' || normalModeBuffer === 'd' || normalModeBuffer === 'y') {
-			console.log(`Incomplete command: '${normalModeBuffer}' - waiting for more input`);
-			return false;
-		}
-
-		// Only take action if we have a complete command sequence
-		// Check for complete sequences only - don't do anything for partial commands
-		if (normalModeBuffer === 'yy') {
-			// Copy the current line or selection
-			copyText();
-			normalModeBuffer = ''; // Clear buffer after command
-			return true;
-		} else if (normalModeBuffer === 'dd') {
-			console.log("Executing 'dd' command - deleting current line");
-			// Delete the current line where the cursor is
-			deleteCurrentLine();
-			normalModeBuffer = ''; // Clear buffer after command
-			return true;
-		} else if (normalModeBuffer === 'gg') {
-			// Move cursor to first line, first position without modifying structure
-			if (editorElement && editorContent) {
-				try {
-					// Get the first div or the editor itself
-					const firstDiv = editorElement.querySelector('div') || editorElement;
-					
-					// Create a range at the start of the first div
-					const range = document.createRange();
-					
-					// Set the range at position 0 properly
-					if (firstDiv.firstChild && firstDiv.firstChild.nodeType === Node.TEXT_NODE) {
-						range.setStart(firstDiv.firstChild, 0);
-					} else {
-						range.setStart(firstDiv, 0);
-					}
-					range.collapse(true);
-					
-					// Apply the range for cursor placement
-					const selection = window.getSelection();
-					if (selection) {
-						editorElement.focus(); // Make sure editor is focused
-						selection.removeAllRanges();
-						selection.addRange(range);
-					}
-					
-					// Update tracking variables
-					activeLineIndex = 0;
-					cursorLine = 1;
-					cursorColumn = 1;
-					
-					// Update UI without changing content or structure
-					updateCursorPosition();
-					updateLineNumbers();
-					
-					// Debug
-					console.log('gg command executed: cursor at first line without content changes');
-				} catch (error) {
-					console.error('Error in gg command:', error);
-				}
-			}
-			normalModeBuffer = ''; // Clear buffer after command
-			return true;
-		}
-
-		return false;
 	}
 
 	// Function to copy text
@@ -4596,106 +4465,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	:global(.editor-page) {
-		padding-top: 0 !important;
-		overflow-x: hidden;
-	}
-	
-	/* Hide all scrollbars globally */
-	:global(*) {
-		scrollbar-width: none !important; /* Firefox */
-		-ms-overflow-style: none !important; /* IE and Edge */
-	}
-	
-	:global(*::-webkit-scrollbar) {
-		display: none !important; /* Chrome, Safari, Opera */
-		width: 0 !important;
-		background: transparent !important;
-	}
-	
-	:global(.document-switcher) {
-		position: relative !important;
-		width: 90% !important;
-		max-width: 1400px !important;
-		margin: 0 auto 15px auto !important;
-		margin-top: 30px !important;
-		margin-bottom: -5px !important;
-		z-index: 100 !important;
-		background-color: transparent !important;
-		border: none !important;
-		display: flex !important; 
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-
-	:global(.navbar), :global(.navbar-container) {
-		position: relative !important;
-		z-index: 1000 !important;
-		width: 100% !important;
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	:global(.editor-container) {
-		margin-top: 10px !important;
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	:global(.status-bar) {
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	/* Use animations as enhancements only - with subtle movement */
-	:global(.fade-in-first) {
-		animation: fadeInNavbar 0.6s ease-out forwards !important;
-		opacity: 1 !important; /* Force opacity to 1 when this class is applied */
-		will-change: opacity, transform;
-		backface-visibility: hidden;
-	}
-
-	:global(.fade-in-second) {
-			animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
-	}
-
-	:global(.fade-in-third) {
-			animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
-	}
-
-	:global(.fade-in-fourth) {
-			animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
-	}
-	
-	/* Special animation for navbar - starts completely invisible */
-	@keyframes fadeInNavbar {
-		from {
-			/* Only animate transform, not opacity */
-			transform: translateY(5px);
-		}
-		to {
-			/* Only animate transform, not opacity */
-			transform: translateY(0);
-		}
-	}
-
-	/* Regular animation for other elements */
-	@keyframes fadeInSlightly {
-		from {
-			opacity: 0.9;
-			transform: translateY(5px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	/* Highlight newly added keybinding */
-	@keyframes highlight-row {
-		0% { background-color: rgba(16, 185, 129, 0.3); }
-		50% { background-color: rgba(16, 185, 129, 0.2); }
-		100% { background-color: transparent; }
-	}
-</style>

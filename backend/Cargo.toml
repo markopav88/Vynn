@@ -25,6 +25,7 @@ rust-bert = "0.20.0"
 pgvector = "0.3.0"
 lazy_static = "1.4.0"
 langchain-rust = "4.6.0"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 anyhow = "1"

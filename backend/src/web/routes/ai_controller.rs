@@ -30,7 +30,6 @@ use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
     CreateSessionPayload, SendMessagePayload, ChatHistory, ChatMessage
 };
-use crate::cag::llm::LangchainService;
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
 use crate::{Error, Result};
@@ -186,7 +185,7 @@ pub async fn api_send_writing_message(
     Path(session_id): Path<i32>,
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<SendMessagePayload>,
-) -> Result<Json<WritingAssistantMessage>> {
+) -> Result<Json<Value>> {
     println!("->> {:<12} - send_writing_message", "HANDLER");
 
     // Get user_id from cookies
@@ -206,6 +205,8 @@ pub async fn api_send_writing_message(
     .fetch_one(&pool)
     .await
     .map_err(|_| Error::PermissionError)?;
+
+    // TODO need to embed the users message
 
     // Record the user's message
     sqlx::query!(
@@ -294,34 +295,10 @@ pub async fn api_send_writing_message(
         None => None,
     };
 
-    // Initialize the LLM service
-    let llm_service = LangchainService::new();
+    // TODO Get the LLM response
     
-    // Generate AI response
-    let context_str = context.as_deref();
-    let ai_response = match llm_service.generate_response(&chat_history, context_str).await {
-        Ok(response) => response,
-        Err(_) => "I'm sorry, I couldn't generate a response at this time.".to_string(),
-    };
 
-    // Store the AI response
-    let ai_message = sqlx::query_as!(
-        WritingAssistantMessage,
-        r#"
-        INSERT INTO writing_assistant_messages (session_id, role, content, created_at)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, session_id, role, content, created_at
-        "#,
-        session_id,
-        "assistant",
-        &ai_response,
-        Utc::now().naive_utc()
-    )
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| Error::DatabaseError)?;
-
-    Ok(Json(ai_message))
+    Ok(Json(json!({})))
 }
 
 /// DELETE handler for removing a writing session and all its messages.
@@ -391,23 +368,6 @@ pub async fn api_analyze_document(
     _cookies: Cookies,
     _pool: Extension<PgPool>,
     _payload: Json<Value>,
-) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
-}
-
-/// GET handler for getting a summary of a writing session.
-/// Accessible via: GET /api/writing-assistant/:id/summary
-/// Test: NULL
-/// Frontend: NULL
-/// NOT IMPLEMENTED: Will provide a summary of the writing suggestions and improvements made.
-pub async fn api_get_session_summary(
-    _cookies: Cookies,
-    _path: Path<i32>,
-    _pool: Extension<PgPool>,
 ) -> Result<Json<Value>> {
     // This is a placeholder for future implementation
     Ok(Json(json!({
