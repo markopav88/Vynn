@@ -28,13 +28,20 @@ use chrono::Utc;
 
 use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
-    CreateSessionPayload, SendMessagePayload, ChatHistory, ChatMessage
+    CreateSessionPayload, SendMessagePayload, ChatHistory, MessageRole
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
 use crate::{Error, Result};
 
 use backend::get_user_id_from_cookie;
+
+// Import RAG components
+use crate::rag::embed::{EmbeddingModel, embed_and_store_user_message};
+use crate::rag::llm::QueryModel;
+use crate::rag::prompt;
+use crate::rag::retrieval;
+use pgvector::Vector;
 
 /// GET handler for retrieving all writing sessions for current user.
 /// Accessible via: GET /api/writing-assistant
@@ -103,7 +110,7 @@ pub async fn api_create_writing_session(
     .await
     .map_err(|_| Error::DatabaseError)?;
 
-    // Add a system message to initialize the chat
+    // Add an assistant message to initialize the chat
     let system_message = "I'm your writing assistant. How can I help you today?";
     sqlx::query!(
         r#"
@@ -111,7 +118,7 @@ pub async fn api_create_writing_session(
         VALUES ($1, $2, $3, $4)
         "#,
         session.id,
-        "assistant",
+        MessageRole::Assistant as _,
         system_message,
         Utc::now().naive_utc()
     )
@@ -157,7 +164,12 @@ pub async fn api_get_writing_session(
     let messages = sqlx::query_as!(
         WritingAssistantMessage,
         r#"
-        SELECT id, session_id, role, content, created_at
+        SELECT 
+            id, 
+            session_id, 
+            role AS "role: MessageRole",
+            content, 
+            created_at
         FROM writing_assistant_messages
         WHERE session_id = $1
         ORDER BY created_at ASC
@@ -188,10 +200,8 @@ pub async fn api_send_writing_message(
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - send_writing_message", "HANDLER");
 
-    // Get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Verify the session belongs to this user
     let session = sqlx::query_as!(
         WritingAssistantSession,
         r#"
@@ -206,24 +216,16 @@ pub async fn api_send_writing_message(
     .await
     .map_err(|_| Error::PermissionError)?;
 
-    // TODO need to embed the users message
-
-    // Record the user's message
-    sqlx::query!(
-        r#"
-        INSERT INTO writing_assistant_messages (session_id, role, content, created_at)
-        VALUES ($1, $2, $3, $4)
-        "#,
+    println!("->> {:<12} - Embedding user message", "RAG FUNCTION");
+    let embedding_model = EmbeddingModel::new()?;
+    let user_embedding: Vector = embed_and_store_user_message(
+        &embedding_model,
+        &pool,
         session_id,
-        "user",
-        &payload.content,
-        Utc::now().naive_utc()
-    )
-    .execute(&pool)
-    .await
-    .map_err(|_| Error::DatabaseError)?;
+        &payload.content
+    ).await?;
 
-    // Update the session's updated_at timestamp
+    // Update time on session
     sqlx::query!(
         r#"
         UPDATE writing_assistant_sessions
@@ -237,68 +239,85 @@ pub async fn api_send_writing_message(
     .await
     .map_err(|_| Error::DatabaseError)?;
 
-    // Retrieve all messages for this session to build the context
-    let db_messages = sqlx::query_as!(
-        WritingAssistantMessage,
-        r#"
-        SELECT id, session_id, role, content, created_at
-        FROM writing_assistant_messages
-        WHERE session_id = $1
-        ORDER BY created_at ASC
-        "#,
-        session_id
-    )
-    .fetch_all(&pool)
-    .await
-    .map_err(|_| Error::DatabaseError)?;
-
-    // Build the chat history for the prompt
-    let mut chat_history = ChatHistory::new();
-    for msg in &db_messages {
-        if msg.role == "user" {
-            chat_history.add_user_message(msg.content.clone());
-        } else if msg.role == "assistant" {
-            chat_history.add_assistant_message(msg.content.clone());
-        }
-    }
-
-    // Get relevant context from document if linked to a document
-    let context = match session.document_id {
+    // Retrieve chat history using the dedicated function
+    println!("->> {:<12} - Retrieving chat history", "RAG FUNCTION");
+    let chat_history = retrieval::retrieve_chat_history(&pool, session_id).await?;
+    
+    // Determine Project ID for context retrieval
+    let project_id_for_context: Option<i32> = match session.document_id {
         Some(doc_id) => {
-            // Fetch the document content
-            let doc_content = sqlx::query!(
-                r#"
-                SELECT name, content
-                FROM documents
-                WHERE id = $1
-                "#,
-                doc_id
-            )
-            .fetch_optional(&pool)
-            .await
-            .map_err(|_| Error::DatabaseError)?;
-
-            // If we found the document, use it as context
-            if let Some(doc) = doc_content {
-                // Get the content or default to empty string
-                let content = doc.content.unwrap_or_default();
-                
-                if !content.is_empty() {
-                    Some(format!("Document: {}\n{}", doc.name, content))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+            sqlx::query!("SELECT project_id FROM document_projects WHERE document_id = $1 LIMIT 1", doc_id)
+                .fetch_optional(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?
+                .map(|info| info.project_id) // Get Option<i32>
         }
-        None => None,
+        None => None, // No document, so no project context
     };
 
-    // TODO Get the LLM response
-    
+    // Retrieve relevant document chunks using semantic search
+    println!("->> {:<12} - Retrieving relevant context via semantic search", "RAG FUNCTION");
+    let relevant_chunks = retrieval::semantic_search(
+        &pool, 
+        project_id_for_context,
+        &user_embedding,
+        3
+    ).await?;
 
-    Ok(Json(json!({})))
+    // Combine chunks into context string
+    let context = if !relevant_chunks.is_empty() {
+        Some(relevant_chunks.join("\n\n---\n\n")) // Join with separator
+    } else {
+        None
+    };
+
+    // --- Construct Prompt --- 
+    println!("->> {:<12} - Constructing prompt", "RAG FUNCTION");
+    let final_prompt = prompt::construct_generic_prompt(
+        &payload.content, 
+        &chat_history, 
+        context // Pass the semantically relevant context
+    );
+
+    // --- Query LLM --- 
+    println!("->> {:<12} - Querying LLM", "RAG FUNCTION");
+    let query_model = QueryModel::new()?;
+    let llm_response_content = query_model.query_model(&final_prompt).await?;
+
+    // --- Embed Assistant Response --- 
+    println!("->> {:<12} - Embedding assistant response", "RAG FUNCTION");
+    let assistant_message_struct = WritingAssistantMessage {
+        id: 0, // Placeholder
+        session_id,
+        role: MessageRole::Assistant,
+        content: llm_response_content.clone(),
+        created_at: Utc::now().naive_utc(), // Placeholder
+    };
+    let assistant_embedding = embedding_model.embed_message(&assistant_message_struct).await?;
+
+    // --- Store Assistant Response (with embedding) --- 
+    println!("->> {:<12} - Storing assistant message", "RAG FUNCTION");
+    sqlx::query!(
+        r#"
+        INSERT INTO writing_assistant_messages (session_id, role, content, created_at, embedding)
+        VALUES ($1, $2, $3, $4, $5)
+        "#,
+        session_id,
+        MessageRole::Assistant as _,
+        &llm_response_content,
+        Utc::now().naive_utc(),
+        assistant_embedding as _ // Add embedding
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| {
+        eprintln!("DB Error storing assistant message: {:?}", e);
+        Error::DatabaseError
+    })?;
+
+    // --- Return Response --- 
+    println!("->> {:<12} - Sending response", "RAG FUNCTION");
+    Ok(Json(json!({ "role": "assistant", "content": llm_response_content })))
 }
 
 /// DELETE handler for removing a writing session and all its messages.

@@ -1,6 +1,14 @@
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
 
+// Define the Rust enum corresponding to the SQL enum
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, PartialEq)]
+#[sqlx(type_name = "message_role_enum", rename_all = "lowercase")]
+pub enum MessageRole {
+    User,
+    Assistant,
+}
+
 /// Represents a chat session between a user and the writing assistant
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct WritingAssistantSession {
@@ -17,7 +25,7 @@ pub struct WritingAssistantSession {
 pub struct WritingAssistantMessage {
     pub id: i32,
     pub session_id: i32,
-    pub role: String,  // "user" or "assistant"
+    pub role: MessageRole,  // Changed to use the enum
     pub content: String,
     pub created_at: NaiveDateTime,
 }
@@ -45,7 +53,7 @@ pub struct SessionWithMessages {
 /// Represents a chat message from either the user or assistant (langchain format)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
-    pub role: String,      // "user", "assistant", or "system"
+    pub role: MessageRole, // Changed to use the enum here too for consistency
     pub content: String,   // The actual message content
 }
 
@@ -65,7 +73,7 @@ impl ChatHistory {
         Self {
             messages: vec![
                 ChatMessage {
-                    role: "system".to_string(),
+                    role: MessageRole::User,
                     content: system_prompt.to_string(),
                 }
             ],
@@ -75,7 +83,7 @@ impl ChatHistory {
     /// Add a user message to the chat history
     pub fn add_user_message(&mut self, content: String) {
         self.messages.push(ChatMessage {
-            role: "user".to_string(),
+            role: MessageRole::User,
             content,
         });
     }
@@ -83,7 +91,7 @@ impl ChatHistory {
     /// Add an assistant message to the chat history
     pub fn add_assistant_message(&mut self, content: String) {
         self.messages.push(ChatMessage {
-            role: "assistant".to_string(),
+            role: MessageRole::Assistant,
             content,
         });
     }

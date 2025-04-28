@@ -22,7 +22,7 @@ argon2 = "0.5.0"
 futures-util = "0.3"
 multipart = "0.18.0"
 rust-bert = "0.20.0"
-pgvector = "0.3.0"
+pgvector = { version = "0.3.0", features = ["sqlx"] }
 lazy_static = "1.4.0"
 langchain-rust = "4.6.0"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }

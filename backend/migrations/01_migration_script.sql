@@ -12,6 +12,8 @@ DROP TABLE IF EXISTS project_permissions CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS user_profile_images;
+DROP TABLE IF EXISTS writing_assistant_sessions;
+DROP TABLE IF EXISTS writing_assistant_messages;
 
 CREATE EXTENSION IF NOT EXISTS vector; -- Use PGVECTOR
 
@@ -44,7 +46,8 @@ CREATE TABLE documents (
     is_starred BOOLEAN DEFAULT FALSE,
     is_trashed BOOLEAN DEFAULT FALSE,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    embedding vector(384)
+    embedding vector(1536),
+    embedding_updated_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Create vector index for similarity search
@@ -241,6 +244,9 @@ SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
 -- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
 
+-- Create enum type for message roles
+CREATE TYPE message_role_enum AS ENUM ('user', 'assistant');
+
 -- Create tables for AI writing assistant functionality
 
 -- Writing assistant sessions table
@@ -257,9 +263,10 @@ CREATE TABLE IF NOT EXISTS writing_assistant_sessions (
 CREATE TABLE IF NOT EXISTS writing_assistant_messages (
     id SERIAL PRIMARY KEY,
     session_id INT NOT NULL REFERENCES writing_assistant_sessions(id) ON DELETE CASCADE,
-    role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    role message_role_enum NOT NULL,
     content TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    embedding vector(1536)
 );
 
 -- Indexes for faster queries
