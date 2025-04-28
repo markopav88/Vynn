@@ -1,0 +1,14 @@
+Help me implement the chat assistant now. Create a function which open and closes a 
+chat assistant window. This window is where we will interact with the ai and have our sessions and messgaes. 
+Please implement the following. 
+
+1. A function to open and close the ai chat window
+
+
+2. Bind this in @keybindings.ts to default binding of alt + c and add to @CommandFunctions in addition add it to the 
+commands in @01_migration_script.sql.
+
+
+3. On first document load get all sessions we have with the ai and when we click a session it will load 
+all message history using apis of @api_get_all_writing_sessions  and @api_get_writing_session and 
+if there is none or we want to make a new session call @api_create_writing_session or can delete with @api_delete_writing_session.

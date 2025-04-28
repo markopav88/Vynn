@@ -17,6 +17,8 @@
 
 	import '$lib/assets/style/document.css';
 
+	import ChatAssistant from '$lib/components/ChatAssistant.svelte';
+
 	// Document state
 	let documentId = $page.params.id;
 	let documentData: any = null;
@@ -86,6 +88,11 @@
 	// User profile data
 	let userId: number | null = null;
 	let userProfileImage = profileDefault;
+
+	let showCommandSheet = false;
+	let chatAssistantComponent: ChatAssistant;
+	let isChatOpen = false; // Declare state variable for chat visibility
+	let chatInputElementRef: HTMLInputElement | null = null; // Add ref for chat input
 
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
@@ -435,6 +442,7 @@
 	let switchDoc7Key = 'Ctrl+7';
 	let switchDoc8Key = 'Ctrl+8';
 	let switchDoc9Key = 'Ctrl+9';
+	let toggleChatKey = 'Alt + C';
 
 	function formatKey(input: KeyboardInput): string {
 		let parts: string[] = [];
@@ -487,6 +495,7 @@
 		switchDoc7Key = bindings.switchToDocument7 ? formatKey(bindings.switchToDocument7) : switchDoc7Key;
 		switchDoc8Key = bindings.switchToDocument8 ? formatKey(bindings.switchToDocument8) : switchDoc8Key;
 		switchDoc9Key = bindings.switchToDocument9 ? formatKey(bindings.switchToDocument9) : switchDoc9Key;
+		toggleChatKey = bindings.toggleChatAssistant ? formatKey(bindings.toggleChatAssistant) : toggleChatKey; // Update chat toggle key
 	}
 
 	// Function to show a toast notification
@@ -3528,10 +3537,19 @@
 				showCommandError('Failed to paste: Check clipboard permissions');
 			}
 		},
+		toggleChatAssistant: () => {
+			isChatOpen = !isChatOpen;
+			console.log(`Toggling chat visibility to: ${isChatOpen}`);
+		},
 	};
 
 	// Global keyboard event handler for keybindings
 	function handleKeybindingKeyDown(event: KeyboardEvent) {
+		// If chat input is focused, don't process editor keybindings
+		if (document.activeElement === chatInputElementRef) {
+			return;
+		}
+
 		// Only process keybindings if we are in NORMAL mode
 		if (editorMode !== 'NORMAL') {
 			// Allow the key event to proceed for other handlers (like the editor's own keydown)
@@ -4289,6 +4307,7 @@
 					</div>
 					<div 
 						bind:this={editorElement}
+
 						class="editor-contenteditable" 
 						contenteditable="true"
 						on:keydown={handleKeyDown}
@@ -4463,5 +4482,15 @@
 				<div class="color-slider-indicator" style="background-color: {selectedColor}"></div>
 			</div>
 		</div>
+	{/if}
+
+	{#if isChatOpen}
+		<ChatAssistant
+			bind:this={chatAssistantComponent}
+			documentId={parseInt(documentId)}
+			bind:isOpen={isChatOpen}
+			on:close={() => (isChatOpen = false)}
+			bind:messageInput={chatInputElementRef}
+		/>
 	{/if}
 </div>

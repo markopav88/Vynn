@@ -54,6 +54,7 @@ export interface CommandFunctions {
     yankText?: () => void;
     deleteLine?: () => void;
     pasteText?: () => Promise<void>;
+    toggleChatAssistant?: () => void;
     [key: string]: (() => void | Promise<void>) | undefined;
 }
 
@@ -238,6 +239,12 @@ export class keybindings {
                 ctrlDown: true,
                 shiftDown: false,
             },
+            toggleChatAssistant: {
+                kd: "c",
+                altDown: true,
+                ctrlDown: false,
+                shiftDown: false,
+            },
         }
     }
     
@@ -272,6 +279,7 @@ export class keybindings {
         27: 'yankText',
         28: 'deleteLine',
         29: 'pasteText',
+        30: 'toggleChatAssistant',
     };
     
     // Command name to function name mapping
@@ -305,6 +313,7 @@ export class keybindings {
         'switchToDocument7': 'switchToDocument7',
         'switchToDocument8': 'switchToDocument8',
         'switchToDocument9': 'switchToDocument9',
+        'toggleChatAssistant': 'toggleChatAssistant',
     };
     
     // Helper function to parse keybinding string from backend

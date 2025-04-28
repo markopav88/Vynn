@@ -28,7 +28,7 @@ use chrono::Utc;
 
 use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
-    CreateSessionPayload, SendMessagePayload, ChatHistory, MessageRole
+    CreateSessionPayload, SendMessagePayload, MessageRole
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
@@ -37,7 +37,7 @@ use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
 // Import RAG components
-use crate::rag::embed::{EmbeddingModel, embed_and_store_user_message};
+use crate::rag::embed::{EmbeddingModel, embed_and_store_user_message, embed_and_store_assistant_message};
 use crate::rag::llm::QueryModel;
 use crate::rag::prompt;
 use crate::rag::retrieval;
@@ -199,6 +199,7 @@ pub async fn api_send_writing_message(
     Json(payload): Json<SendMessagePayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - send_writing_message", "HANDLER");
+    println!("->> {:<12} - Payload: {:?}", "HANDLER", payload);
 
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
@@ -218,12 +219,23 @@ pub async fn api_send_writing_message(
 
     println!("->> {:<12} - Embedding user message", "RAG FUNCTION");
     let embedding_model = EmbeddingModel::new()?;
+    // Create the message struct to pass
+    let user_message_to_store = WritingAssistantMessage {
+        id: 0, // Placeholder
+        session_id,
+        role: MessageRole::User,
+        content: payload.content.clone(), // Clone content from payload
+        created_at: Utc::now().naive_utc(), // Placeholder, actual time set during INSERT
+    };
+    println!("->> {:<12} - User message content: \"{}\"", "RAG FUNCTION", payload.content);
     let user_embedding: Vector = embed_and_store_user_message(
         &embedding_model,
         &pool,
         session_id,
-        &payload.content
+        &user_message_to_store
     ).await?;
+    // Log a snippet of the embedding for verification
+    println!("->> {:<12} - User embedding calculated (first 5 dims): {:?}", "RAG FUNCTION", user_embedding.as_slice().iter().take(5).collect::<Vec<_>>());
 
     // Update time on session
     sqlx::query!(
@@ -242,82 +254,86 @@ pub async fn api_send_writing_message(
     // Retrieve chat history using the dedicated function
     println!("->> {:<12} - Retrieving chat history", "RAG FUNCTION");
     let chat_history = retrieval::retrieve_chat_history(&pool, session_id).await?;
+    println!("->> {:<12} - Retrieved {} messages from history", "RETRIEVAL", chat_history.messages.len());
     
-    // Determine Project ID for context retrieval
-    let project_id_for_context: Option<i32> = match session.document_id {
-        Some(doc_id) => {
-            sqlx::query!("SELECT project_id FROM document_projects WHERE document_id = $1 LIMIT 1", doc_id)
-                .fetch_optional(&pool)
-                .await
-                .map_err(|_| Error::DatabaseError)?
-                .map(|info| info.project_id) // Get Option<i32>
+    // Determine Project ID and Current Document Name for context retrieval
+    let mut project_id_for_context: Option<i32> = None;
+    let mut current_doc_name: Option<String> = None;
+    if let Some(doc_id) = session.document_id {
+        // Fetch project ID and document name if document is linked
+        let doc_info = sqlx::query!(
+            r#"
+            SELECT dp.project_id, d.name 
+            FROM documents d 
+            LEFT JOIN document_projects dp ON d.id = dp.document_id 
+            WHERE d.id = $1
+            "#,
+            doc_id
+        )
+        .fetch_optional(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+
+        if let Some(info) = doc_info {
+            project_id_for_context = Some(info.project_id); // Wrap in Some() to match Option type
+            current_doc_name = Some(info.name); // Store the name
         }
-        None => None, // No document, so no project context
-    };
+    }
 
     // Retrieve relevant document chunks using semantic search
     println!("->> {:<12} - Retrieving relevant context via semantic search", "RAG FUNCTION");
+    let k_value = 3;
+    println!("->> {:<12} - Retrieving relevant chunks (k={}) for project_id: {:?}", "RETRIEVAL", k_value, project_id_for_context);
     let relevant_chunks = retrieval::semantic_search(
         &pool, 
         project_id_for_context,
         &user_embedding,
-        3
+        k_value // Use k_value variable
     ).await?;
-
-    // Combine chunks into context string
-    let context = if !relevant_chunks.is_empty() {
-        Some(relevant_chunks.join("\n\n---\n\n")) // Join with separator
-    } else {
-        None
-    };
+    println!("->> {:<12} - Retrieved {} relevant chunks", "RETRIEVAL", relevant_chunks.len());
+    // Log retrieved chunks (or snippets)
+    for (i, chunk) in relevant_chunks.iter().enumerate() {
+        println!("->> {:<12} - Chunk {} (Doc ID: {}, Name: {}): \"{}...\"", 
+                 "RETRIEVAL", 
+                 i + 1, 
+                 chunk.document_id, 
+                 chunk.document_name, 
+                 chunk.content.chars().take(70).collect::<String>());
+    }
 
     // --- Construct Prompt --- 
     println!("->> {:<12} - Constructing prompt", "RAG FUNCTION");
     let final_prompt = prompt::construct_generic_prompt(
         &payload.content, 
         &chat_history, 
-        context // Pass the semantically relevant context
+        &relevant_chunks, // Pass the Vec<RetrievedChunk>
+        session.document_id, // Pass current doc ID
+        current_doc_name.as_deref() // Pass current doc name as &str
     );
+    // Log prompt snippet and estimated tokens (simple space split estimate)
+    let estimated_tokens = final_prompt.split_whitespace().count();
+    println!("->> {:<12} - Prompt constructed ({} tokens estimated):\n---\n{}\n---", "PROMPT", estimated_tokens, final_prompt);
 
     // --- Query LLM --- 
     println!("->> {:<12} - Querying LLM", "RAG FUNCTION");
     let query_model = QueryModel::new()?;
     let llm_response_content = query_model.query_model(&final_prompt).await?;
+    println!("->> {:<12} - LLM response received: \"{}...\"", "RAG FUNCTION", llm_response_content.chars().take(70).collect::<String>());
 
-    // --- Embed Assistant Response --- 
-    println!("->> {:<12} - Embedding assistant response", "RAG FUNCTION");
-    let assistant_message_struct = WritingAssistantMessage {
-        id: 0, // Placeholder
+    // --- Embed and Store Assistant Response --- 
+    println!("->> {:<12} - Assistant response content: \"{}\"", "RAG FUNCTION", llm_response_content);
+    embed_and_store_assistant_message(
+        &embedding_model,
+        &pool,
         session_id,
-        role: MessageRole::Assistant,
-        content: llm_response_content.clone(),
-        created_at: Utc::now().naive_utc(), // Placeholder
-    };
-    let assistant_embedding = embedding_model.embed_message(&assistant_message_struct).await?;
-
-    // --- Store Assistant Response (with embedding) --- 
-    println!("->> {:<12} - Storing assistant message", "RAG FUNCTION");
-    sqlx::query!(
-        r#"
-        INSERT INTO writing_assistant_messages (session_id, role, content, created_at, embedding)
-        VALUES ($1, $2, $3, $4, $5)
-        "#,
-        session_id,
-        MessageRole::Assistant as _,
-        &llm_response_content,
-        Utc::now().naive_utc(),
-        assistant_embedding as _ // Add embedding
-    )
-    .execute(&pool)
-    .await
-    .map_err(|e| {
-        eprintln!("DB Error storing assistant message: {:?}", e);
-        Error::DatabaseError
-    })?;
+        &llm_response_content // Pass LLM response content
+    ).await?;
 
     // --- Return Response --- 
     println!("->> {:<12} - Sending response", "RAG FUNCTION");
-    Ok(Json(json!({ "role": "assistant", "content": llm_response_content })))
+    let response_json = json!({ "role": "assistant", "content": llm_response_content });
+    println!("->> {:<12} - Response JSON: {:?}", "RES_MAPPER", response_json);
+    Ok(Json(response_json))
 }
 
 /// DELETE handler for removing a writing session and all its messages.

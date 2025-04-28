@@ -1,7 +1,5 @@
-// TODO prompts 
-// Look at https://github.com/Abraxas-365/langchain-rust/blob/main/examples/conversational_retriever_chain_with_vector_store.rs
-
 use crate::models::ai::{ChatHistory, MessageRole};
+use crate::rag::retrieval::RetrievedChunk;
 
 const MAX_HISTORY_TOKENS: usize = 1000; // Example token limit for history
 const MAX_CONTEXT_TOKENS: usize = 1500; // Example token limit for context
@@ -14,33 +12,64 @@ fn estimate_tokens(text: &str) -> usize {
 /// Constructs a generic prompt for the LLM using chat history and context.
 pub fn construct_generic_prompt(
     user_query: &str,
-    chat_history: &ChatHistory, 
-    context: Option<String>
+    chat_history: &ChatHistory,
+    context_chunks: &[RetrievedChunk],
+    current_doc_id: Option<i32>,
+    current_doc_name: Option<&str>
 ) -> String {
     let mut prompt = String::new();
 
-    // Add context if available (truncated if too long)
-    if let Some(mut ctx) = context {
-        if estimate_tokens(&ctx) > MAX_CONTEXT_TOKENS {
-            // Simple truncation - more sophisticated methods exist
-            let mut truncated_ctx = String::new();
-            for word in ctx.split_whitespace().take(MAX_CONTEXT_TOKENS) {
-                truncated_ctx.push_str(word);
-                truncated_ctx.push(' ');
-            }
-            ctx = truncated_ctx.trim_end().to_string();
-            println!("->> {:<12} - Context truncated due to length", "PROMPT");
-        }
-        prompt.push_str("Relevant Context:\n");
-        prompt.push_str(&ctx);
-        prompt.push_str("\n\n---\n\n");
+    // --- Add System Instructions ---
+    prompt.push_str(
+        "You are a helpful writing assistant. \
+        Use the following 'Relevant Context' retrieved from the user's documents \
+        and the 'Chat History' to answer the 'User Query'. \
+        Synthesize information from the context and history to provide a specific and helpful response. \
+        If the context contains information relevant to the query, use it directly in your answer.\n\n"
+    );
+    // --- End System Instructions ---
+
+    // --- Add Current Document Info ---
+    prompt.push_str("Current Document Focus:\n");
+    match (current_doc_id, current_doc_name) {
+        (Some(id), Some(name)) => prompt.push_str(&format!("- ID: {}, Name: {}\n\n", id, name)),
+        (Some(id), None) => prompt.push_str(&format!("- ID: {}\n\n", id)),
+        _ => prompt.push_str("- No specific document associated with this chat.\n\n"),
     }
+    prompt.push_str("---\n\n");
+    // --- End Current Document Info ---
+
+    // Add context if available (truncated if too long)
+    prompt.push_str("Relevant Context (from related documents):\n");
+    if !context_chunks.is_empty() {
+        let mut current_context_tokens = 0;
+        for chunk in context_chunks {
+            let chunk_header = format!("--- Source Document (ID: {}, Name: {}) ---\n", chunk.document_id, chunk.document_name);
+            let chunk_content = &chunk.content;
+            let chunk_tokens = estimate_tokens(&chunk_header) + estimate_tokens(chunk_content);
+
+            if current_context_tokens + chunk_tokens > MAX_CONTEXT_TOKENS {
+                 println!("->> {:<12} - Context truncated due to length (skipping remaining chunks)", "PROMPT");
+                 break; // Stop adding context if limit exceeded
+            }
+            prompt.push_str(&chunk_header);
+            prompt.push_str(chunk_content);
+            prompt.push_str("\n---\n"); // Separator after each chunk
+            current_context_tokens += chunk_tokens;
+        }
+        prompt.push_str("\n"); // Add a final newline after context section
+
+    } else {
+         prompt.push_str("(No relevant context found from other documents)\n\n"); // Indicate no context was found
+    }
+    prompt.push_str("---\n\n"); // Separator after context section
 
     // Add chat history (recent messages first, truncated if too long)
     prompt.push_str("Chat History (Recent first):\n");
     let mut current_history_tokens = 0;
     let mut history_str = String::new();
-    for message in chat_history.messages.iter().rev() {
+    // Skip the very first message if it's the initial system prompt from ChatHistory::new()
+    for message in chat_history.messages.iter().rev().skip(1) { // <-- Added .skip(1)
         let role_str = match message.role {
             MessageRole::User => "User",
             MessageRole::Assistant => "Assistant",
@@ -55,14 +84,19 @@ pub fn construct_generic_prompt(
         history_str.insert_str(0, &message_line); // Prepend to keep chronological order in final string
         current_history_tokens += message_tokens;
     }
-    prompt.push_str(&history_str);
+    if history_str.is_empty() {
+        prompt.push_str("(No relevant chat history)\n");
+    } else {
+        prompt.push_str(&history_str);
+    }
     prompt.push_str("\n---\n\n");
 
     // Add the current user query
     prompt.push_str("User Query:\n");
     prompt.push_str(user_query);
-    prompt.push_str("\n\nAssistant Response:"); // Prompt the LLM for its response
-
+    prompt.push_str("\n\nAssistant Response:");
+    // Keep the final log statement
     println!("->> {:<12} - Prompt constructed ({} tokens estimated)", "PROMPT", estimate_tokens(&prompt));
+
     prompt
 }

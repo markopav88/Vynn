@@ -224,7 +224,8 @@ VALUES
 (26, 'deleteSelectedText', 'Action: delete Selected Text', 'X'),
 (27, 'yankText', 'Action: yank Text', 'Y'),
 (28, 'deleteLine', 'Action: delete Line', 'D'),
-(29, 'pasteText', 'Action: paste Text', 'P')
+(29, 'pasteText', 'Action: paste Text', 'P'),
+(30, 'toggleChatAssistant', 'Action: toggle AI Chat Window', 'Alt+C')
 ON CONFLICT (command_id) DO UPDATE SET
     command_name = EXCLUDED.command_name,
     command_description = EXCLUDED.command_description,
@@ -240,6 +241,7 @@ VALUES
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+SELECT setval('commands_id_seq', (SELECT MAX(command_id) FROM commands));
 
 -- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
