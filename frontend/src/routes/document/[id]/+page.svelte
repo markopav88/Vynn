@@ -399,15 +399,11 @@
 		}
 	}
 
-	// --- ADD Function Definition Here ---
 	function exitInsertMode() {
 		editorMode = 'NORMAL';
-		showCommandError('-- NORMAL --'); // Optional feedback
+		showCommandError('NORMAL'); // Optional feedback
 		clearNormalModeBuffer(); // Clear any pending sequence
-		// Optionally return focus to the editor if needed
-		// if (editorElement) editorElement.focus(); 
 	}
-	// --- END ADDED Function ---
 
 	// Function to handle command input
 	function handleCommandInput() {}
@@ -415,19 +411,11 @@
 	// Function to show command error for a few seconds
 	function showCommandError(message: string) {
 		commandError = message;
-
-		// Clear any existing timeout
-		if (commandErrorTimeout) {
-			clearTimeout(commandErrorTimeout);
-		}
-
-		// Auto-hide the error after 3 seconds
 		commandErrorTimeout = setTimeout(() => {
 			commandError = '';
 		}, 3000);
 	}
 
-	// Add toast types and state
 	type ToastData = {
 		message: string;
 		type: 'success' | 'error' | 'warning';
@@ -2971,52 +2959,33 @@
 	function updateLineNumbers() {
 		if (!editorElement) return;
 
-		// Determine line count based on editor content
-		let lineCount = 1; // Start with at least one line
-
-		// First check if we have any div elements (paragraphs)
-		const divElements = editorElement.querySelectorAll('div');
-		const divCount = divElements.length;
-
-		// If we have divs, count them (each is a paragraph/line)
-		if (divCount > 0) {
-			lineCount = divCount;
-
-			// Double-check if there should be an extra line at the end (if cursor is after last div)
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				if (range.startContainer === editorElement && range.startOffset === editorElement.childNodes.length) {
-					// Cursor is after the last div, may need an extra line
-					lineCount++;
-				}
-			}
-		} else {
-			// No divs, check for other line separators
-			const brElements = editorElement.querySelectorAll('br');
-
-			if (brElements.length > 0) {
-				// Each br tag creates a new line
-				lineCount = brElements.length + 1;
-			} else {
-				// If there's any content at all, ensure at least one line
-				const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
-				lineCount = hasContent ? 1 : 1; // Always at least one line
-
-				// Also check for newlines in the text content
-				const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
-				if (newlineCount > 0) {
-					lineCount = Math.max(lineCount, newlineCount + 1);
-				}
-			}
-		}
-
-		// Ensure at least one line
-		lineCount = Math.max(1, lineCount);
-
-		// Get line numbers container
 		const lineNumbersContainer = document.querySelector('.editor-content .line-numbers');
 		if (!lineNumbersContainer) return;
+
+		// Determine line count based on editor content
+		let lineCount = 0;
+		const divElements = Array.from(editorElement.querySelectorAll('div'));
+		const divCount = divElements.length;
+
+		if (divCount === 1) {
+			// Special case: Only one div exists
+			const firstDiv = divElements[0];
+			const text = (firstDiv.textContent || '').trim();
+			const hasOnlyBr = firstDiv.innerHTML.trim() === '<br>';
+			const isEmpty = text === '' || text === '\u200B'; // Check for empty or zero-width space
+
+			if (isEmpty || hasOnlyBr) {
+				lineCount = 1; // If the single div is effectively empty, show only 1 line number
+			} else {
+				lineCount = 1; // If the single div has content, it's still 1 line
+			}
+		} else if (divCount > 1) {
+			// Multiple divs, count them directly
+			lineCount = divCount;
+		} else {
+			// No divs found (should ideally not happen with contenteditable if properly initialized)
+			lineCount = 1; // Default to 1 line
+		}
 
 		// Clear existing line numbers
 		lineNumbersContainer.innerHTML = '';
@@ -3898,8 +3867,6 @@
 		const currentOffset = range.startOffset;
 		const newRange = document.createRange();
 		let successfullyMoved = false;
-
-		// --- Start: Add check for empty line ---
 		const currentDiv = allDivs[activeLineIndex];
 		const lineIsEmpty = !currentDiv?.textContent || currentDiv.textContent.trim() === '' || currentDiv.textContent.trim() === '\u200B' || (currentDiv.childNodes.length === 1 && currentDiv.firstChild?.nodeName === 'BR');
 
@@ -3908,7 +3875,6 @@
 			moveDown();
 			return;
 		}
-		// --- End: Add check for empty line ---
 
 		// Check if we can move forward within the current node
 		let canMoveInNode = false;
@@ -4193,6 +4159,14 @@
 		// --- End of the logic to add ---
 
 		// If not a handled shortcut, let default input handling occur
+	}
+
+	function handleCommand(command: string) {
+		// Ensure command prefix is included
+		if (!command.startsWith(':')) {
+			command = `:${command}`;
+		}
+		// ... existing code ...
 	}
 </script>
 

@@ -5,12 +5,11 @@
     import { keybindings, type KeyboardInput } from '$lib/ts/keybindings';
     import Navbar from '$lib/components/Navbar.svelte';
     import profileDefault from '$lib/assets/profile-image.png';
+    import Toast from '$lib/components/Toast.svelte';
     
     let isLoggedIn = true;
     let isLoading = true;
     let isSaving = false;
-    let successMessage = '';
-    let errorMessage = '';
     
     // User data
     let userId: number;
@@ -96,6 +95,29 @@
     // Metadata for custom keybindings (not stored in Command object)
     let customKeybindingsMetadata: Map<number, { actionId: string }> = new Map();
     
+    // --- ADD Toast State ---
+    type ToastData = {
+        message: string;
+        type: 'success' | 'error' | 'warning';
+    };
+    let toasts: ToastData[] = [];
+    // --- END Toast State ---
+    
+    // --- ADD Toast Functions ---
+    function showToast(message: string, type: 'success' | 'error' | 'warning' = 'success') {
+        toasts = [...toasts, { message, type }];
+        // Remove the toast after 3 seconds
+        setTimeout(() => {
+            // Use message content for removal to handle potential duplicates
+            toasts = toasts.filter((t) => t.message !== message);
+        }, 3000);
+    }
+
+    function removeToast(index: number) {
+        toasts = toasts.filter((_, i) => i !== index);
+    }
+    // --- END Toast Functions ---
+    
     // --- ADD HELPER FUNCTION --- 
     // Helper function to format KeyboardInput into a display string
     function formatKeybindingInput(input: KeyboardInput): string {
@@ -113,6 +135,68 @@
     }
     // --- END HELPER FUNCTION ---
     
+    const formattingCommandNames = new Set([
+        'bold',
+        'italic',
+        'underline',
+        'openColorPicker',
+        'switchToDocument1',
+        'switchToDocument2',
+        'switchToDocument3',
+        'switchToDocument4',
+        'switchToDocument5',
+        'switchToDocument6',
+        'switchToDocument7',
+        'switchToDocument8',
+        'switchToDocument9',
+        'toggleCommandSheet',
+    ]);
+
+    // Helper to parse keybinding string (similar to keybindings.ts but simplified)
+    function parseKeyString(keybinding: string): { key: string, ctrl: boolean, alt: boolean, shift: boolean } {
+        const parts = keybinding.toLowerCase().split('+');
+        const key = parts.pop()?.trim() || '';
+        const ctrl = parts.includes('ctrl');
+        const alt = parts.includes('alt');
+        const shift = parts.includes('shift');
+        return { key, ctrl, alt, shift };
+    }
+
+    // Validation function
+    function validateKeybinding(commandId: number, keybindingString: string): { isValid: boolean, message: string } {
+        const command = commands.find(cmd => cmd.command_id === commandId);
+        if (!command) return { isValid: false, message: 'Unknown command.' };
+
+        const parsed = parseKeyString(keybindingString);
+
+        // Rule 1: Check formatting commands
+        if (formattingCommandNames.has(command.command_name)) {
+            if (!parsed.ctrl && !parsed.alt) {
+                return { isValid: false, message: `Formatting commands like "${command.command_name}" require Ctrl or Alt.` };
+            }
+            if (!parsed.key || parsed.key.length === 0) { // Ensure there's an actual key
+                return { isValid: false, message: 'Keybinding must include a primary key.' };
+            }
+            // Optionally add stricter rules like preventing only Shift+Letter if needed
+        }
+
+        // Rule 2: Check for duplicates
+        const normalizedInput = formatKeybindingInput(keybindings.parseKeybindingString(keybindingString));
+
+        for (const cmd of commands) {
+            if (cmd.command_id === commandId) continue; // Skip self
+            
+            const existingBindingStr = getKeybinding(cmd.command_id);
+            const normalizedExisting = formatKeybindingInput(keybindings.parseKeybindingString(existingBindingStr));
+            
+            if (normalizedExisting === normalizedInput) {
+                return { isValid: false, message: `Keybinding "${keybindingString}" is already used by "${cmd.command_name}".` };
+            }
+        }
+
+        return { isValid: true, message: '' };
+    }
+
     onMount(async () => {
         try {
             const user = await get_current_user();
@@ -144,7 +228,7 @@
             }
         } catch (error) {
             console.error('Error loading user data:', error);
-            errorMessage = 'Failed to load user data';
+            showToast('Failed to load user data', 'error');
         } finally {
             isLoading = false;
         }
@@ -161,13 +245,13 @@
         
         // Check if the file is an image
         if (!file.type.startsWith('image/')) {
-            errorMessage = 'Please select an image file';
+            showToast('Please select an image file', 'error');
             return;
         }
         
         // Check file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-            errorMessage = 'Image size must be less than 5MB';
+            showToast('Image size must be less than 5MB', 'error');
             return;
         }
         
@@ -181,19 +265,19 @@
         reader.readAsDataURL(file);
         
         // Clear error message
-        errorMessage = '';
+        keybindingsErrorMessage = '';
     }
     
     // Handle form submission
     async function handleSubmit() {
         try {
             isSaving = true;
-            errorMessage = '';
-            successMessage = '';
+            keybindingsErrorMessage = '';
+            keybindingsSuccessMessage = '';
             
             // Validate passwords match if changed
             if (password && password !== confirmPassword) {
-                errorMessage = 'Passwords do not match';
+                showToast('Passwords do not match', 'error');
                 return;
             }
 
@@ -201,7 +285,7 @@
             if (name && email) {
                 const updated = await update_user(name, email, password);
                 if (!updated) {
-                    errorMessage = 'Failed to update user information';
+                    showToast('Failed to update user information', 'error');
                     return;
                 }
             }
@@ -210,7 +294,7 @@
             if (imageFile) {
                 const uploaded = await upload_profile_image(imageFile);
                 if (!uploaded) {
-                    errorMessage = 'Failed to upload profile image';
+                    showToast('Failed to upload profile image', 'error');
                     return;
                 }
                 
@@ -223,7 +307,7 @@
             confirmPassword = '';
             
             // Show success message
-            successMessage = 'Account updated successfully';
+            showToast('Account updated successfully', 'success');
             
             // Clear file input
             const fileInput = document.getElementById('profileImageInput') as HTMLInputElement;
@@ -235,7 +319,7 @@
             
         } catch (error) {
             console.error('Error updating account:', error);
-            errorMessage = 'An unexpected error occurred';
+            showToast('An unexpected error occurred', 'error');
         } finally {
             isSaving = false;
         }
@@ -291,7 +375,7 @@
 
         } catch (error) {
             console.error('Error loading keybindings:', error);
-            keybindingsErrorMessage = 'Failed to load keybindings';
+            showToast('Failed to load keybindings', 'error');
         } finally {
             isLoadingKeybindings = false;
         }
@@ -329,7 +413,13 @@
             keybindingsSuccessMessage = '';
             
             if (!newKeybindingValue.trim()) {
-                keybindingsErrorMessage = 'Keybinding cannot be empty';
+                showToast('Keybinding cannot be empty', 'error');
+                return;
+            }
+            
+            const validation = validateKeybinding(commandId, newKeybindingValue);
+            if (!validation.isValid) {
+                showToast(validation.message, 'error');
                 return;
             }
             
@@ -344,16 +434,16 @@
                     userKeybindings = [...userKeybindings, result];
                 }
                 
-                keybindingsSuccessMessage = 'Keybinding updated successfully';
+                showToast('Keybinding updated successfully', 'success');
                 editingKeybinding = null;
                 newKeybindingValue = '';
             } else {
-                keybindingsErrorMessage = 'Failed to update keybinding';
+                showToast('Failed to update keybinding', 'error');
             }
             
         } catch (error) {
             console.error('Error saving keybinding:', error);
-            keybindingsErrorMessage = 'An unexpected error occurred';
+            showToast('An unexpected error occurred', 'error');
         }
     }
     
@@ -370,7 +460,7 @@
                 // Remove from user keybindings
                 userKeybindings = userKeybindings.filter(kb => kb.command_id !== commandId);
                 
-                keybindingsSuccessMessage = 'Keybinding reset to default';
+                showToast('Keybinding reset to default', 'success');
                 
                 // If we were editing this keybinding, clear the edit state
                 if (editingKeybinding === commandId) {
@@ -381,12 +471,12 @@
                 // Force reactivity update for the table display
                 commands = [...commands];
             } else {
-                keybindingsErrorMessage = 'Failed to reset keybinding';
+                showToast('Failed to reset keybinding', 'error');
             }
             
         } catch (error) {
             console.error('Error resetting keybinding:', error);
-            keybindingsErrorMessage = 'An unexpected error occurred';
+            showToast('An unexpected error occurred', 'error');
         }
     }
     
@@ -427,25 +517,35 @@
     // Handle creating a new custom keybinding
     function createCustomKeybinding() {
         if (!customCommandName.trim()) {
-            keybindingsErrorMessage = 'Command name cannot be empty';
+            showToast('Command name cannot be empty', 'error');
             return;
         }
         
         if (!customCommandDescription.trim()) {
-            keybindingsErrorMessage = 'Command description cannot be empty';
+            showToast('Command description cannot be empty', 'error');
             return;
         }
         
         if (!customKeybindingValue.trim()) {
-            keybindingsErrorMessage = 'Keybinding cannot be empty';
+            showToast('Keybinding cannot be empty', 'error');
             return;
         }
         
         if (!customCommandAction) {
-            keybindingsErrorMessage = 'Please select an action for this keybinding';
+            showToast('Please select an action for this keybinding', 'error');
             return;
         }
         
+        const normalizedInput = formatKeybindingInput(keybindings.parseKeybindingString(customKeybindingValue));
+        for (const cmd of commands) {
+            const existingBindingStr = getKeybinding(cmd.command_id);
+            const normalizedExisting = formatKeybindingInput(keybindings.parseKeybindingString(existingBindingStr));
+            if (normalizedExisting === normalizedInput) {
+                showToast(`Keybinding "${customKeybindingValue}" is already used by "${cmd.command_name}".`, 'error');
+                return;
+            }
+        }
+
         // Create new custom command
         const cmdId = nextCustomCommandId;
         const newCommand = new Command(
@@ -481,7 +581,7 @@
         customCommandAction = 'toggleDarkMode'; // Reset to default action
         showCustomKeybindingForm = false;
         
-        keybindingsSuccessMessage = 'Custom keybinding created successfully';
+        showToast('Custom keybinding created successfully', 'success');
     }
     
     // Handle custom keybinding key input
@@ -518,7 +618,7 @@
         );
         
         if (existingCommand) {
-            keybindingsErrorMessage = `A command named "${command.name}" already exists. Please choose a different name.`;
+            showToast(`A command named "${command.name}" already exists. Please choose a different name.`, 'error');
             
             // Scroll to the existing command to show the user
             setTimeout(() => {
@@ -549,7 +649,7 @@
             );
             
             if (conflictingCommand) {
-                keybindingsErrorMessage = `The keybinding "${command.keybinding}" is already used by "${conflictingCommand.command_name}". Please use a different keybinding.`;
+                showToast(`The keybinding "${command.keybinding}" is already used by "${conflictingCommand.command_name}". Please use a different keybinding.`, 'error');
                 
                 // Scroll to the conflicting command
                 setTimeout(() => {
@@ -608,7 +708,7 @@
         console.log("Current custom keybindings:", customKeybindings);
         
         // Show success message
-        keybindingsSuccessMessage = `Custom keybinding "${command.name}" created successfully`;
+        showToast(`Custom keybinding "${command.name}" created successfully`, 'success');
         
         // Scroll to the newly added keybinding in the table after a short delay
         // to allow the DOM to update
@@ -659,13 +759,19 @@
     // Handle changing a custom keybinding's action
     function updateCustomKeybindingAction(commandId: number, actionId: string) {
         customKeybindingsMetadata.set(commandId, { actionId });
-        keybindingsSuccessMessage = 'Keybinding action updated successfully';
+        showToast('Keybinding action updated successfully', 'success');
     }
 </script>
 
 <svelte:head>
     <title>My Account | Vynn</title>
 </svelte:head>
+
+<!-- ADD Toast Rendering -->
+{#each toasts as toast, i}
+	<Toast message={toast.message} type={toast.type} onClose={() => removeToast(i)} />
+{/each}
+<!-- END Toast Rendering -->
 
 <div class="bg-black min-vh-100 d-flex flex-column">
     <Navbar {isLoggedIn} />
@@ -706,19 +812,7 @@
                                     </div>
                                 </div>
                             {:else}
-                                <!-- Success message -->
-                                {#if successMessage}
-                                    <div class="alert alert-success mb-4" role="alert">
-                                        {successMessage}
-                                    </div>
-                                {/if}
-                                
-                                <!-- Error message -->
-                                {#if errorMessage}
-                                    <div class="alert alert-danger mb-4" role="alert">
-                                        {errorMessage}
-                                    </div>
-                                {/if}
+                                <!-- Messages now handled by Toast component -->
                                 
                                 <form on:submit|preventDefault={handleSubmit}>
                                     <!-- Profile Image -->
@@ -830,21 +924,7 @@
                                     </div>
                                 </div>
                             {:else}
-                                <!-- Success message -->
-                                {#if keybindingsSuccessMessage}
-                                    <div class="alert alert-success mb-4 alert-dismissible fade show" role="alert">
-                                        {keybindingsSuccessMessage}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                    </div>
-                                {/if}
-                                
-                                <!-- Error message -->
-                                {#if keybindingsErrorMessage}
-                                    <div class="alert alert-danger mb-4 alert-dismissible fade show" role="alert">
-                                        {keybindingsErrorMessage}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                    </div>
-                                {/if}
+                                <!-- Messages now handled by Toast component -->
                                 
                                 <!-- Add Keybinding Button -->
                                 <div class="mb-4">
