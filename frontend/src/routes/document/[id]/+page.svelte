@@ -3187,80 +3187,78 @@
 	// Define our command functions object with formatting commands
 	const commandFunctions: CommandFunctions = {
 		applyBoldFormatting: () => {
-			console.debug('Executing bold formatting command');
+			console.debug('Executing bold formatting command (NORMAL mode)');
 			if (!document.queryCommandSupported('bold')) {
 				showCommandError('Bold formatting not supported');
 				return;
 			}
 
 			const selection = window.getSelection();
-			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
+			// ONLY apply if text is actually selected in NORMAL mode
+			if (selection && !selection.isCollapsed) {
 				document.execCommand('bold', false);
+				// MutationObserver handles content updates
 				showCommandError('Bold formatting applied');
+			} else {
+				console.debug('Bold command ignored: No text selected in NORMAL mode.');
 			}
 		},
 		applyItalicFormatting: () => {
-			console.debug('Executing italic formatting command');
+			console.debug('Executing italic formatting command (NORMAL mode)');
 			if (!document.queryCommandSupported('italic')) {
 				showCommandError('Italic formatting not supported');
 				return;
 			}
 
 			const selection = window.getSelection();
-			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
+			// ONLY apply if text is actually selected in NORMAL mode
+			if (selection && !selection.isCollapsed) {
 				document.execCommand('italic', false);
+				// MutationObserver handles content updates
 				showCommandError('Italic formatting applied');
+			} else {
+				console.debug('Italic command ignored: No text selected in NORMAL mode.');
 			}
 		},
 		applyUnderlineFormatting: () => {
-			console.debug('Executing underline formatting command');
+			console.debug('Executing underline formatting command (NORMAL mode)');
 			if (!document.queryCommandSupported('underline')) {
 				showCommandError('Underline formatting not supported');
 				return;
 			}
 
 			const selection = window.getSelection();
-			if ((selection && !selection.isCollapsed) || editorMode === 'INSERT') {
+			// ONLY apply if text is actually selected in NORMAL mode
+			if (selection && !selection.isCollapsed) {
 				document.execCommand('underline', false);
-				
-				// Fix the case where we have multiple colored sections within a single underline
+				// MutationObserver handles content updates
+
+				// Fix potential nested font/u issues (keep this logic)
 				if (editorElement) {
-					// Find any u elements with multiple font children
 					const underlineElements = editorElement.querySelectorAll('u');
-					
 					for (const uElem of underlineElements) {
 						const fontElements = uElem.querySelectorAll('font');
-						
-						// If we have multiple font elements inside a single u tag
 						if (fontElements.length > 1) {
-							// Create a document fragment to hold our new structure
 							const fragment = document.createDocumentFragment();
-							
-							// For each font element, restructure to font > u
 							Array.from(fontElements).forEach(fontElem => {
 								const color = fontElem.getAttribute('color');
 								const content = fontElem.innerHTML;
-								
-								// Create new structure with font wrapping u
 								const newFont = document.createElement('font');
 								if (color) newFont.setAttribute('color', color);
-								
 								const newU = document.createElement('u');
 								newU.innerHTML = content;
-								
 								newFont.appendChild(newU);
 								fragment.appendChild(newFont);
 							});
-							
-							// Replace the old structure with our fixed one
 							if (uElem.parentNode) {
 								uElem.parentNode.replaceChild(fragment, uElem);
 							}
 						}
 					}
 				}
-				
 				showCommandError('Underline formatting applied');
+			} else {
+				console.debug('Underline command ignored: No text selected in NORMAL mode.');
 			}
 		},
 		// Add document switching commands
