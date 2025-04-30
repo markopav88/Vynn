@@ -1150,4 +1150,105 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	position: relative;
 }
 
-/* When animating, we need the container to maintain its height and width */
+/* === Styles moved from +page.svelte === */
+
+.editor-page {
+	padding-top: 0 !important;
+	overflow-x: hidden;
+}
+
+* {
+	scrollbar-width: none !important; /* Firefox */
+	-ms-overflow-style: none !important; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+	display: none !important; /* Chrome, Safari, Opera */
+	width: 0 !important;
+	background: transparent !important;
+}
+
+.document-switcher {
+	position: relative !important;
+	width: 90% !important;
+	max-width: 1400px !important;
+	margin: 0 auto 15px auto !important;
+	margin-top: 30px !important;
+	margin-bottom: -5px !important;
+	z-index: 100 !important;
+	background-color: transparent !important;
+	border: none !important;
+	display: flex !important;
+	opacity: 0.9 !important; /* Higher initial opacity */
+	transform: translateY(5px); /* Match animation start state */
+}
+
+.navbar,
+.navbar-container {
+	position: relative !important;
+	z-index: 1000 !important;
+	width: 100% !important;
+	transform: translateY(5px); /* Match animation start state */
+}
+
+.editor-container {
+	margin-top: 10px !important;
+	opacity: 0.9 !important; /* Higher initial opacity */
+	transform: translateY(5px); /* Match animation start state */
+}
+
+.status-bar {
+	opacity: 0.9 !important; /* Higher initial opacity */
+	transform: translateY(5px); /* Match animation start state */
+}
+
+.fade-in-first {
+	animation: fadeInNavbar 0.6s ease-out forwards !important;
+	opacity: 1 !important;
+	will-change: opacity, transform;
+	backface-visibility: hidden;
+}
+
+.fade-in-second {
+	animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
+}
+
+.fade-in-third {
+	animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
+}
+
+.fade-in-fourth {
+	animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
+}
+
+@keyframes fadeInNavbar {
+	from {
+		transform: translateY(5px);
+	}
+	to {
+		transform: translateY(0);
+	}
+}
+
+@keyframes fadeInSlightly {
+	from {
+		opacity: 0.9;
+		transform: translateY(5px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes highlight-row {
+	0% {
+		background-color: rgba(16, 185, 129, 0.3);
+	}
+	50% {
+		background-color: rgba(16, 185, 129, 0.2);
+	}
+	100% {
+		background-color: transparent;
+	}
+}

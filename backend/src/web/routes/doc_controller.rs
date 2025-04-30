@@ -34,6 +34,10 @@ use crate::{Error, Result};
 
 use backend::get_user_id_from_cookie;
 
+// Import necessary items for embedding
+use crate::rag::embed::EmbeddingModel;
+use chrono::{Utc, Duration};
+
 /// GET handler for retrieving a document by ID.
 /// Accessible via: GET /api/document/:id
 /// Test: test_documents.rs/test_get_document()
@@ -196,18 +200,33 @@ pub async fn api_update_document(
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - update_document", "HANDLER");
 
-    // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Check if user has editor or owner permission
     let has_permission = check_document_permission(&pool, user_id, document_id, "editor").await?;
-
     if !has_permission {
         return Err(Error::PermissionError);
     }
 
-    // Proceed with update...
-    let result = sqlx::query!(
+    // --- Embedding Logic Start ---
+    // Fetch old content and embedding timestamp BEFORE updating
+    let old_data = sqlx::query!(
+        r#"
+        SELECT content, embedding_updated_at
+        FROM documents
+        WHERE id = $1
+        "#,
+        document_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    let old_content = old_data.as_ref().and_then(|d| d.content.clone()).unwrap_or_default();
+    let old_embedding_time = old_data.as_ref().and_then(|d| d.embedding_updated_at);
+    // --- Embedding Logic End ---
+
+    // Proceed with the main update
+    let update_result = sqlx::query!(
         "UPDATE documents
         SET name = $1, content = $2, updated_at = $3
         WHERE id = $4",
@@ -219,12 +238,59 @@ pub async fn api_update_document(
     .execute(&pool)
     .await;
 
-    // if the update doesnt affect any rows it failed
-    if result.as_ref().unwrap().rows_affected() == 0 {
+    // Check if the main update failed
+    if update_result.is_err() || update_result.unwrap().rows_affected() == 0 {
+        // Note: Using unwrap() as we checked is_err(). Consider proper error handling.
         return Err(Error::DocumentUpdateError);
     }
 
-    // otherwise it passes
+    let should_update_embedding = match old_embedding_time {
+        Some(timestamp) => {
+            // Get length of new content, defaulting to 0 if None
+            let new_content_len = payload.content.as_ref().map_or(0, |s| s.len());
+            // Get length of old content, defaulting to 0 if None (already handled by unwrap_or_default earlier)
+            let old_content_len = old_content.len();
+            
+            let content_diff = (new_content_len as i64 - old_content_len as i64).abs();
+            let time_diff = Utc::now().signed_duration_since(timestamp);
+            
+            content_diff > 500 || time_diff > Duration::minutes(20)
+        },
+        None => true, // Always update if no previous embedding time exists
+    };
+
+    if should_update_embedding {
+        println!("->> {:<12} - Updating embedding for document {}", "INFO", document_id);
+        let embedding_model = EmbeddingModel::new()?;
+
+        // Handle Option<String> for content before embedding
+        if let Some(content_str) = payload.content.as_deref() {
+            // Generate new embedding only if content exists
+            let new_embedding = embedding_model.embed_document(content_str).await?;
+            
+            // Update the embedding and timestamp in the database
+            let embed_update_result = sqlx::query!(
+                r#"
+                UPDATE documents
+                SET embedding = $1, embedding_updated_at = $2
+                WHERE id = $3
+                "#,
+                new_embedding as _,
+                Utc::now(),
+                document_id
+            )
+            .execute(&pool)
+            .await;
+
+            if embed_update_result.is_err() {
+                println!("->> {:<12} - Failed to update embedding for document {}: {:?}", "ERROR", document_id, embed_update_result.err());
+            }
+        } else {
+            println!("->> {:<12} - Skipping embedding update for document {} as content is None", "INFO", document_id);
+        }
+    }
+    
+    // Return success for the main update
     Ok(Json(json!({
         "result": {
             "success": true

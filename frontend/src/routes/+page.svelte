@@ -17,7 +17,6 @@
 	let pageLoaded = false;
 
 	onMount(() => {
-		// First part: async function for auth check
 		(async () => {
 			try {
 				const authCheckPromise = check_auth();

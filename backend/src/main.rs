@@ -5,6 +5,7 @@ mod db;
 mod error;
 mod models;
 mod web;
+mod rag;
 
 use axum::middleware;
 
@@ -62,6 +63,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let db_api_routes = web::routes::db_controller::db_routes();
     let project_api_routes = web::routes::proj_controller::project_routes();
     let key_api_routes = web::routes::key_controller::key_routes();
+    let writing_assistant_routes = web::routes::ai_controller::writing_assistant_routes();
 
     let cookie_layer = CookieManagerLayer::new();
 
@@ -71,6 +73,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .nest("/api/document", doc_api_routes) // Merge routes from document_controller
         .nest("/api/project", project_api_routes)
         .nest("/api/command", key_api_routes)
+        .nest("/api/writing-assistant", writing_assistant_routes)
         .layer(Extension(pool.clone())) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::map_response(main_response_mapper))
         .layer(cookie_layer)

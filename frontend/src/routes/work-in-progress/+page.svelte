@@ -25,6 +25,5 @@
 			<a href="/" class="btn btn-green btn-lg px-4">Return to Home</a>
 		</div>
 	</div>
-
 	<Footer />
 </div>

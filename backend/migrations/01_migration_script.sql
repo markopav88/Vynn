@@ -12,6 +12,10 @@ DROP TABLE IF EXISTS project_permissions CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS user_profile_images;
+DROP TABLE IF EXISTS writing_assistant_sessions;
+DROP TABLE IF EXISTS writing_assistant_messages;
+
+CREATE EXTENSION IF NOT EXISTS vector; -- Use PGVECTOR
 
 -- Create users table
 CREATE TABLE users (
@@ -41,8 +45,13 @@ CREATE TABLE documents (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_starred BOOLEAN DEFAULT FALSE,
     is_trashed BOOLEAN DEFAULT FALSE,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    embedding vector(1536),
+    embedding_updated_at TIMESTAMP WITH TIME ZONE
 );
+
+-- Create vector index for similarity search
+CREATE INDEX document_embedding_idx ON documents USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- Create junction table for many-to-many relationship
 CREATE TABLE document_projects (
@@ -187,9 +196,40 @@ ON CONFLICT DO NOTHING;
 -- Insert Default Commands
 INSERT INTO commands(command_id, command_name, command_description, default_keybinding)
 VALUES 
-(1, 'Bold Selected', 'Bolds The Selected Text', 'Ctrl, B'),
-(2, 'Italic Selected', 'Italics The Selected Text', 'Ctrl, I'),
-(3, 'Underline Selected', 'Underline The Selected Text', 'Ctrl, U');
+(1, 'bold', 'Action: bold', 'Ctrl+B'),
+(2, 'italic', 'Action: italic', 'Ctrl+I'),
+(3, 'underline', 'Action: underline', 'Ctrl+U'),
+(4, 'openColorPicker', 'Action: open Color Picker', 'Ctrl+F'),
+(5, 'moveLeft', 'Action: move Left', 'H'),
+(6, 'moveRight', 'Action: move Right', 'L'),
+(7, 'moveUp', 'Action: move Up', 'K'),
+(8, 'moveDown', 'Action: move Down', 'J'),
+(9, 'switchToDocument1', 'Action: switch To Document1', 'Ctrl+1'),
+(10, 'switchToDocument2', 'Action: switch To Document2', 'Ctrl+2'),
+(11, 'switchToDocument3', 'Action: switch To Document3', 'Ctrl+3'),
+(12, 'switchToDocument4', 'Action: switch To Document4', 'Ctrl+4'),
+(13, 'switchToDocument5', 'Action: switch To Document5', 'Ctrl+5'),
+(14, 'switchToDocument6', 'Action: switch To Document6', 'Ctrl+6'),
+(15, 'switchToDocument7', 'Action: switch To Document7', 'Ctrl+7'),
+(16, 'switchToDocument8', 'Action: switch To Document8', 'Ctrl+8'),
+(17, 'switchToDocument9', 'Action: switch To Document9', 'Ctrl+9'),
+(18, 'enterInsertMode', 'Action: enter Insert Mode', 'I'),
+(19, 'moveToStartOfLine', 'Action: move To Start Of Line', '0'),
+(20, 'moveToEndOfLine', 'Action: move To End Of Line', 'Shift+$'),
+(21, 'moveToEndOfDocument', 'Action: move To End Of Document', 'Shift+G'),
+(22, 'moveToStartOfDocument', 'Action: move To Start Of Document', 'g'),
+(23, 'toggleCommandSheet', 'Action: toggle Command Sheet', 'Ctrl+/'),
+(24, 'findNextMatch', 'Action: find Next Match', 'N'),
+(25, 'findPreviousMatch', 'Action: find Previous Match', 'M'),
+(26, 'deleteSelectedText', 'Action: delete Selected Text', 'X'),
+(27, 'yankText', 'Action: yank Text', 'Y'),
+(28, 'deleteLine', 'Action: delete Line', 'D'),
+(29, 'pasteText', 'Action: paste Text', 'P'),
+(30, 'toggleChatAssistant', 'Action: toggle AI Chat Window', 'Alt+C')
+ON CONFLICT (command_id) DO UPDATE SET
+    command_name = EXCLUDED.command_name,
+    command_description = EXCLUDED.command_description,
+    default_keybinding = EXCLUDED.default_keybinding;
 
 -- Give User 1 Some Custom Keybindings
 INSERT INTO user_keybindings(user_id, command_id, keybinding)
@@ -201,6 +241,41 @@ VALUES
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+SELECT setval('commands_id_seq', (SELECT MAX(command_id) FROM commands));
 
 -- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+
+-- Create enum type for message roles
+CREATE TYPE message_role_enum AS ENUM ('user', 'assistant');
+
+-- Create tables for AI writing assistant functionality
+
+-- Writing assistant sessions table
+CREATE TABLE IF NOT EXISTS writing_assistant_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id INT REFERENCES documents(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL DEFAULT 'New Writing Session',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Writing assistant messages table
+CREATE TABLE IF NOT EXISTS writing_assistant_messages (
+    id SERIAL PRIMARY KEY,
+    session_id INT NOT NULL REFERENCES writing_assistant_sessions(id) ON DELETE CASCADE,
+    role message_role_enum NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    embedding vector(1536)
+);
+
+-- Indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_writing_messages_session_id ON writing_assistant_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_writing_sessions_user_id ON writing_assistant_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_writing_sessions_document_id ON writing_assistant_sessions(document_id);
+
+-- Set initial sequence values for writing assistant tables
+SELECT setval('writing_assistant_sessions_id_seq', 1, false);
+SELECT setval('writing_assistant_messages_id_seq', 1, false);

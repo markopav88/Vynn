@@ -53,3 +53,101 @@
 .bg-green {
     background-color: var(--color-primary) !important;
 }
+
+/* Table styling */
+.table-responsive {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) #343a40;
+}
+
+.table-responsive::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #343a40;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background-color: var(--color-primary);
+    border-radius: 4px;
+}
+
+/* Custom keybinding form */
+.card.bg-black {
+    background-color: #121212;
+}
+
+/* Suggested commands styling */
+.suggested-commands .card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+}
+
+.suggested-commands .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    border-color: var(--color-primary) !important;
+}
+
+.suggested-commands .card-title {
+    font-weight: 600;
+    color: var(--color-primary-light);
+}
+
+.suggested-commands .badge {
+    font-family: monospace;
+    letter-spacing: 0.5px;
+    background-color: #1a1a1a;
+    padding: 6px 8px;
+}
+
+.suggested-commands .btn-outline-success {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.suggested-commands .btn-outline-success:hover {
+    background-color: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* Keybindings table styling */
+.keybindings-table tr.keybinding-row {
+    transition: background-color 0.3s ease;
+}
+
+.keybindings-table tr[data-command-id^="-"] td:first-child {
+    border-left: 3px solid var(--color-primary);
+}
+
+/* Custom keybindings styling */
+.keybindings-table tr.custom-keybinding {
+    background-color: rgba(16, 185, 129, 0.05);
+}
+
+.keybindings-table tr.custom-keybinding:hover {
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.keybindings-table .custom-keybinding td:first-child {
+    border-left: 3px solid var(--color-primary);
+}
+
+/* Section headers in table */
+.keybindings-table tr.border-bottom.border-secondary td {
+    padding: 10px;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Highlight newly added keybinding */
+@keyframes highlight-row {
+    0% { background-color: rgba(16, 185, 129, 0.3); }
+    50% { background-color: rgba(16, 185, 129, 0.2); }
+    100% { background-color: transparent; }
+} 

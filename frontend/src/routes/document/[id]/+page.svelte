@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, afterUpdate } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
-	import { get_document, update_document, setup_auto_save, get_project_from_document } from '$lib/ts/document';
+	import Toast from '$lib/components/Toast.svelte';
+	
+	import { get_document, update_document, get_project_from_document, setup_auto_save } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
 	import { get_project_documents } from '$lib/ts/project';
-	import { handleNormalModeKeydown } from '$lib/ts/editor-commands';
-	import Toast from '$lib/components/Toast.svelte';
+	import { keybindings, keybindingMap, type CommandFunctions, type KeyboardInput } from '$lib/ts/keybindings';
 
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
@@ -16,8 +17,7 @@
 
 	import '$lib/assets/style/document.css';
 
-	// Define a type that can be either HTMLDivElement or HTMLTextAreaElement
-	type EditorElement = HTMLDivElement;
+	import ChatAssistant from '$lib/components/ChatAssistant.svelte';
 
 	// Document state
 	let documentId = $page.params.id;
@@ -84,53 +84,22 @@
 	// Add state for commands overlay
 	let showCommands = false;
 	let showColorPicker = false;
-	let colorPickerPosition = { x: 0, y: 0 };
-	let colorSpectrumElement: HTMLDivElement | null = null;
 
 	// User profile data
 	let userId: number | null = null;
 	let userProfileImage = profileDefault;
 
-	// Initialize editor element
+	let showCommandSheet = false;
+	let chatAssistantComponent: ChatAssistant;
+	let isChatOpen = false; // Declare state variable for chat visibility
+	let chatInputElementRef: HTMLInputElement | null = null; // Add ref for chat input
 
-	let commandMode = false;
-
-	// Add at the top of the script where the other variable declarations are
-	let lastColumnPerLine: number[] = [];
-
-	// Add these two helper functions
-	function updateLastColumnForCurrentLine() {
-		// Ensure the array has enough entries
-		while (lastColumnPerLine.length < lines.length) {
-			lastColumnPerLine.push(0);
-		}
-		
-		// Get current cursor position
-		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return;
-		
-		const range = selection.getRangeAt(0);
-		const currentOffset = getTextOffset(range.startContainer, range.startOffset);
-		const textBeforeCursor = editorContent.substring(0, currentOffset);
-		const linesBeforeCursor = textBeforeCursor.split('\n');
-		const currentColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length;
-		
-		// Save current column for this line
-		lastColumnPerLine[activeLineIndex] = currentColumn;
-	}
-
-	function getSavedColumnForLine(lineIndex: number): number {
-		if (lineIndex >= 0 && lineIndex < lastColumnPerLine.length) {
-			return lastColumnPerLine[lineIndex];
-		}
-		return 0;
-	}
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
 			// Allow only specific browser shortcuts we want to keep
-			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'f', '/'];
+			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'x'];
 			if (!allowedKeys.includes(event.key.toLowerCase())) {
 				event.preventDefault();
 			}
@@ -354,29 +323,42 @@
 			const projectInfo = await get_project_from_document(parseInt(documentId));
 
 			if (projectInfo && projectInfo.project_id) {
-				// Get all documents in this project
+				console.log(`Fetching documents for project ID: ${projectInfo.project_id}`); // Add log
+				// Fetch the actual documents for the project
 				const documents = await get_project_documents(projectInfo.project_id);
+				console.log(`Found ${documents ? documents.length : 0} documents in project`); // Add log
 
 				if (documents && documents.length > 0) {
 					projectDocuments = documents;
-
-					// Find the index of the current document
 					currentDocumentIndex = projectDocuments.findIndex((doc) => doc.id.toString() === documentId);
-
-					// Preload documents into the map
+					// Pre-populate the map for faster switching
+					projectDocumentsMap.clear(); // Clear previous map entries
 					projectDocuments.forEach((doc) => {
 						projectDocumentsMap.set(doc.id, doc);
 					});
-
-					// Set the project name in documentData
-					documentData.project_name = projectInfo.project_name;
+					// Ensure project name is set if available
+					if(documentData) documentData.project_name = projectInfo.project_name;
+					console.log(`projectDocuments array updated. Current index: ${currentDocumentIndex}`); // Add log
+				} else {
+					// Handle case where project exists but has no documents (or only the current one)
+					projectDocuments = documentData ? [documentData] : []; // Show at least current doc if available
+					currentDocumentIndex = 0;
+					projectDocumentsMap.clear();
+					if(documentData) projectDocumentsMap.set(documentData.id, documentData);
+					console.log('Project has no other documents, showing only current.'); // Add log
 				}
+			} else {
+				// Document is not part of a project
+				projectDocuments = documentData ? [documentData] : [];
+				currentDocumentIndex = 0;
+				projectDocumentsMap.clear();
+				if(documentData) projectDocumentsMap.set(documentData.id, documentData);
+				console.log('Document is not part of a project.'); // Add log
 			}
-			// Set projectDocumentsLoaded to true regardless of whether document is in a project
 			projectDocumentsLoaded = true;
+			console.log('Finished loadProjectDocuments'); // Add log
 		} catch (error) {
 			console.error('Error loading project documents:', error);
-			// Still set projectDocumentsLoaded to true even if there's an error
 			projectDocumentsLoaded = true;
 		}
 	}
@@ -406,31 +388,115 @@
 		}
 	}
 
+	function exitInsertMode() {
+		editorMode = 'NORMAL';
+		showCommandError('NORMAL'); // Optional feedback
+		clearNormalModeBuffer(); // Clear any pending sequence
+	}
+
 	// Function to handle command input
 	function handleCommandInput() {}
 
 	// Function to show command error for a few seconds
 	function showCommandError(message: string) {
 		commandError = message;
-
-		// Clear any existing timeout
-		if (commandErrorTimeout) {
-			clearTimeout(commandErrorTimeout);
-		}
-
-		// Auto-hide the error after 3 seconds
 		commandErrorTimeout = setTimeout(() => {
 			commandError = '';
 		}, 3000);
 	}
 
-	// Add toast types and state
 	type ToastData = {
 		message: string;
 		type: 'success' | 'error' | 'warning';
 	};
 
 	let toasts: ToastData[] = [];
+
+	// --- Keybinding variables for Cheat Sheet --- 
+	let boldKey = 'Ctrl+B';
+	let italicKey = 'Ctrl+I';
+	let underlineKey = 'Ctrl+U';
+	let colorPickerKey = 'Ctrl+F';
+	let insertModeKey = 'I';
+	let moveLeftKey = 'H';
+	let moveRightKey = 'L';
+	let moveUpKey = 'K';
+	let moveDownKey = 'J';
+	let startOfLineKey = '0';
+	let endOfLineKey = 'Shift+$';
+	let endOfDocKey = 'Shift+G';
+	let startOfDocKey = 'g';
+	let toggleSheetKey = 'Ctrl+/';
+	let nextMatchKey = 'N';
+	let prevMatchKey = 'M';
+	let deleteSelectedKey = 'X';
+	let yankKey = 'Y';
+	let deleteLineKey = 'D';
+	let pasteKey = 'P';
+	let switchDoc1Key = 'Ctrl+1';
+	let switchDoc2Key = 'Ctrl+2';
+	let switchDoc3Key = 'Ctrl+3';
+	let switchDoc4Key = 'Ctrl+4';
+	let switchDoc5Key = 'Ctrl+5';
+	let switchDoc6Key = 'Ctrl+6';
+	let switchDoc7Key = 'Ctrl+7';
+	let switchDoc8Key = 'Ctrl+8';
+	let switchDoc9Key = 'Ctrl+9';
+	let toggleChatKey = 'Alt + C';
+
+	function formatKey(input: KeyboardInput): string {
+		let parts: string[] = [];
+		if (!input) return ''; // Add check for undefined input
+
+		if (input.ctrlDown) parts.push('Ctrl');
+		if (input.altDown) parts.push('Alt');
+		if (input.shiftDown) parts.push('Shift');
+		
+		// Use kd property instead of keyDown
+		let key = input.kd; 
+		if (!key) return parts.join('+'); // Return early if key is missing
+
+		if (key.length === 1) key = key.toUpperCase(); 
+		// Handle specific key names if needed
+		parts.push(key); 
+		return parts.join('+');
+	}
+
+	// Updated function to populate specific key variables
+	function prepareCommandSheetData() {
+		const bindings = keybindings.activeBindings;
+		boldKey = bindings.bold ? formatKey(bindings.bold) : boldKey;
+		italicKey = bindings.italic ? formatKey(bindings.italic) : italicKey;
+		underlineKey = bindings.underline ? formatKey(bindings.underline) : underlineKey;
+		colorPickerKey = bindings.openColorPicker ? formatKey(bindings.openColorPicker) : colorPickerKey;
+		insertModeKey = bindings.enterInsertMode ? formatKey(bindings.enterInsertMode) : insertModeKey;
+		moveLeftKey = bindings.moveLeft ? formatKey(bindings.moveLeft) : moveLeftKey;
+		moveRightKey = bindings.moveRight ? formatKey(bindings.moveRight) : moveRightKey;
+		moveUpKey = bindings.moveUp ? formatKey(bindings.moveUp) : moveUpKey;
+		moveDownKey = bindings.moveDown ? formatKey(bindings.moveDown) : moveDownKey;
+		startOfLineKey = bindings.moveToStartOfLine ? formatKey(bindings.moveToStartOfLine) : startOfLineKey;
+		endOfLineKey = bindings.moveToEndOfLine ? formatKey(bindings.moveToEndOfLine) : endOfLineKey;
+		endOfDocKey = bindings.moveToEndOfDocument ? formatKey(bindings.moveToEndOfDocument) : endOfDocKey;
+		startOfDocKey = bindings.moveToStartOfDocument ? formatKey(bindings.moveToStartOfDocument) : startOfDocKey;
+		toggleSheetKey = bindings.toggleCommandSheet ? formatKey(bindings.toggleCommandSheet) : toggleSheetKey;
+		nextMatchKey = bindings.findNextMatch ? formatKey(bindings.findNextMatch) : nextMatchKey;
+		prevMatchKey = bindings.findPreviousMatch ? formatKey(bindings.findPreviousMatch) : prevMatchKey;
+		deleteSelectedKey = bindings.deleteSelectedText ? formatKey(bindings.deleteSelectedText) : deleteSelectedKey;
+		yankKey = bindings.yankText ? formatKey(bindings.yankText) : yankKey;
+		deleteLineKey = bindings.deleteLine ? formatKey(bindings.deleteLine) : deleteLineKey;
+		pasteKey = bindings.pasteText ? formatKey(bindings.pasteText) : pasteKey;
+		// Add document switch keys
+		switchDoc1Key = bindings.switchToDocument1 ? formatKey(bindings.switchToDocument1) : switchDoc1Key;
+		switchDoc2Key = bindings.switchToDocument2 ? formatKey(bindings.switchToDocument2) : switchDoc2Key;
+		switchDoc3Key = bindings.switchToDocument3 ? formatKey(bindings.switchToDocument3) : switchDoc3Key;
+		switchDoc4Key = bindings.switchToDocument4 ? formatKey(bindings.switchToDocument4) : switchDoc4Key;
+		switchDoc5Key = bindings.switchToDocument5 ? formatKey(bindings.switchToDocument5) : switchDoc5Key;
+		switchDoc6Key = bindings.switchToDocument6 ? formatKey(bindings.switchToDocument6) : switchDoc6Key;
+		switchDoc7Key = bindings.switchToDocument7 ? formatKey(bindings.switchToDocument7) : switchDoc7Key;
+		switchDoc8Key = bindings.switchToDocument8 ? formatKey(bindings.switchToDocument8) : switchDoc8Key;
+		switchDoc9Key = bindings.switchToDocument9 ? formatKey(bindings.switchToDocument9) : switchDoc9Key;
+		toggleChatKey = bindings.toggleChatAssistant ? formatKey(bindings.toggleChatAssistant) : toggleChatKey; // Update chat toggle key
+	}
 
 	// Function to show a toast notification
 	function showToast(message: string, type: 'success' | 'error' | 'warning' = 'success') {
@@ -612,99 +678,6 @@
 		}
 
 		return true;
-	}
-
-	// Function to handle normal mode key sequences
-	function handleNormalModeSequence(key: string) {
-		// Add the key to the buffer
-		normalModeBuffer += key;
-		console.log('Buffer:', normalModeBuffer);
-
-		// Clear any existing timeout
-		if (normalModeBufferTimeout) {
-			clearTimeout(normalModeBufferTimeout);
-		}
-
-		// Set a timeout to clear the buffer after a delay
-		normalModeBufferTimeout = setTimeout(() => {
-			// Important: make sure we don't trigger any content changes by the buffer clearing
-			const oldBuffer = normalModeBuffer;
-			normalModeBuffer = '';
-			console.log(`Buffer "${oldBuffer}" cleared by timeout without taking action`);
-			
-			// Update cursor position and line numbers to reflect current state
-			if (editorElement) {
-				// Safely update position without changing content
-				updateCursorPosition();
-				updateLineNumbers();
-			}
-		}, 800); // 800ms timeout for multi-key commands
-
-		// Explicitly log and return false for incomplete sequences
-		if (normalModeBuffer === 'g' || normalModeBuffer === 'd' || normalModeBuffer === 'y') {
-			console.log(`Incomplete command: '${normalModeBuffer}' - waiting for more input`);
-			return false;
-		}
-
-		// Only take action if we have a complete command sequence
-		// Check for complete sequences only - don't do anything for partial commands
-		if (normalModeBuffer === 'yy') {
-			// Copy the current line or selection
-			copyText();
-			normalModeBuffer = ''; // Clear buffer after command
-			return true;
-		} else if (normalModeBuffer === 'dd') {
-			console.log("Executing 'dd' command - deleting current line");
-			// Delete the current line where the cursor is
-			deleteCurrentLine();
-			normalModeBuffer = ''; // Clear buffer after command
-			return true;
-		} else if (normalModeBuffer === 'gg') {
-			// Move cursor to first line, first position without modifying structure
-			if (editorElement && editorContent) {
-				try {
-					// Get the first div or the editor itself
-					const firstDiv = editorElement.querySelector('div') || editorElement;
-					
-					// Create a range at the start of the first div
-					const range = document.createRange();
-					
-					// Set the range at position 0 properly
-					if (firstDiv.firstChild && firstDiv.firstChild.nodeType === Node.TEXT_NODE) {
-						range.setStart(firstDiv.firstChild, 0);
-					} else {
-						range.setStart(firstDiv, 0);
-					}
-					range.collapse(true);
-					
-					// Apply the range for cursor placement
-					const selection = window.getSelection();
-					if (selection) {
-						editorElement.focus(); // Make sure editor is focused
-						selection.removeAllRanges();
-						selection.addRange(range);
-					}
-					
-					// Update tracking variables
-					activeLineIndex = 0;
-					cursorLine = 1;
-					cursorColumn = 1;
-					
-					// Update UI without changing content or structure
-					updateCursorPosition();
-					updateLineNumbers();
-					
-					// Debug
-					console.log('gg command executed: cursor at first line without content changes');
-				} catch (error) {
-					console.error('Error in gg command:', error);
-				}
-			}
-			normalModeBuffer = ''; // Clear buffer after command
-			return true;
-		}
-
-		return false;
 	}
 
 	// Function to copy text
@@ -935,16 +908,14 @@
 
 	// Special handler for Enter key to fix line counting issues
 	function handleKeyDown(event: KeyboardEvent) {
-		if (!event) return;
+		console.log(`KeyDown event: {key: '${event.key}', ctrlKey: ${event.ctrlKey}, metaKey: ${event.metaKey}, shiftKey: ${event.shiftKey}, showColorPicker: ${showColorPicker}}`);
+
+		if (showColorPicker) {
+			handleColorPickerKeyDown(event);
+			return;
+		}
 
 		preventBrowserDefaults(event);
-
-		console.log('KeyDown event:', {
-			key: event.key,
-			ctrlKey: event.ctrlKey,
-			metaKey: event.metaKey,
-			showColorPicker: showColorPicker
-		});
 
 		// If color picker is open, handle its navigation
 		if (showColorPicker) {
@@ -962,25 +933,25 @@
 				showColorPicker = false;
 				return;
 			}
-			if (event.key === 'ArrowLeft') {
+			if (event.key === 'ArrowLeft' || event.key === 'h') {
 				event.preventDefault();
 				hue = (hue - 5 + 365) % 365; // Wrap around when going below 0
 				updateColorFromHueOnly();
 				return;
 			}
-			if (event.key === 'ArrowRight') {
+			if (event.key === 'ArrowRight' || event.key === 'l') {
 				event.preventDefault();
 				hue = (hue + 5) % 365; // Wrap around when exceeding 365
 				updateColorFromHueOnly();
 				return;
 			}
-			if (event.key === 'ArrowUp') {
+			if (event.key === 'ArrowUp' || event.key === 'k') {
 				event.preventDefault();
 				hue = (hue + 15) % 365; // Larger jump up with wrap around
 				updateColorFromHueOnly();
 				return;
 			}
-			if (event.key === 'ArrowDown') {
+			if (event.key === 'ArrowDown' || event.key === 'j') {
 				event.preventDefault();
 				hue = (hue - 15 + 365) % 365; // Larger jump down with wrap around
 				updateColorFromHueOnly();
@@ -988,169 +959,6 @@
 			}
 			// Block all other keys while color picker is open
 			event.preventDefault();
-			return;
-		}
-
-		// Handle Ctrl+/ for command cheat sheet in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
-			event.preventDefault();
-			showCommands = !showCommands;
-			return;
-		}
-
-		// Handle Ctrl+F for color picker in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
-			console.log('Ctrl+F detected, checking selection');
-			event.preventDefault();
-			const selection = window.getSelection();
-			console.log('Selection:', {
-				exists: !!selection,
-				isCollapsed: selection?.isCollapsed,
-				editorMode: editorMode
-			});
-
-			if (selection && (!selection.isCollapsed || editorMode === 'INSERT')) {
-				// Position the color picker relative to the editor
-				if (editorElement) {
-					const editorRect = editorElement.getBoundingClientRect();
-					const cursorX = editorRect.left + Math.min(200, editorRect.width * 0.3);
-					const cursorY = editorRect.top + Math.min(150, editorRect.height * 0.2);
-
-					colorPickerPosition = {
-						x: Math.max(0, Math.min(cursorX, window.innerWidth - 320)),
-						y: Math.max(0, Math.min(cursorY, window.innerHeight - 450))
-					};
-					console.log('Setting color picker position with editor rect:', {
-						editorRect,
-						cursorX,
-						cursorY,
-						colorPickerPosition,
-						windowSize: {
-							width: window.innerWidth,
-							height: window.innerHeight
-						}
-					});
-				}
-
-				// Initialize color picker with default black color
-				hue = 0;
-				saturation = 100;
-				lightness = 50;
-				updateColorFromHSL();
-
-				// Try to get the current selection color if possible
-				try {
-					const selection = window.getSelection();
-					if (selection && selection.rangeCount > 0) {
-						const range = selection.getRangeAt(0);
-						const span = document.createElement('span');
-						range.surroundContents(span);
-
-						// Get computed color
-						const computedColor = window.getComputedStyle(span).color;
-						if (computedColor) {
-							// Parse RGB color
-							const rgb = computedColor.match(/\d+/g);
-							if (rgb && rgb.length >= 3) {
-								rgbColor = {
-									r: parseInt(rgb[0]),
-									g: parseInt(rgb[1]),
-									b: parseInt(rgb[2])
-								};
-
-								// Update hex and HSL
-								hexColor = rgbToHex(rgbColor.r, rgbColor.g, rgbColor.b);
-								const hsl = rgbToHsl(rgbColor.r, rgbColor.g, rgbColor.b);
-								hue = hsl[0];
-								// For slider, always use full saturation and medium lightness
-								saturation = 100;
-								lightness = 50;
-
-								selectedColor = rgbToHex(...hslToRgb(hue, saturation / 100, lightness / 100));
-							}
-						}
-
-						// Restore the selection without removing the content
-						// First, save the content
-						const content = span.innerHTML;
-						// Replace span with its content
-						const fragment = document.createDocumentFragment();
-						while (span.firstChild) {
-							fragment.appendChild(span.firstChild);
-						}
-						span.parentNode?.replaceChild(fragment, span);
-						
-						// Reselect the text
-						if (selection && selection.rangeCount > 0) {
-							selection.removeAllRanges();
-							selection.addRange(range);
-						}
-					}
-				} catch (error) {
-					console.error('Error getting current color:', error);
-				}
-
-				showColorPicker = true;
-				console.log('Color picker opened');
-			} else {
-				console.log('Color picker not opened: no valid selection or not in INSERT mode');
-			}
-			return;
-		}
-
-		// Handle Ctrl+B for bold formatting in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
-			event.preventDefault();
-			// Only apply bold if there's a selection
-			const selection = window.getSelection();
-			if (selection && !selection.isCollapsed) {
-				applyBoldFormatting();
-			} else if (editorMode === 'INSERT') {
-				// In insert mode, allow toggling bold mode even without selection
-				applyBoldFormatting();
-			}
-			return;
-		}
-
-		// Handle Ctrl+I for italic formatting in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
-			event.preventDefault();
-			// Only apply italic if there's a selection
-			const selection = window.getSelection();
-			if (selection && !selection.isCollapsed) {
-				applyItalicFormatting();
-			} else if (editorMode === 'INSERT') {
-				// In insert mode, allow toggling italic mode even without selection
-				applyItalicFormatting();
-			}
-			return;
-		}
-
-		// Handle Ctrl+U for underline formatting in any mode
-		if ((event.ctrlKey || event.metaKey) && event.key === 'u') {
-			event.preventDefault();
-			// Only apply underline if there's a selection
-			const selection = window.getSelection();
-			if (selection && !selection.isCollapsed) {
-				applyUnderlineFormatting();
-			} else if (editorMode === 'INSERT') {
-				// In insert mode, allow toggling underline mode even without selection
-				applyUnderlineFormatting();
-			}
-			return;
-		}
-
-		// Handle Ctrl+1-9 for document switching in any mode
-		if ((event.ctrlKey || event.metaKey) && /^[1-9]$/.test(event.key)) {
-			event.preventDefault();
-			const index = parseInt(event.key) - 1;
-			if (projectDocuments && projectDocuments[index]) {
-				console.log(`Switching to document ${index + 1}:`, projectDocuments[index]);
-				switchDocument(projectDocuments[index].id);
-			} else {
-				console.log(`No document at index ${index + 1}`);
-				showCommandError(`No document ${index + 1} available`);
-			}
 			return;
 		}
 
@@ -1172,53 +980,25 @@
 			return;
 		}
 
-		// INSERT MODE: Allow typing but handle minimal key commands
+		// INSERT MODE: Delegate to the specific handler
 		if (editorMode === 'INSERT') {
-			clearNormalModeBuffer();
-			// Handle arrow keys in any mode - update line highlighting with better timing
-			if (
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight'
-			) {
-			// Let browser handle actual cursor movement
-				// Then update our position tracking with two phases to ensure accuracy
-			setTimeout(() => {
-				updateCursorPosition();
-				updateLineNumbers();
-
-					setTimeout(() => {
-						updateCursorPosition();
-						updateLineNumbers();
-					}, 10);
-			}, 0);
-			}
-
-			// For all other keys in INSERT mode, just let the default behavior occur
+			handleInsertModeKeyDown(event);
+			// After handling specific keys (like Escape or formatting), 
+			// update UI for regular typing
 			setTimeout(() => {
 				updateCursorPosition();
 				updateLineNumbers();
 				ensureCursorVisible();
 			}, 0);
-
-			return;
+			return; // Return after handling INSERT mode
 		}
 
 		// NORMAL MODE: Handle editor commands
 		if (editorMode === 'NORMAL') {
 			// Clear any existing buffer timeout
 			if (normalModeBufferTimeout) {
-				clearTimeout(normalModeBufferTimeout);
-				normalModeBufferTimeout = null;
-			}
-
-			// Special handler for '0' key in NORMAL mode
-			if (event.key === '0') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				moveToStartOfLine(); // Call the function to move to start of line
-				return;
+					clearTimeout(normalModeBufferTimeout);
+					normalModeBufferTimeout = null;
 			}
 
 			// Allow text selection with Shift + arrow keys in normal mode
@@ -1233,273 +1013,55 @@
 					event.key === 'k' ||
 					event.key === 'l')
 			) {
-				// Let the browser handle the selection
+				return; // Let browser handle selection
+			}
+
+			if (event.key === 'ArrowLeft') {
+				event.preventDefault();
+				moveLeft();
+				return;
+			}
+			if (event.key === 'ArrowRight') {
+				event.preventDefault();
+				moveRight();
+				return;
+			}
+			if (event.key === 'ArrowUp') {
+				event.preventDefault();
+				moveUp();
+				return;
+			}
+			if (event.key === 'ArrowDown') {
+				event.preventDefault();
+				moveDown();
 				return;
 			}
 
-			// Handle navigation keys in NORMAL mode only
-				if (event.key === 'h') {
+			if (event.key === '/' && !event.ctrlKey && !event.shiftKey) {
 				event.preventDefault();
-				if (!editorElement) return;
-					const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-						const range = selection.getRangeAt(0);
-				console.log('Move Left (h) - Initial state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-
-				// Get the current div element
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				const currentDiv = allDivs[activeLineIndex];
-				if (!currentDiv) return;
-
-				// Get current position in the text
-				const textContent = currentDiv.textContent || '';
-				const currentTextNode = range.startContainer;
-				const currentOffset = range.startOffset;
-
-				console.log('Current text state:', {
-					textContent,
-					currentOffset,
-					nodeType: currentTextNode.nodeType
-				});
-
-				// If we're at the start of a text node
-						if (currentOffset > 0) {
-					// Move left within the current text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode, currentOffset - 1);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				} else if (currentTextNode.previousSibling) {
-					// Move to the end of the previous text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode.previousSibling, currentTextNode.previousSibling.textContent?.length || 0);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				}
-
-						updateCursorPosition();
-						updateLineNumbers();
-				ensureCursorVisible();
-
-				console.log('Move Left (h) - Final state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-					return;
-				} else if (event.key === 'l') {
+				enterCommandMode('/'); // Enter command mode with forward search prefix
+				return;
+			}
+			if (event.key === '?' && !event.ctrlKey) {
 				event.preventDefault();
-				if (!editorElement) return;
-					const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-						const range = selection.getRangeAt(0);
-				console.log('Move Right (l) - Initial state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-
-				// Get the current div element
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				const currentDiv = allDivs[activeLineIndex];
-				if (!currentDiv) return;
-
-				// Get current position in the text
-				const textContent = currentDiv.textContent || '';
-				const currentTextNode = range.startContainer;
-				const currentOffset = range.startOffset;
-
-				console.log('Current text state:', {
-					textContent,
-					currentOffset,
-					nodeType: currentTextNode.nodeType,
-					textLength: currentTextNode.textContent?.length || 0
-				});
-
-				// If we're not at the end of the current text node
-				if (currentTextNode.nodeType === Node.TEXT_NODE && currentOffset < currentTextNode.textContent!.length) {
-					// Move right within the current text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode, currentOffset + 1);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				} else if (currentTextNode.nextSibling) {
-					// Move to the start of the next text node
-					const newRange = document.createRange();
-					newRange.setStart(currentTextNode.nextSibling, 0);
-					newRange.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(newRange);
-				}
-
-						updateCursorPosition();
-						updateLineNumbers();
-				ensureCursorVisible();
-
-				console.log('Move Right (l) - Final state:', {
-					activeLineIndex,
-					cursorLine,
-					cursorColumn
-				});
-					return;
-				} else if (event.key === 'k') {
-				event.preventDefault();
-				if (!editorElement) return;
-				const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-				if (activeLineIndex > 0) {
-					const allDivs = Array.from(editorElement.querySelectorAll('div'));
-					const targetDiv = allDivs[activeLineIndex - 1];
-					if (targetDiv) {
-						const range = document.createRange();
-						const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
-						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
-							range.setStart(targetDiv.firstChild, targetColumn);
-						} else {
-							range.setStart(targetDiv, 0);
-						}
-						range.collapse(true);
-						selection.removeAllRanges();
-						selection.addRange(range);
-						activeLineIndex--;
-						updateCursorPosition();
-						updateLineNumbers();
-						ensureCursorVisible();
-					}
-				}
-					return;
-				} else if (event.key === 'j') {
-				event.preventDefault();
-				if (!editorElement) return;
-				const selection = window.getSelection();
-				if (!selection || !selection.rangeCount) return;
-
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				if (activeLineIndex < allDivs.length - 1) {
-					const targetDiv = allDivs[activeLineIndex + 1];
-					if (targetDiv) {
-						const range = document.createRange();
-						const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
-						if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
-							range.setStart(targetDiv.firstChild, targetColumn);
-						} else {
-							range.setStart(targetDiv, 0);
-						}
-						range.collapse(true);
-						selection.removeAllRanges();
-						selection.addRange(range);
-						activeLineIndex++;
-						updateCursorPosition();
-						updateLineNumbers();
-						ensureCursorVisible();
-				}
-				}
+				enterCommandMode('?'); // Enter command mode with backward search prefix
 				return;
 			}
 
-			// Mode switching commands - these should clear the buffer immediately
-			if (event.key === 'i') {
-				clearNormalModeBuffer();
-					editorMode = 'INSERT';
-					event.preventDefault();
-					return;
-			} else if (event.key === ':' || event.key === '/' || event.key === '?') {
-				clearNormalModeBuffer();
-				enterCommandMode(event.key);
+			if (event.key === ':') {
 				event.preventDefault();
-				return;
-			} else if (event.key === '$') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				moveToEndOfLine();
+				enterCommandMode(':'); // Enter command mode with colon prefix
 				return;
 			}
 
-			// Handle multi-key commands
-			if (event.key === 'd' || event.key === 'y' || event.key === 'g') {
-				normalModeBuffer += event.key;
-				event.preventDefault();
-
-				// Check for complete commands
-				if (normalModeBuffer === 'dd') {
-					deleteCurrentLine();
-					clearNormalModeBuffer();
-				return;
-				} else if (normalModeBuffer === 'yy') {
-					copyText();
-					clearNormalModeBuffer();
-				return;
-				} else if (normalModeBuffer === 'gg') {
-					moveToStartOfDocument();
-					clearNormalModeBuffer();
-				return;
-				}
-
-				// Set timeout to clear buffer if no matching command is completed
-				normalModeBufferTimeout = window.setTimeout(() => {
-					console.log('Buffer cleared by timeout:', normalModeBuffer);
-					clearNormalModeBuffer();
-				}, 1000) as unknown as number;
-
-				return;
+			// For any other key in NORMAL mode that wasn't handled above 
+			// or by the keybinding system (which runs separately via window listener),
+			// prevent the default browser action (e.g., inserting characters).
+			// Exception: Allow Ctrl+A (Select All) default behavior.
+			if (!( (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') ) {
+				event.preventDefault(); 
 			}
 
-			// Single key commands that should execute immediately
-			if (event.key === 'G') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				moveToEndOfDocument();
-				return;
-			} else if (event.key === 'x') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				deleteHighlightedText();
-				return;
-			} else if (event.key === 'n') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				findNextMatch(false); // Search forward
-				return;
-			} else if (event.key === 'm') {
-				event.preventDefault();
-				clearNormalModeBuffer();
-				findNextMatch(true); // Search backward
-				return;
-			}
-
-			// Single key commands - these should clear the buffer immediately
-			if (
-				event.key === 'p' ||
-				event.key === 'u' ||
-				// 'event.key === '0' removed from here because we handle it specifically above
-				event.key === 'h' ||
-				event.key === 'j' ||
-				event.key === 'k' ||
-				event.key === 'l' ||
-				event.key === 'N'
-			) {
-				clearNormalModeBuffer();
-			}
-
-			// Handle 'p' key in normal mode for paste
-			if (event.key === 'p') {
-				event.preventDefault();
-				pasteText();
-				return;
-			}
-
-			// Rest of your normal mode commands...
-			// [Previous normal mode commands remain unchanged]
 		}
 	}
 
@@ -1891,9 +1453,6 @@
 							subtree: true
 						});
 					}
-
-					// Set up color picker listeners
-					setupColorPickerListeners();
 				}, 100);
 			}, 150);
 		} catch (e) {
@@ -1902,6 +1461,10 @@
 		} finally {
 			loading = false;
 		}
+
+		await keybindings.fetchAndUpdateBindings();
+		// Update the command sheet data after bindings are loaded
+		prepareCommandSheetData();
 	});
 
 	// Separate cleanup function for event listeners
@@ -1914,7 +1477,7 @@
 		
 		// Clean up auto-save if it exists
 		if (autoSaveCleanup) {
-			autoSaveCleanup();
+			autoSaveCleanup(); 
 		}
 	});
 
@@ -2005,12 +1568,12 @@
 				// Load project documents if this document is part of a project
 				await loadProjectDocuments();
 
-				// Set up auto-save
+				// Re-add Set up auto-save
 				autoSaveCleanup = setup_auto_save(documentData, () => {
 					if (documentData && editorElement) {
 						// Save the inner HTML of the editor element
 						documentData.content = editorElement.innerHTML;
-						console.log(editorElement.innerHTML);
+						console.log('Auto-saving content:', editorElement.innerHTML);
 						update_document(documentData);
 					}
 				});
@@ -2339,74 +1902,6 @@
 		}
 	}
 
-	function applyItalicFormatting() {
-		if (document.queryCommandSupported('italic')) {
-			document.execCommand('italic', false);
-			showCommandError('Italic formatting applied');
-		} else {
-			showCommandError('Italic formatting not supported');
-		}
-	}
-
-	function applyBoldFormatting() {
-		if (document.queryCommandSupported('bold')) {
-			document.execCommand('bold', false);
-			showCommandError('Bold formatting applied');
-		}
-	}
-
-	function applyUnderlineFormatting() {
-		if (document.queryCommandSupported('underline')) {
-			// Apply the underline command
-			document.execCommand('underline', false);
-			
-			// Fix the case where we have multiple colored sections within a single underline
-			if (editorElement) {
-				// Find any u elements with multiple font children
-				const underlineElements = editorElement.querySelectorAll('u');
-				
-				for (const uElem of underlineElements) {
-					const fontElements = uElem.querySelectorAll('font');
-					
-					// If we have multiple font elements inside a single u tag
-					if (fontElements.length > 1) {
-						// Create a document fragment to hold our new structure
-						const fragment = document.createDocumentFragment();
-						
-						// For each font element, restructure to font > u
-						Array.from(fontElements).forEach(fontElem => {
-							const color = fontElem.getAttribute('color');
-							const content = fontElem.innerHTML;
-							
-							// Create new structure with font wrapping u
-							const newFont = document.createElement('font');
-							if (color) newFont.setAttribute('color', color);
-							
-							const newU = document.createElement('u');
-							newU.innerHTML = content;
-							
-							newFont.appendChild(newU);
-							fragment.appendChild(newFont);
-						});
-						
-						// Replace the old structure with our fixed one
-						if (uElem.parentNode) {
-							uElem.parentNode.replaceChild(fragment, uElem);
-						}
-					}
-				}
-			}
-			
-			showCommandError('Underline formatting applied');
-		} else {
-			showCommandError('Underline formatting not supported');
-		}
-	}
-
-	function applyIndentation() {
-			document.execCommand('indent', false);
-			showCommandError('Indentation applied');
-	}
 
 	function applyTextColor(color: string) {
 		if (document.queryCommandSupported('foreColor')) {
@@ -2470,6 +1965,16 @@
 		} else {
 			showCommandError('Text color formatting not supported');
 		}
+		
+		// Ensure editor remains focused after applying color
+		if(editorElement) {
+			editorElement.focus();
+			// Update internal content state AFTER execCommand modifies the DOM
+			editorContent = getEditorContent(); 
+			// Explicitly update UI elements that might rely on content length/lines
+			updateLineNumbers();
+			adjustEditorHeight();
+		}
 	}
 
 	// Add this helper function to implement setSelectionRange for contenteditable divs
@@ -2519,185 +2024,56 @@
 
 	// Add a handlePaste function for contenteditable
 	function handlePaste(event: ClipboardEvent) {
-		event.preventDefault();
+		if (!editorElement || !event.clipboardData) return;
+		
 		console.log('Paste event triggered');
+		event.preventDefault(); // Prevent default paste
 
-		// Get the clipboard text, strip any HTML
-		let clipboardText = event.clipboardData?.getData('text/plain') || '';
+		// Get plain text from clipboard
+		let clipboardText = event.clipboardData.getData('text/plain');
 		console.log('Raw clipboard text:', clipboardText);
 
-		// If we got HTML content, convert it to plain text by removing HTML tags
-		if (clipboardText.includes('<') && clipboardText.includes('>')) {
-			console.log('HTML content detected, converting to plain text');
-			clipboardText = clipboardText
-				.replace(/<[^>]*>/g, '') // Remove HTML tags
-				.replace(/&[^;]+;/g, '') // Remove HTML entities
-				.replace(/\s+/g, ' ') // Normalize whitespace
-				.trim();
-			console.log('Converted clipboard text:', clipboardText);
-		}
+		// Normalize line endings
+		clipboardText = clipboardText.replace(/\r\n/g, '\n');
 
-		if (!clipboardText) {
-			console.log('No clipboard text after processing, aborting paste');
-			return;
-		}
-		
-		// Get the current selection
+		// Get current selection and offset
 		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) {
-			console.log('No valid selection, aborting paste');
-			return;
-		}
-		
+		if (!selection || !selection.rangeCount) return;
 		const range = selection.getRangeAt(0);
-		const start = getTextOffset(range.startContainer, range.startOffset);
-		const end = getTextOffset(range.endContainer, range.endOffset);
+		const startOffsetInDocument = getTextOffset(range.startContainer, range.startOffset);
 		
-		console.log('Paste position:', { start, end });
-
-		// Get the current line's content before the paste position
-		let currentLineStart = start;
-		while (currentLineStart > 0 && editorContent[currentLineStart - 1] !== '\n') {
-			currentLineStart--;
+		console.log('Paste position:', {
+			container: range.startContainer,
+			offset: range.startOffset,
+			documentOffset: startOffsetInDocument
+		});
+		
+		// If text is selected, delete it first
+		if (!range.collapsed) {
+			range.deleteContents();
 		}
+		
+		// Get current editor content
+		let currentContent = getEditorContent();
+		
+		// Insert clipboard text into content string at the correct offset
+		const contentBefore = currentContent.substring(0, startOffsetInDocument);
+		const contentAfter = currentContent.substring(startOffsetInDocument);
+		const newContent = contentBefore + clipboardText + contentAfter;
+		const insertedLength = clipboardText.length;
+		const targetOffset = startOffsetInDocument + insertedLength;
 
-		const currentLineBeforePaste = editorContent.substring(currentLineStart, start);
-		console.log('Current line before paste:', currentLineBeforePaste);
-
-		// Get the current line's content after the paste position
-		let currentLineEnd = end;
-		while (currentLineEnd < editorContent.length && editorContent[currentLineEnd] !== '\n') {
-			currentLineEnd++;
-		}
-
-		const currentLineAfterPaste = editorContent.substring(end, currentLineEnd);
-		console.log('Current line after paste:', currentLineAfterPaste);
-
-		// Calculate remaining space in the current line
-		const currentLineLength = currentLineBeforePaste.length;
-		const spaceRemaining = MAX_COLUMN_WIDTH - currentLineLength;
-		console.log('Space remaining in current line:', spaceRemaining);
-
-		// Split clipboard text into lines, handling both \n and \r\n
-		const clipLines = clipboardText.split(/\r?\n/);
-		console.log('Split clipboard lines:', clipLines);
-
-		// Handle the first line differently - try to fit it in the current line
-		let newContent = editorContent.substring(0, start);
-
-		if (clipLines.length > 0) {
-			const firstLine = clipLines[0];
-			console.log('Processing first line:', firstLine);
-
-			// If first line can fit in remaining space
-			if (firstLine.length <= spaceRemaining) {
-				console.log('First line fits in remaining space');
-				// Add to current line and check if it needs wrapping
-				const currentLine = currentLineBeforePaste + firstLine + currentLineAfterPaste;
-				if (currentLine.length > MAX_COLUMN_WIDTH) {
-					// Wrap the combined line
-					const wrapped = autoWrapLine(currentLine);
-					newContent += wrapped;
-				} else {
-					newContent += firstLine + currentLineAfterPaste;
-				}
-				clipLines.shift();
-			} else {
-				// Take what fits in the current line
-				newContent += firstLine.substring(0, spaceRemaining) + '\n' + firstLine.substring(spaceRemaining);
-				clipLines.shift();
-			}
-		}
-
-		// Add remaining lines
-		if (clipLines.length > 0) {
-			newContent +=
-				(newContent.endsWith('\n') ? '' : '\n') +
-				clipLines.join('\n') +
-				(currentLineAfterPaste ? '\n' + currentLineAfterPaste : '');
-		}
-
-		// Add the rest of the original content
-		newContent += editorContent.substring(currentLineEnd);
-
-		// Function to check and fix overflowed lines
-		function fixOverflowedLines(content: string): string {
-			const lines = content.split('\n');
-			const fixedLines = [];
-
-			for (let i = 0; i < lines.length; i++) {
-				let line = lines[i];
-
-				// If line is within limit, keep it as is
-				if (line.length <= MAX_COLUMN_WIDTH) {
-					fixedLines.push(line);
-					continue;
-				}
-
-				// Line is overflowed, need to split it
-				while (line.length > MAX_COLUMN_WIDTH) {
-					// Try to find a space to break at
-					let breakIndex = -1;
-					for (let j = MAX_COLUMN_WIDTH; j >= MAX_COLUMN_WIDTH - 20; j--) {
-						if (line[j] === ' ') {
-							breakIndex = j;
-							break;
-						}
-					}
-
-					// If no space found, break at MAX_COLUMN_WIDTH
-					if (breakIndex === -1) {
-						breakIndex = MAX_COLUMN_WIDTH;
-					}
-
-					// Add the segment up to break point
-					const segment = line.substring(0, breakIndex).trimEnd();
-					fixedLines.push(segment);
-
-					// Continue with remaining text
-					line = line.substring(breakIndex).trimStart();
-				}
-
-				// Add any remaining text if it exists
-				if (line.length > 0) {
-					fixedLines.push(line);
-				}
-			}
-
-			return fixedLines.join('\n');
-		}
-
-		// Apply initial line wrapping
-		newContent = autoWrapLine(newContent);
-
-		// Double-check and fix any remaining overflowed lines
-		newContent = fixOverflowedLines(newContent);
-
-		// Update the editor content
-		editorContent = newContent;
-
-		// Update the editor content using our safe method
+		// Use safelySetEditorContent to handle wrapping and update UI
 		safelySetEditorContent(newContent);
-
-		// Calculate new cursor position after wrapping
-		const newPosition = start + clipboardText.length;
-
-		// Set cursor position after the pasted text
-		if (editorElement) {
-			setRange(editorElement, newPosition, newPosition);
-		}
-
-		// Update line numbers and other UI elements
-		lines = editorContent.split('\n');
-		updateCursorPosition();
-		adjustEditorHeight();
-
-		// Force a re-render of line numbers and adjust height after a short delay
-		// This ensures the DOM has updated
+		
 		setTimeout(() => {
+			console.log(`Restoring cursor position after paste to offset: ${targetOffset}`);
+			setCursorPositionByOffset(targetOffset);
+			// Also ensure updates run again after setting cursor
 			updateLineNumbers();
+			ensureCursorVisible();
 			adjustEditorHeight();
-		}, 10);
+		}, 0); // Use setTimeout to ensure DOM is updated by safelySetEditorContent
 	}
 
 	// Add performUndo function
@@ -3033,20 +2409,13 @@
 		
 		console.log('Setting content safely:', content);
 
-		// First, if content contains HTML tags, convert to plain text
-		let plainContent = content;
-		if (content.includes('<') && content.includes('>')) {
-			plainContent = content
-				.replace(/<[^>]*>/g, '') // Remove HTML tags
-				.replace(/&lt;/g, '<') // Convert escaped < back to <
-				.replace(/&gt;/g, '>') // Convert escaped > back to >
-				.replace(/&amp;/g, '&') // Convert escaped & back to &
-				.replace(/&quot;/g, '"') // Convert escaped " back to "
-				.replace(/&#039;/g, "'"); // Convert escaped ' back to '
-		}
+		// REMOVED block that stripped HTML tags - Assume input 'content' 
+		// already represents lines separated by '\n'.
+		// let plainContent = content;
+		// if (content.includes('<') && content.includes('>')) { ... }
 
-		// Split into lines and wrap if needed
-		let lines = plainContent.split('\n');
+		// Split into lines directly from input content and wrap if needed
+		let lines = content.split('\n');
 		let wrappedLines: string[] = [];
 		let originalLineToWrappedMap = new Map<number, number>(); // Maps original line index to first wrapped line index
 		let wrappedToOriginalMap = new Map<number, number>(); // Maps wrapped line index back to original line
@@ -3496,52 +2865,33 @@
 	function updateLineNumbers() {
 		if (!editorElement) return;
 
-		// Determine line count based on editor content
-		let lineCount = 1; // Start with at least one line
-
-		// First check if we have any div elements (paragraphs)
-		const divElements = editorElement.querySelectorAll('div');
-		const divCount = divElements.length;
-
-		// If we have divs, count them (each is a paragraph/line)
-		if (divCount > 0) {
-			lineCount = divCount;
-
-			// Double-check if there should be an extra line at the end (if cursor is after last div)
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				if (range.startContainer === editorElement && range.startOffset === editorElement.childNodes.length) {
-					// Cursor is after the last div, may need an extra line
-					lineCount++;
-				}
-			}
-		} else {
-			// No divs, check for other line separators
-			const brElements = editorElement.querySelectorAll('br');
-
-			if (brElements.length > 0) {
-				// Each br tag creates a new line
-				lineCount = brElements.length + 1;
-			} else {
-				// If there's any content at all, ensure at least one line
-				const hasContent = editorElement.textContent && editorElement.textContent.trim().length > 0;
-				lineCount = hasContent ? 1 : 1; // Always at least one line
-
-				// Also check for newlines in the text content
-				const newlineCount = (editorElement.textContent?.match(/\n/g) || []).length;
-				if (newlineCount > 0) {
-					lineCount = Math.max(lineCount, newlineCount + 1);
-				}
-			}
-		}
-
-		// Ensure at least one line
-		lineCount = Math.max(1, lineCount);
-
-		// Get line numbers container
 		const lineNumbersContainer = document.querySelector('.editor-content .line-numbers');
 		if (!lineNumbersContainer) return;
+
+		// Determine line count based on editor content
+		let lineCount = 0;
+		const divElements = Array.from(editorElement.querySelectorAll('div'));
+		const divCount = divElements.length;
+
+		if (divCount === 1) {
+			// Special case: Only one div exists
+			const firstDiv = divElements[0];
+			const text = (firstDiv.textContent || '').trim();
+			const hasOnlyBr = firstDiv.innerHTML.trim() === '<br>';
+			const isEmpty = text === '' || text === '\u200B'; // Check for empty or zero-width space
+
+			if (isEmpty || hasOnlyBr) {
+				lineCount = 1; // If the single div is effectively empty, show only 1 line number
+			} else {
+				lineCount = 1; // If the single div has content, it's still 1 line
+			}
+		} else if (divCount > 1) {
+			// Multiple divs, count them directly
+			lineCount = divCount;
+		} else {
+			// No divs found (should ideally not happen with contenteditable if properly initialized)
+			lineCount = 1; // Default to 1 line
+		}
 
 		// Clear existing line numbers
 		lineNumbersContainer.innerHTML = '';
@@ -3807,19 +3157,6 @@
 		return [Math.round(h), s, l];
 	}
 
-	// Function to set up color picker event listeners
-	function setupColorPickerListeners() {
-		// Add click outside handlers for closing modals
-		window.addEventListener('click', (event) => {
-			// Handle clicks outside the color picker
-			if (showColorPicker && event.target instanceof Node) {
-				const colorPickerEl = document.querySelector('.color-picker');
-				if (colorPickerEl && !colorPickerEl.contains(event.target)) {
-					showColorPicker = false;
-				}
-			}
-		});
-	}
 
 	// Simple onMount function that ensures all content is visible immediately
 	onMount(() => {
@@ -3843,6 +3180,1020 @@
 			}, 100);
 		}, 300);
 	});
+	
+	// Define our command functions object with formatting commands
+	const commandFunctions: CommandFunctions = {
+		applyBoldFormatting: () => {
+			console.debug('Executing bold formatting command (NORMAL mode)');
+			if (!document.queryCommandSupported('bold')) {
+				showCommandError('Bold formatting not supported');
+				return;
+			}
+
+			const selection = window.getSelection();
+			// ONLY apply if text is actually selected in NORMAL mode
+			if (selection && !selection.isCollapsed) {
+				document.execCommand('bold', false);
+				// MutationObserver handles content updates
+				showCommandError('Bold formatting applied');
+			} else {
+				console.debug('Bold command ignored: No text selected in NORMAL mode.');
+			}
+		},
+		applyItalicFormatting: () => {
+			console.debug('Executing italic formatting command (NORMAL mode)');
+			if (!document.queryCommandSupported('italic')) {
+				showCommandError('Italic formatting not supported');
+				return;
+			}
+
+			const selection = window.getSelection();
+			// ONLY apply if text is actually selected in NORMAL mode
+			if (selection && !selection.isCollapsed) {
+				document.execCommand('italic', false);
+				// MutationObserver handles content updates
+				showCommandError('Italic formatting applied');
+			} else {
+				console.debug('Italic command ignored: No text selected in NORMAL mode.');
+			}
+		},
+		applyUnderlineFormatting: () => {
+			console.debug('Executing underline formatting command (NORMAL mode)');
+			if (!document.queryCommandSupported('underline')) {
+				showCommandError('Underline formatting not supported');
+				return;
+			}
+
+			const selection = window.getSelection();
+			// ONLY apply if text is actually selected in NORMAL mode
+			if (selection && !selection.isCollapsed) {
+				document.execCommand('underline', false);
+				// MutationObserver handles content updates
+
+				// Fix potential nested font/u issues (keep this logic)
+				if (editorElement) {
+					const underlineElements = editorElement.querySelectorAll('u');
+					for (const uElem of underlineElements) {
+						const fontElements = uElem.querySelectorAll('font');
+						if (fontElements.length > 1) {
+							const fragment = document.createDocumentFragment();
+							Array.from(fontElements).forEach(fontElem => {
+								const color = fontElem.getAttribute('color');
+								const content = fontElem.innerHTML;
+								const newFont = document.createElement('font');
+								if (color) newFont.setAttribute('color', color);
+								const newU = document.createElement('u');
+								newU.innerHTML = content;
+								newFont.appendChild(newU);
+								fragment.appendChild(newFont);
+							});
+							if (uElem.parentNode) {
+								uElem.parentNode.replaceChild(fragment, uElem);
+							}
+						}
+					}
+				}
+				showCommandError('Underline formatting applied');
+			} else {
+				console.debug('Underline command ignored: No text selected in NORMAL mode.');
+			}
+		},
+		// Add document switching commands
+		switchToDocument1: () => {
+			console.debug('Switching to document 1');
+			const index = 0;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 1:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 1`);
+				showCommandError(`No document 1 available`);
+			}
+		},
+		switchToDocument2: () => {
+			console.debug('Switching to document 2');
+			const index = 1;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 2:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 2`);
+				showCommandError(`No document 2 available`);
+			}
+		},
+		switchToDocument3: () => {
+			console.debug('Switching to document 3');
+			const index = 2;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 3:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 3`);
+				showCommandError(`No document 3 available`);
+			}
+		},
+		switchToDocument4: () => {
+			console.debug('Switching to document 4');
+			const index = 3;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 4:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 4`);
+				showCommandError(`No document 4 available`);
+			}
+		},
+		switchToDocument5: () => {
+			console.debug('Switching to document 5');
+			const index = 4;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 5:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 5`);
+				showCommandError(`No document 5 available`);
+			}
+		},
+		switchToDocument6: () => {
+			console.debug('Switching to document 6');
+			const index = 5;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 6:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 6`);
+				showCommandError(`No document 6 available`);
+			}
+		},
+		switchToDocument7: () => {
+			console.debug('Switching to document 7');
+			const index = 6;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 7:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 7`);
+				showCommandError(`No document 7 available`);
+			}
+		},
+		switchToDocument8: () => {
+			console.debug('Switching to document 8');
+			const index = 7;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 8:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 8`);
+				showCommandError(`No document 8 available`);
+			}
+		},
+		switchToDocument9: () => {
+			console.debug('Switching to document 9');
+			const index = 8;
+			if (projectDocuments && projectDocuments[index]) {
+				console.log(`Switching to document 9:`, projectDocuments[index]);
+				switchDocument(projectDocuments[index].id);
+			} else {
+				console.log(`No document at index 9`);
+				showCommandError(`No document 9 available`);
+			}
+		},
+		openColorPicker: () => {
+			console.debug('Opening color picker');
+			// Reset state on open for consistency
+			hue = 0; // Reset hue (e.g., to white)
+			updateColorFromHueOnly(); // Update selectedColor based on reset hue
+			showColorPicker = true;
+		},
+		enterInsertMode: () => {
+			console.debug('Executing enter insert mode command');
+			if (editorMode !== 'INSERT') {
+				editorMode = 'INSERT';
+				showCommandError('-- INSERT --');
+				clearNormalModeBuffer();
+			}
+		},
+		// Add the movement functions here
+		moveLeft: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveLeft command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveLeft command');
+			moveLeft(); // Call the existing function
+		},
+		moveRight: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveRight command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveRight command');
+			moveRight(); // Call the existing function
+		},
+		moveUp: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveUp command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveUp command');
+			moveUp(); // Call the existing function
+		},
+		moveDown: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveDown command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveDown command');
+			moveDown(); // Call the existing function
+		},
+		moveToStartOfLine: () => { // Add this function
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveToStartOfLine command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveToStartOfLine command');
+			moveToStartOfLine(); // Call the existing function
+		},
+		moveToEndOfLine: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveToEndOfLine command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveToEndOfLine command');
+			moveToEndOfLine(); // Call the existing function
+		},
+		moveToEndOfDocument: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveToEndOfDocument command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveToEndOfDocument command');
+			moveToEndOfDocument(); // Call the existing function
+		},
+		moveToStartOfDocument: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring moveToStartOfDocument command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing moveToStartOfDocument command');
+			moveToStartOfDocument(); // Call the existing function
+		},
+		toggleCommandSheet: () => {
+			// No mode check needed for this
+			console.debug('Executing toggleCommandSheet command');
+			showCommands = !showCommands;
+		},
+		findNextMatch: () => { 
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring findNextMatch command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing findNextMatch command');
+			findNextMatch(false); // false for forward
+		},
+		findPreviousMatch: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring findPreviousMatch command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing findPreviousMatch command');
+			findNextMatch(true); // true for reverse
+		},
+		deleteSelectedText: () => { 
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring deleteSelectedText command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing deleteSelectedText command');
+			clearNormalModeBuffer(); // Clear any pending sequence
+			deleteHighlightedText(); // Call the existing helper function
+		},
+		yankText: () => { 
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring yankText command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing yankText command (calling copyText)');
+			clearNormalModeBuffer();
+			copyText(); // Call the existing copy/yank helper
+		},
+		deleteCurrentLine: () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring deleteCurrentLine command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing deleteCurrentLine command');
+			clearNormalModeBuffer(); // Clear buffer
+			deleteCurrentLine(); // Call the existing helper function
+		},
+		pasteText: async () => {
+			if (editorMode !== 'NORMAL') {
+				console.debug('Ignoring pasteText command: Not in NORMAL mode.');
+				return; // Only allow in NORMAL mode
+			}
+			console.debug('Executing pasteText command');
+			clearNormalModeBuffer();
+			try {
+				const clipboardText = await navigator.clipboard.readText();
+				if (!clipboardText || !editorElement) return;
+				
+				// Similar logic to handlePaste, but using read text
+				const selection = window.getSelection();
+				if (!selection || !selection.rangeCount) return;
+				const range = selection.getRangeAt(0);
+				const startOffsetInDocument = getTextOffset(range.startContainer, range.startOffset);
+				
+				if (!range.collapsed) {
+					range.deleteContents(); // Delete selected text if any
+				}
+
+				let currentContent = getEditorContent();
+				const contentBefore = currentContent.substring(0, startOffsetInDocument);
+				const contentAfter = currentContent.substring(startOffsetInDocument);
+				const normalizedClipboardText = clipboardText.replace(/\r\n/g, '\n'); // Normalize newlines
+				const newContent = contentBefore + normalizedClipboardText + contentAfter;
+				
+				const insertedLength = normalizedClipboardText.length;
+				const targetOffset = startOffsetInDocument + insertedLength;
+
+				safelySetEditorContent(newContent);
+				
+				// Restore cursor position
+				setTimeout(() => {
+					console.log(`Restoring cursor position after programmatic paste to offset: ${targetOffset}`);
+					setCursorPositionByOffset(targetOffset);
+					updateLineNumbers();
+					ensureCursorVisible();
+					adjustEditorHeight();
+				}, 0); 
+
+			} catch (err) {
+				console.error('Failed to read clipboard contents: ', err);
+				showCommandError('Failed to paste: Check clipboard permissions');
+			}
+		},
+		toggleChatAssistant: () => {
+			isChatOpen = !isChatOpen;
+			console.log(`Toggling chat visibility to: ${isChatOpen}`);
+		},
+	};
+
+	// Global keyboard event handler for keybindings
+	function handleKeybindingKeyDown(event: KeyboardEvent) {
+		// If chat input is focused, don't process editor keybindings
+		if (document.activeElement === chatInputElementRef) {
+			return;
+		}
+
+		// Only process keybindings if we are in NORMAL mode
+		if (editorMode !== 'NORMAL') {
+			// Allow the key event to proceed for other handlers (like the editor's own keydown)
+			return; 
+		}
+		// Block keybindings if color picker is open
+		if (showColorPicker) {
+			return;
+		}
+
+		console.debug('Keyboard event received:', {
+			key: event.key,
+			altDown: event.altKey,
+			ctrlDown: event.ctrlKey,
+			shiftDown: event.shiftKey
+		});
+
+		// Convert event to our input format for debugging
+		const input = keybindingMap.keyEventToInput(event);
+		const mapKey = keybindingMap.getMapKey(input);
+		console.debug('Converted to map key:', mapKey);
+
+		// Check active bindings for debugging
+		console.debug('Current active bindings:', keybindings.activeBindings);
+
+		// Try to handle the input
+		const wasHandled = keybindingMap.handleKeyboardInput(event, commandFunctions);
+		console.debug('Keyboard input was handled:', wasHandled);
+
+		if (wasHandled) {
+			console.debug('Command was executed successfully');
+		} else {
+			console.debug('No matching keybinding found for:', mapKey);
+		}
+	}
+
+	// Handle color picker keyboard events
+	function handleColorPickerKeyDown(event: KeyboardEvent) {
+		if (!showColorPicker) return;
+
+		// Get dynamic movement keys (lowercase for comparison)
+		const leftKey = keybindings.activeBindings.moveLeft?.kd?.toLowerCase();
+		const rightKey = keybindings.activeBindings.moveRight?.kd?.toLowerCase();
+		const upKey = keybindings.activeBindings.moveUp?.kd?.toLowerCase();
+		const downKey = keybindings.activeBindings.moveDown?.kd?.toLowerCase();
+
+		const eventKeyLower = event.key.toLowerCase();
+		let handled = false;
+
+		switch(eventKeyLower) { // Switch on lowercase key
+			case 'escape':
+				event.preventDefault();
+				showColorPicker = false;
+				handled = true;
+				break;
+			case 'enter':
+				event.preventDefault();
+				if (selectedColor) {
+					applyTextColor(selectedColor);
+						showColorPicker = false;
+				}
+				handled = true;
+				break;
+			// Keep hardcoded arrow keys
+			case 'arrowleft':
+				event.preventDefault();
+				hue = (hue - 5 + 365) % 365; 
+				updateColorFromHueOnly();
+				handled = true;
+				break; 
+			case 'arrowright':
+				event.preventDefault();
+				hue = (hue + 5) % 365;
+				updateColorFromHueOnly();
+				handled = true;
+				break;
+			case 'arrowup':
+				event.preventDefault();
+				hue = (hue + 15) % 365; 
+				updateColorFromHueOnly();
+				handled = true;
+				break;
+			case 'arrowdown':
+				event.preventDefault();
+				hue = (hue - 15 + 365) % 365;
+				updateColorFromHueOnly();
+				handled = true;
+				break;
+			// Handle dynamic keys if not an arrow/escape/enter
+			default:
+				if (leftKey && eventKeyLower === leftKey) {
+					event.preventDefault();
+					hue = (hue - 5 + 365) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} else if (rightKey && eventKeyLower === rightKey) {
+					event.preventDefault();
+					hue = (hue + 5) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} else if (upKey && eventKeyLower === upKey) {
+					event.preventDefault();
+					hue = (hue + 15) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} else if (downKey && eventKeyLower === downKey) {
+					event.preventDefault();
+					hue = (hue - 15 + 365) % 365;
+					updateColorFromHueOnly();
+					handled = true;
+				} 
+		}
+
+		// If the key wasn't handled by the switch or the dynamic checks, prevent default anyway
+		if (!handled) {
+			event.preventDefault(); 
+		}
+	}
+
+	onMount(() => {
+		console.debug('Component mounted, initializing keybindings');
+		
+		// Initialize keybindings
+		keybindings.fetchAndUpdateBindings()
+			.then(() => {
+				console.debug('Keybindings initialized:', keybindings.activeBindings);
+				window.addEventListener('keydown', handleKeybindingKeyDown);
+			})
+			.catch((error) => {
+				console.error('Error initializing keybindings:', error);
+			});
+
+		// Return cleanup function
+		return () => {
+			console.debug('Cleaning up keyboard event listener');
+			window.removeEventListener('keydown', handleKeybindingKeyDown);
+		};
+	});
+
+	// Movement functions
+	function moveLeft() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		const range = selection.getRangeAt(0);
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		
+		// If selection is not collapsed, move to the start of the selection first
+		if (!range.collapsed) {
+			range.collapse(true); // Collapse to the start
+			selection.removeAllRanges();
+			selection.addRange(range);
+			updateCursorPosition(); // Update state after collapsing
+			updateLineNumbers();
+			ensureCursorVisible();
+			return; // Let next key press handle actual movement
+		}
+		
+		const currentContainer = range.startContainer;
+		const currentOffset = range.startOffset;
+		const newRange = document.createRange();
+		let successfullyMoved = false;
+
+		if (currentOffset > 0) {
+			// Try moving one position back in the current node
+			try {
+				// If it's a text node, move within text
+				if (currentContainer.nodeType === Node.TEXT_NODE) {
+					newRange.setStart(currentContainer, currentOffset - 1);
+				} else {
+					// If it's an element node, select the node before the current offset
+					// This handles moving out of elements like <font> or <u> correctly
+					const nodeBefore = currentContainer.childNodes[currentOffset - 1];
+					newRange.setStartAfter(nodeBefore); // Position cursor after the previous node
+				}
+				successfullyMoved = true;
+			} catch (e) {
+				console.error('Error setting range in moveLeft (current node):', e, {container: currentContainer, offset: currentOffset});
+				return;
+			}
+		} else {
+			// At the start of the current container node
+			// Find the visually previous node we can move into
+			let nodeToMoveTo: Node | null = null;
+			let offsetInNode = 0;
+			let currentNode: Node | null = currentContainer;
+
+			// Traverse siblings first
+			while (currentNode && currentNode !== editorElement && currentNode.parentNode !== editorElement ) { 
+				if (currentNode.previousSibling) {
+					nodeToMoveTo = currentNode.previousSibling;
+					// Find the deepest last child that is a text node or an element node
+					while (nodeToMoveTo && (nodeToMoveTo.nodeType === Node.ELEMENT_NODE || nodeToMoveTo.nodeType === Node.TEXT_NODE) && nodeToMoveTo.lastChild) {
+						nodeToMoveTo = nodeToMoveTo.lastChild;
+					}
+					// Set position at the end of the found node
+					if (nodeToMoveTo && nodeToMoveTo.nodeType === Node.TEXT_NODE) {
+						offsetInNode = nodeToMoveTo.textContent?.length || 0;
+					} else if (nodeToMoveTo) { 
+						offsetInNode = nodeToMoveTo.childNodes.length;
+					} else { // Fallback if sibling is weird (comment etc.)
+						nodeToMoveTo = currentNode.previousSibling; 
+						offsetInNode = 0; 
+					}
+					break;
+				} else {
+					// No previous sibling, move up to parent
+					currentNode = currentNode.parentNode;
+				}
+			}
+
+			// If we didn't find a suitable sibling, or we reached the line div, move to the previous line
+			if (!nodeToMoveTo && activeLineIndex > 0) {
+				const prevDiv = allDivs[activeLineIndex - 1];
+				const textNodes = getAllTextNodes(prevDiv);
+
+				if (textNodes.length > 0) {
+					// If previous line has text, target the end of the last text node
+					nodeToMoveTo = textNodes[textNodes.length - 1];
+					offsetInNode = nodeToMoveTo.textContent?.length || 0;
+				} else {
+					// Previous line is empty or has only non-text nodes (<br>), target start of the div
+					nodeToMoveTo = prevDiv; 
+					offsetInNode = 0; 
+				}
+				
+				activeLineIndex--; // Update line index
+				// nodeToMoveTo and offsetInNode are now set
+			} else if (!nodeToMoveTo) {
+				// At the very beginning of the document or couldn't find sibling
+				return;
+			}
+
+			// Set the range based on the found node and offset
+			if (nodeToMoveTo) {
+				try {
+					const maxOffset = nodeToMoveTo.nodeType === Node.TEXT_NODE ? (nodeToMoveTo.textContent?.length || 0) : nodeToMoveTo.childNodes.length;
+					// Ensure offset is not negative and not exceeding maxOffset
+					const safeOffset = Math.max(0, Math.min(offsetInNode, maxOffset)); 
+					newRange.setStart(nodeToMoveTo, safeOffset);
+					successfullyMoved = true;
+				} catch (e) {
+					console.error('Error setting range in moveLeft (previous node/line):', e, { node: nodeToMoveTo, offset: offsetInNode });
+					// Attempt fallback: set to start of the node
+					try {
+						newRange.setStart(nodeToMoveTo, 0);
+						successfullyMoved = true;
+					} catch (fallbackError) {
+						console.error('Fallback setting range failed in moveLeft:', fallbackError);
+						return;
+					}
+				}
+			}
+		}
+
+		if (successfullyMoved) {
+			newRange.collapse(true);
+			selection.removeAllRanges();
+			selection.addRange(newRange);
+
+			updateCursorPosition();
+			updateLineNumbers();
+			ensureCursorVisible();
+		} else {
+			console.warn('MoveLeft command executed but no movement occurred.');
+		}
+	}
+
+	function moveRight() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		const range = selection.getRangeAt(0);
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+
+		// If selection is not collapsed, move to the end of the selection first
+		if (!range.collapsed) {
+			range.collapse(false); // Collapse to the end
+			selection.removeAllRanges();
+			selection.addRange(range);
+			updateCursorPosition(); // Update state after collapsing
+			updateLineNumbers();
+			ensureCursorVisible();
+			return; // Let next key press handle actual movement
+		}
+
+		const currentContainer = range.startContainer;
+		const currentOffset = range.startOffset;
+		const newRange = document.createRange();
+		let successfullyMoved = false;
+		const currentDiv = allDivs[activeLineIndex];
+		const lineIsEmpty = !currentDiv?.textContent || currentDiv.textContent.trim() === '' || currentDiv.textContent.trim() === '\u200B' || (currentDiv.childNodes.length === 1 && currentDiv.firstChild?.nodeName === 'BR');
+
+		if (lineIsEmpty && activeLineIndex < allDivs.length - 1) {
+			console.log('Moving right from empty line, calling moveDown()');
+			moveDown();
+			return;
+		}
+
+		// Check if we can move forward within the current node
+		let canMoveInNode = false;
+		if (currentContainer.nodeType === Node.TEXT_NODE) {
+			canMoveInNode = currentOffset < (currentContainer.textContent?.length || 0);
+		} else { // Element node
+			canMoveInNode = currentOffset < currentContainer.childNodes.length;
+		}
+
+		if (canMoveInNode) {
+			// Move one position forward in the current node
+			try {
+				if (currentContainer.nodeType === Node.TEXT_NODE) {
+					newRange.setStart(currentContainer, currentOffset + 1);
+				} else {
+					// If element node, select the node *at* the current offset
+					const nodeAfter = currentContainer.childNodes[currentOffset];
+					newRange.setStartBefore(nodeAfter);
+				}
+				successfullyMoved = true;
+			} catch (e) {
+				console.error('Error setting range in moveRight (current node):', e, {container: currentContainer, offset: currentOffset});
+				return;
+			}
+		} else {
+			// At the end of the current container node
+			// Find the visually next node we can move into within the same line (div)
+			let nodeToMoveTo: Node | null = null;
+			let offsetInNode = 0;
+			let currentNode: Node | null = currentContainer;
+			let parentDiv: Node | null = currentNode;
+			while(parentDiv && parentDiv.parentNode && parentDiv.parentNode !== editorElement) {
+				parentDiv = parentDiv.parentNode;
+			}
+
+			while (currentNode && currentNode !== editorElement && currentNode !== parentDiv) { // Stop if we reach the editor or the line's div
+				if (currentNode.nextSibling) {
+					nodeToMoveTo = currentNode.nextSibling;
+					// Find the deepest first child that is a text node or element node
+					while (nodeToMoveTo && (nodeToMoveTo.nodeType === Node.ELEMENT_NODE || nodeToMoveTo.nodeType === Node.TEXT_NODE) && nodeToMoveTo.firstChild) {
+						nodeToMoveTo = nodeToMoveTo.firstChild;
+					}
+					offsetInNode = 0; // Start at the beginning of the next node
+					break;
+				} else {
+					// No next sibling, move up to parent
+					currentNode = currentNode.parentNode;
+				}
+			}
+
+			// If we found a next node within the same line
+			if (nodeToMoveTo) {
+				try {
+					const maxOffset = nodeToMoveTo.nodeType === Node.TEXT_NODE ? 0 : nodeToMoveTo.childNodes.length;
+					const safeOffset = Math.max(0, Math.min(offsetInNode, maxOffset));
+					newRange.setStart(nodeToMoveTo, safeOffset);
+					successfullyMoved = true;
+				} catch (e) {
+					console.error('Error setting range in moveRight (next node):', e, { node: nodeToMoveTo, offset: offsetInNode });
+					return;
+				}
+			} else {
+				// At the end of the line, attempt to move down if possible
+				if (activeLineIndex < allDivs.length - 1) {
+					console.log('Reached end of line, attempting moveDown()');
+					moveDown(); // Call moveDown to handle moving to the next line
+					return; // moveDown handles updates, so we return here
+				} else {
+					// At the very end of the document
+					return;
+				}
+			}
+		}
+
+		if (successfullyMoved) {
+			newRange.collapse(true);
+			selection.removeAllRanges();
+			selection.addRange(newRange);
+			updateCursorPosition();
+			updateLineNumbers();
+			ensureCursorVisible();
+		} else if (!successfullyMoved && activeLineIndex < allDivs.length - 1) {
+			// Fallback logging
+			console.warn('MoveRight reached end of line but moveDown was not called?');
+		}
+	}
+
+	function moveUp() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		if (activeLineIndex > 0) {
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			const targetDiv = allDivs[activeLineIndex - 1];
+			if (targetDiv) {
+				const range = document.createRange();
+				// Check if empty or just zero-width space
+				const lineIsEmpty = !targetDiv.textContent || targetDiv.textContent.trim() === '\u200B'; 
+
+				if (lineIsEmpty) {
+					// If target line is empty, place cursor at its start
+					range.setStart(targetDiv, 0);
+				} else {
+					// Line has content, try to maintain column
+					const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
+					if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+						range.setStart(targetDiv.firstChild, targetColumn);
+					} else {
+						// Fallback if first child isn't text (or line has complex nodes)
+						// We need a more robust way to find the node at the target column
+						let accumulatedOffset = 0;
+						let targetNode: Node | null = null;
+						let targetOffset = 0;
+						const walker = document.createTreeWalker(targetDiv, NodeFilter.SHOW_TEXT);
+						let currentNode: Node | null;
+						while ((currentNode = walker.nextNode())) {
+							const nodeLength = currentNode.textContent?.length || 0;
+							if (accumulatedOffset + nodeLength >= targetColumn) {
+								targetNode = currentNode;
+								targetOffset = targetColumn - accumulatedOffset;
+								break;
+							}
+							accumulatedOffset += nodeLength;
+						}
+						// If still no target node (e.g., column beyond actual text), use last text node
+						if (!targetNode) {
+							const allTextNodes = getAllTextNodes(targetDiv);
+							if (allTextNodes.length > 0) {
+								targetNode = allTextNodes[allTextNodes.length - 1];
+								targetOffset = targetNode.textContent?.length || 0;
+							} else {
+								// Fallback: start of the div if truly no text nodes
+								targetNode = targetDiv;
+								targetOffset = 0;
+							}
+						}
+						// Set the range
+						try {
+							range.setStart(targetNode, targetOffset);
+						} catch(e) {
+							console.error("Error setting range in moveUp fallback:", e, {targetNode, targetOffset});
+							range.setStart(targetDiv, 0); // Ultimate fallback
+						}
+					}
+				}
+
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				activeLineIndex--;
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible();
+			}
+		}
+	}
+
+	function moveDown() {
+		if (!editorElement) return;
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount) return;
+
+		const allDivs = Array.from(editorElement.querySelectorAll('div'));
+		if (activeLineIndex < allDivs.length - 1) {
+			const targetDiv = allDivs[activeLineIndex + 1];
+			if (targetDiv) {
+				const range = document.createRange();
+				// Check if empty or just zero-width space
+				const lineIsEmpty = !targetDiv.textContent || targetDiv.textContent.trim() === '\u200B'; 
+
+				if (lineIsEmpty) {
+					// If target line is empty, place cursor at its start
+					range.setStart(targetDiv, 0);
+				} else {
+					// Line has content, try to maintain column
+					const targetColumn = Math.min(cursorColumn - 1, targetDiv.textContent?.length || 0);
+					if (targetDiv.firstChild && targetDiv.firstChild.nodeType === Node.TEXT_NODE) {
+						range.setStart(targetDiv.firstChild, targetColumn);
+					} else {
+						// Fallback if first child isn't text (or line has complex nodes)
+						let accumulatedOffset = 0;
+						let targetNode: Node | null = null;
+						let targetOffset = 0;
+						const walker = document.createTreeWalker(targetDiv, NodeFilter.SHOW_TEXT);
+						let currentNode: Node | null;
+						while ((currentNode = walker.nextNode())) {
+							const nodeLength = currentNode.textContent?.length || 0;
+							if (accumulatedOffset + nodeLength >= targetColumn) {
+								targetNode = currentNode;
+								targetOffset = targetColumn - accumulatedOffset;
+								break;
+							}
+							accumulatedOffset += nodeLength;
+						}
+						// If still no target node, use last text node
+						if (!targetNode) {
+							const allTextNodes = getAllTextNodes(targetDiv);
+							if (allTextNodes.length > 0) {
+								targetNode = allTextNodes[allTextNodes.length - 1];
+								targetOffset = targetNode.textContent?.length || 0;
+							} else {
+								// Fallback: start of the div if truly no text nodes
+								targetNode = targetDiv;
+								targetOffset = 0;
+							}
+						}
+						// Set the range
+						try {
+							range.setStart(targetNode, targetOffset);
+						} catch(e) {
+							console.error("Error setting range in moveDown fallback:", e, {targetNode, targetOffset});
+							range.setStart(targetDiv, 0); // Ultimate fallback
+						}
+					}
+				}
+
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				activeLineIndex++;
+				updateCursorPosition();
+				updateLineNumbers();
+				ensureCursorVisible();
+			}
+		}
+	}
+
+	function handleInsertModeKeyDown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			exitInsertMode(); // Assuming exitInsertMode is defined in the outer scope
+			event.preventDefault();
+			return;
+		}
+
+		// --- This is the logic that should be present ---
+
+		// Explicitly check for formatting shortcuts in INSERT mode
+		const eventInput = {
+			// Use kd and ensure lowercase for comparison
+			kd: event.key.toLowerCase(), 
+			altDown: event.altKey,
+			ctrlDown: event.ctrlKey,
+			shiftDown: event.shiftKey
+		};
+
+		const bindings = keybindings.activeBindings;
+
+		// *** Helper function defined INSIDE handleInsertModeKeyDown ***
+		const checkBinding = (binding: KeyboardInput | undefined): boolean => {
+			if (!binding) return false;
+			// Compare using kd
+			return (
+				binding.kd.toLowerCase() === eventInput.kd && // Compare lowercase key
+				binding.altDown === eventInput.altDown &&
+					binding.ctrlDown === eventInput.ctrlDown &&
+					binding.shiftDown === eventInput.shiftDown
+			);
+		};
+		// *** End of checkBinding definition ***
+
+		// Now use the helper function
+		if (bindings.bold && checkBinding(bindings.bold)) {
+			console.log('Applying bold formatting in INSERT mode');
+			commandFunctions.applyBoldFormatting?.();
+			event.preventDefault();
+			return;
+		}
+
+		if (bindings.italic && checkBinding(bindings.italic)) {
+			console.log('Applying italic formatting in INSERT mode');
+			commandFunctions.applyItalicFormatting?.();
+			event.preventDefault();
+			return;
+		}
+
+		if (bindings.underline && checkBinding(bindings.underline)) {
+			console.log('Applying underline formatting in INSERT mode');
+			commandFunctions.applyUnderlineFormatting?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.openColorPicker && checkBinding(bindings.openColorPicker)) {
+			console.log('Opening color picker in INSERT mode');
+			commandFunctions.openColorPicker?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument1 && checkBinding(bindings.switchToDocument1)) {
+			console.log('Switching to document 1 in INSERT mode');
+			commandFunctions.switchToDocument1?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument2 && checkBinding(bindings.switchToDocument2)) {
+			console.log('Switching to document 2 in INSERT mode');
+			commandFunctions.switchToDocument2?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument3 && checkBinding(bindings.switchToDocument3)) {
+			console.log('Switching to document 3 in INSERT mode');
+			commandFunctions.switchToDocument3?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument4 && checkBinding(bindings.switchToDocument4)) {
+			console.log('Switching to document 4 in INSERT mode');
+			commandFunctions.switchToDocument4?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument5 && checkBinding(bindings.switchToDocument5)) {
+			console.log('Switching to document 5 in INSERT mode');
+			commandFunctions.switchToDocument5?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument6 && checkBinding(bindings.switchToDocument6)) {
+			console.log('Switching to document 6 in INSERT mode');
+			commandFunctions.switchToDocument6?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument7 && checkBinding(bindings.switchToDocument7)) {
+			console.log('Switching to document 7 in INSERT mode');
+			commandFunctions.switchToDocument7?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument8 && checkBinding(bindings.switchToDocument8)) {
+			console.log('Switching to document 8 in INSERT mode');
+			commandFunctions.switchToDocument8?.();
+			event.preventDefault();
+			return;
+		}
+		if (bindings.switchToDocument9 && checkBinding(bindings.switchToDocument9)) {
+			console.log('Switching to document 9 in INSERT mode');
+			commandFunctions.switchToDocument9?.();
+			event.preventDefault();
+			return;
+		} 
+		if (bindings.toggleCommandSheet && checkBinding(bindings.toggleCommandSheet)) {
+			console.log('Toggling command sheet in INSERT mode');
+			commandFunctions.toggleCommandSheet?.();
+			event.preventDefault();
+			return;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -3951,6 +4302,7 @@
 					</div>
 					<div 
 						bind:this={editorElement}
+
 						class="editor-contenteditable" 
 						contenteditable="true"
 						on:keydown={handleKeyDown}
@@ -4015,88 +4367,103 @@
 	<!-- Add commands cheat sheet overlay -->
 	<div class="commands-overlay" class:show-commands={showCommands}>
 		<div class="commands-header">
-			<h5>Vim Command Reference</h5>
+				<h5>Command Reference</h5>
 			<button class="commands-close" on:click={() => (showCommands = false)} aria-label="Close commands reference"
 				>×</button
 			>
 		</div>
 		<div class="commands-body">
+			<!-- Restored original structure with dynamic keys -->
 			<div class="commands-section">
 				<h6>Mode Switching</h6>
 				<ul>
-					<li><span class="key">i</span> Enter Insert mode</li>
+					<li><span class="key">{insertModeKey}</span> Enter Insert mode</li>
 					<li><span class="key">Esc</span> Return to Normal mode</li>
 					<li><span class="key">:</span> Enter Command mode</li>
 				</ul>
 			</div>
 			
 			<div class="commands-section">
-				<h6>Commands</h6>
-				<ul>
-					<li><span class="key">:q</span> Quit document</li>
-					<li><span class="key">:w</span> Save document</li>
-					<li><span class="key">:wq</span> Save and quit</li>
-					<li><span class="key">:export</span> Export to PDF</li>
-				</ul>
-			</div>
-			
-			<div class="commands-section">
 				<h6>Navigation</h6>
 				<ul>
-					<li><span class="key">h</span> Move left</li>
-					<li><span class="key">j</span> Move down</li>
-					<li><span class="key">k</span> Move up</li>
-					<li><span class="key">l</span> Move right</li>
-					<li><span class="key">0</span> Start of line</li>
-					<li><span class="key">$</span> End of line</li>
-					<li><span class="key">gg</span> Start of document</li>
-					<li><span class="key">G</span> End of document</li>
+					<li><span class="key">{moveLeftKey}</span> Move left</li>
+					<li><span class="key">{moveDownKey}</span> Move down</li>
+					<li><span class="key">{moveUpKey}</span> Move up</li>
+					<li><span class="key">{moveRightKey}</span> Move right</li>
+					<li><span class="key">{startOfLineKey}</span> Start of line</li>
+					<li><span class="key">{endOfLineKey}</span> End of line</li>
+					<li><span class="key">{startOfDocKey}</span> Start of document (gg)</li>
+					<li><span class="key">{endOfDocKey}</span> End of document</li>
 				</ul>
 			</div>
 			
 			<div class="commands-section">
 				<h6>Editing</h6>
 				<ul>
-					<li><span class="key">x</span> Delete selected</li>
-					<li><span class="key">dd</span> Delete line</li>
-					<li><span class="key">yy</span> Copy line</li>
-					<li><span class="key">p</span> Paste from yank</li>
+					<li><span class="key">{deleteSelectedKey}</span> Delete selected</li>
+					<li><span class="key">{deleteLineKey}</span> Delete current line</li>
+					<li><span class="key">{yankKey}</span> Copy (Yank)</li>
+					<li><span class="key">{pasteKey}</span> Paste</li>
 				</ul>
 			</div>
 
 			<div class="commands-section">
 				<h6>Styling</h6>
 				<ul>
-					<li><span class="key">Ctrl+b</span> Toggle Bold</li>
-					<li><span class="key">Ctrl+i</span> Toggle Italic</li>
-					<li><span class="key">Ctrl+u</span> Toggle Underline</li>
-					<li><span class="key">Ctrl+f</span> Open Color Picker</li>
+					<li><span class="key">{boldKey}</span> Toggle Bold</li>
+					<li><span class="key">{italicKey}</span> Toggle Italic</li>
+					<li><span class="key">{underlineKey}</span> Toggle Underline</li>
+					<li><span class="key">{colorPickerKey}</span> Open Color Picker</li>
 				</ul>
 			</div>
 			
 			<div class="commands-section">
-				<h6>Search & Replace</h6>
+				<h6>Search</h6>
 				<ul>
-					<li><span class="key">/</span> Search relative forward</li>
-					<li><span class="key">?</span> Search relative backward</li>
-					<li><span class="key">n</span> Next match</li>
-					<li><span class="key">m</span> Previous match</li>
+					<li><span class="key">/</span> Search forward</li>
+					<li><span class="key">?</span> Search backward</li>
+					<li><span class="key">{nextMatchKey}</span> Next match</li>
+					<li><span class="key">{prevMatchKey}</span> Previous match</li>
+				</ul>
+			</div>
+
+			<div class="commands-section">
+				<h6>Colon Commands</h6>
+				<ul>
+					<li><span class="key">:q</span> Quit document</li>
+					<li><span class="key">:w</span> Save document</li>
+					<li><span class="key">:wq</span> Save and quit</li>
+					<li><span class="key">:export</span> Export to PDF</li>
 					<li><span class="key">:%s/old/new/gi</span> Replace all</li>
 				</ul>
 			</div>
 
 			<div class="commands-section">
-				<h6>Editor Shortcuts</h6>
+				<h6>Document Switching</h6>
 				<ul>
-					<li><span class="key">Ctrl+/</span> Toggle this cheat sheet</li>
-					<li><span class="key">Ctrl+1-9</span> Switch to document number</li>
+					<li><span class="key">{switchDoc1Key}</span> Switch to Document 1</li>
+					<li><span class="key">{switchDoc2Key}</span> Switch to Document 2</li>
+					<li><span class="key">{switchDoc3Key}</span> Switch to Document 3</li>
+					<li><span class="key">{switchDoc4Key}</span> Switch to Document 4</li>
+					<li><span class="key">{switchDoc5Key}</span> Switch to Document 5</li>
+					<li><span class="key">{switchDoc6Key}</span> Switch to Document 6</li>
+					<li><span class="key">{switchDoc7Key}</span> Switch to Document 7</li>
+					<li><span class="key">{switchDoc8Key}</span> Switch to Document 8</li>
+					<li><span class="key">{switchDoc9Key}</span> Switch to Document 9</li>
+				</ul>
+			</div>
+
+			<div class="commands-section">
+				<h6>Editor</h6>
+				<ul>
+					<li><span class="key">{toggleSheetKey}</span> Toggle Command Sheet</li>
 				</ul>
 			</div>
 		</div>
 	</div>
 
 	{#if showColorPicker}
-		<div class="color-picker" style="left: {colorPickerPosition.x}px; top: {colorPickerPosition.y}px;">
+		<div class="color-picker" style="position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);">
 			<div class="hue-slider-container">
 				<input
 					type="range"
@@ -4111,100 +4478,14 @@
 			</div>
 		</div>
 	{/if}
+
+	{#if isChatOpen}
+		<ChatAssistant
+			bind:this={chatAssistantComponent}
+			documentId={parseInt(documentId)}
+			bind:isOpen={isChatOpen}
+			on:close={() => (isChatOpen = false)}
+			bind:messageInput={chatInputElementRef}
+		/>
+	{/if}
 </div>
-
-<style>
-	:global(.editor-page) {
-		padding-top: 0 !important;
-		overflow-x: hidden;
-	}
-	
-	/* Hide all scrollbars globally */
-	:global(*) {
-		scrollbar-width: none !important; /* Firefox */
-		-ms-overflow-style: none !important; /* IE and Edge */
-	}
-	
-	:global(*::-webkit-scrollbar) {
-		display: none !important; /* Chrome, Safari, Opera */
-		width: 0 !important;
-		background: transparent !important;
-	}
-	
-	:global(.document-switcher) {
-		position: relative !important;
-		width: 90% !important;
-		max-width: 1400px !important;
-		margin: 0 auto 15px auto !important;
-		margin-top: 30px !important;
-		margin-bottom: -5px !important;
-		z-index: 100 !important;
-		background-color: transparent !important;
-		border: none !important;
-		display: flex !important; 
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-
-	:global(.navbar), :global(.navbar-container) {
-		position: relative !important;
-		z-index: 1000 !important;
-		width: 100% !important;
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	:global(.editor-container) {
-		margin-top: 10px !important;
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	:global(.status-bar) {
-		opacity: 0.9 !important; /* Higher initial opacity */
-		transform: translateY(5px); /* Match animation start state */
-	}
-	
-	/* Use animations as enhancements only - with subtle movement */
-	:global(.fade-in-first) {
-		animation: fadeInNavbar 0.6s ease-out forwards !important;
-		opacity: 1 !important; /* Force opacity to 1 when this class is applied */
-		will-change: opacity, transform;
-		backface-visibility: hidden;
-	}
-
-	:global(.fade-in-second) {
-			animation: fadeInSlightly 0.4s ease-out forwards 0.1s !important;
-	}
-
-	:global(.fade-in-third) {
-			animation: fadeInSlightly 0.4s ease-out forwards 0.2s !important;
-	}
-
-	:global(.fade-in-fourth) {
-			animation: fadeInSlightly 0.4s ease-out forwards 0.3s !important;
-	}
-	
-	/* Special animation for navbar - starts completely invisible */
-	@keyframes fadeInNavbar {
-		from {
-			/* Only animate transform, not opacity */
-			transform: translateY(5px);
-		}
-		to {
-			/* Only animate transform, not opacity */
-			transform: translateY(0);
-		}
-	}
-
-	/* Regular animation for other elements */
-	@keyframes fadeInSlightly {
-		from {
-			opacity: 0.9;
-			transform: translateY(5px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-</style>
