@@ -132,7 +132,7 @@ export class keybindings {
                 shiftDown: true,
             },
             moveToEndOfDocument: {
-                kd: "G",
+                kd: "g",
                 altDown: false,
                 ctrlDown: false,
                 shiftDown: true,

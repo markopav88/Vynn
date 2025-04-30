@@ -99,7 +99,7 @@
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
 			// Allow only specific browser shortcuts we want to keep
-			const allowedKeys = ['c', 'v', 'a', 'z', 'y'];
+			const allowedKeys = ['c', 'v', 'a', 'z', 'y', 'x'];
 			if (!allowedKeys.includes(event.key.toLowerCase())) {
 				event.preventDefault();
 			}
@@ -909,9 +909,6 @@
 	// Special handler for Enter key to fix line counting issues
 	function handleKeyDown(event: KeyboardEvent) {
 		console.log(`KeyDown event: {key: '${event.key}', ctrlKey: ${event.ctrlKey}, metaKey: ${event.metaKey}, shiftKey: ${event.shiftKey}, showColorPicker: ${showColorPicker}}`);
-
-		// Log the currently active binding for underline for debugging
-		console.log('Active underline binding:', keybindings.activeBindings.underline);
 
 		if (showColorPicker) {
 			handleColorPickerKeyDown(event);
