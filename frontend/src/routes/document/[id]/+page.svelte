@@ -2,6 +2,7 @@
 	import { onMount, onDestroy, afterUpdate } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { fade } from 'svelte/transition';
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
 	import Toast from '$lib/components/Toast.svelte';
@@ -93,6 +94,7 @@
 	let chatAssistantComponent: ChatAssistant;
 	let isChatOpen = false; // Declare state variable for chat visibility
 	let chatInputElementRef: HTMLInputElement | null = null; // Add ref for chat input
+	let animateIn = false; // Add animation state variable
 
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
@@ -3440,6 +3442,9 @@
 		},
 		toggleCommandSheet: () => {
 			// No mode check needed for this
+			if (!showCommands) {
+				isChatOpen = false; // ensure we cloe the chat if command is opened
+			}
 			console.debug('Executing toggleCommandSheet command');
 			showCommands = !showCommands;
 		},
@@ -3533,6 +3538,9 @@
 			}
 		},
 		toggleChatAssistant: () => {
+			if (!isChatOpen) {
+				showCommands = false; // ensure we close cheatsheet on ai open
+			}
 			isChatOpen = !isChatOpen;
 			console.log(`Toggling chat visibility to: ${isChatOpen}`);
 		},
@@ -4204,53 +4212,52 @@
 	<Toast message={toast.message} type={toast.type} onClose={() => removeToast(i)} />
 {/each}
 
-
-<div class="editor-page">
-	<div class="background-image" style="background-image: url({backgroundImage})"></div>
-
-	<!-- Minimal Navbar with fade-in animation -->
-	<div class="navbar-container" class:fade-in-first={navbarReady} class:navbar-ready={navbarReady} style="opacity: {navbarReady ? 1 : 0}; transition: opacity 0.6s ease-out;">
-		<nav class="navbar">
-			<a href="/drive" class="logo-link" aria-label="Go to Drive">
-				<div class="logo-container">
-					<img src={logo} alt="Vynn Logo" class="logo" />
-					<span class="logo-text">Vynn</span>
-				</div>
-			</a>
-			<div class="spacer"></div>
-			
-			<div class="dropdown">
-				<button 
-					class="btn p-0 border-0 bg-transparent" 
-					data-bs-toggle="dropdown"
-					aria-expanded="false"
-					aria-haspopup="true"
-					aria-label="Profile menu"
-				>
-					<img 
-						src={userProfileImage} 
-						alt="Profile" 
-						class="rounded-circle profile-img"
-						style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px; object-fit: cover;"
-						on:error={() => (userProfileImage = profileDefault)}
-					/>
-				</button>
-				<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark profile-dropdown">
-					<li>
-						<button class="dropdown-item" on:click={goToAccount}>
-							<i class="bi bi-person me-2"></i> My Account
-						</button>
-					</li>
-					<li><hr class="dropdown-divider" /></li>
-					<li>
-						<button class="dropdown-item text-danger" on:click={handleLogout}>
-							<i class="bi bi-box-arrow-right me-2"></i> Sign Out
-						</button>
-					</li>
-				</ul>
+<!-- Moved Navbar outside of editor-page -->
+<div class="navbar-container" class:fade-in-first={navbarReady} class:navbar-ready={navbarReady} style="opacity: {navbarReady ? 1 : 0}; transition: opacity 0.6s ease-out;">
+	<nav class="navbar">
+		<a href="/drive" class="logo-link" aria-label="Go to Drive">
+			<div class="logo-container">
+				<img src={logo} alt="Vynn Logo" class="logo" />
+				<span class="logo-text">Vynn</span>
 			</div>
-		</nav>
-	</div>
+		</a>
+		<div class="spacer"></div>
+		
+		<div class="dropdown">
+			<button 
+				class="btn p-0 border-0 bg-transparent" 
+				data-bs-toggle="dropdown"
+				aria-expanded="false"
+				aria-haspopup="true"
+				aria-label="Profile menu"
+			>
+				<img 
+					src={userProfileImage} 
+					alt="Profile" 
+					class="rounded-circle profile-img"
+					style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px; object-fit: cover;"
+					on:error={() => (userProfileImage = profileDefault)}
+				/>
+			</button>
+			<ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark profile-dropdown">
+				<li>
+					<button class="dropdown-item" on:click={goToAccount}>
+						<i class="bi bi-person me-2"></i> My Account
+					</button>
+				</li>
+				<li><hr class="dropdown-divider" /></li>
+				<li>
+					<button class="dropdown-item text-danger" on:click={handleLogout}>
+						<i class="bi bi-box-arrow-right me-2"></i> Sign Out
+					</button>
+				</li>
+			</ul>
+		</div>
+	</nav>
+</div>
+
+<div class="editor-page" class:chat-open={isChatOpen}>
+	<div class="background-image" style="background-image: url({backgroundImage})"></div>
 
 	<!-- Project Document Switcher with fade-in animation -->
 	{#if projectDocumentsLoaded}
@@ -4354,7 +4361,16 @@
 		<div class="cursor-position">
 			<button
 				class="commands-toggle"
-				on:click={() => (showCommands = !showCommands)}
+				on:click={commandFunctions.toggleChatAssistant}
+				title="Toggle AI Chat Assistant"
+				aria-label="Toggle AI chat assistant"
+				style="margin-right: -.5px;"
+			>
+				<i class="bi bi-robot"></i>
+			</button>
+			<button
+				class="commands-toggle"
+						on:click={commandFunctions.toggleCommandSheet}
 				title="Toggle Commands Reference"
 				aria-label="Toggle commands reference"
 			>
@@ -4368,9 +4384,24 @@
 	<div class="commands-overlay" class:show-commands={showCommands}>
 		<div class="commands-header">
 				<h5>Command Reference</h5>
-			<button class="commands-close" on:click={() => (showCommands = false)} aria-label="Close commands reference"
-				>×</button
-			>
+				<div class="header-buttons">
+					<button 
+						class="header-action-btn"
+						on:click={() => goto('/account')}
+						title="Edit Keybindings"
+						aria-label="Edit keybindings"
+					>
+						<i class="bi bi-pencil-square"></i>
+					</button>
+					<button 
+						class="header-action-btn" 
+						on:click={() => (showCommands = false)} 
+						aria-label="Close commands reference"
+						title="Close"
+					>
+						&times;
+					</button>
+				</div>
 		</div>
 		<div class="commands-body">
 			<!-- Restored original structure with dynamic keys -->
@@ -4392,7 +4423,7 @@
 					<li><span class="key">{moveRightKey}</span> Move right</li>
 					<li><span class="key">{startOfLineKey}</span> Start of line</li>
 					<li><span class="key">{endOfLineKey}</span> End of line</li>
-					<li><span class="key">{startOfDocKey}</span> Start of document (gg)</li>
+					<li><span class="key">{startOfDocKey}</span> Start of document</li>
 					<li><span class="key">{endOfDocKey}</span> End of document</li>
 				</ul>
 			</div>
@@ -4457,6 +4488,7 @@
 				<h6>Editor</h6>
 				<ul>
 					<li><span class="key">{toggleSheetKey}</span> Toggle Command Sheet</li>
+					
 				</ul>
 			</div>
 		</div>
@@ -4480,12 +4512,16 @@
 	{/if}
 
 	{#if isChatOpen}
-		<ChatAssistant
-			bind:this={chatAssistantComponent}
-			documentId={parseInt(documentId)}
-			bind:isOpen={isChatOpen}
-			on:close={() => (isChatOpen = false)}
-			bind:messageInput={chatInputElementRef}
-		/>
+		<div
+			in:fade={{ duration: 700}}
+			out:fade={{ duration: 250}}>
+			<ChatAssistant
+				bind:this={chatAssistantComponent}
+				documentId={parseInt(documentId)}
+				bind:isOpen={isChatOpen}
+				on:close={() => (isChatOpen = false)}
+				bind:messageInput={chatInputElementRef}
+			/>
+		</div>
 	{/if}
 </div>

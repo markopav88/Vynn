@@ -12,6 +12,7 @@
 	margin-top: 0;
 	scrollbar-width: none; /* Firefox */
 	-ms-overflow-style: none; /* IE and Edge */
+	transition: padding-right 0.4s ease-out; /* Add transition for padding */
 }
 
 .editor-page::-webkit-scrollbar {
@@ -1251,4 +1252,35 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	100% {
 		background-color: transparent;
 	}
+}
+
+/* Add styles for shifting elements when chat is open by adjusting page padding */
+.editor-page.chat-open {
+	padding-right: 360px; /* Add padding equal to chat width + small gap */
+}
+
+.commands-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+.header-buttons {
+	display: flex;
+	gap: 0.1rem;
+	margin-right: -10px;
+}
+.header-action-btn {
+	background: none;
+	border: none;
+	color: var(--bs-gray-500); /* Subtle grey color */
+	padding: 0.25rem 0.5rem; /* Adjust padding */
+	line-height: 1;
+	font-size: 1.1rem; /* Adjust size if needed */
+	cursor: pointer;
+	opacity: 0.8;
+	transition: opacity 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+.header-action-btn:hover {
+	color: var(--bs-light); /* Brighter color on hover */
+	opacity: 1;
 }
