@@ -383,8 +383,6 @@
         border-radius: 15px 15px 5px 15px; /* Chat bubble style */
     }
 
-    /* --- START: Enhanced Dropdown Styles --- */
-
     /* Ensure flex properties on the li */
     .dropdown-menu li.d-flex {
         padding: 0; /* Remove padding from li if button handles it */

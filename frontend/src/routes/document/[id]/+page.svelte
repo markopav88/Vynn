@@ -396,9 +396,6 @@
 		clearNormalModeBuffer(); // Clear any pending sequence
 	}
 
-	// Function to handle command input
-	function handleCommandInput() {}
-
 	// Function to show command error for a few seconds
 	function showCommandError(message: string) {
 		commandError = message;
@@ -497,38 +494,32 @@
 		switchDoc7Key = bindings.switchToDocument7 ? formatKey(bindings.switchToDocument7) : switchDoc7Key;
 		switchDoc8Key = bindings.switchToDocument8 ? formatKey(bindings.switchToDocument8) : switchDoc8Key;
 		switchDoc9Key = bindings.switchToDocument9 ? formatKey(bindings.switchToDocument9) : switchDoc9Key;
-		toggleChatKey = bindings.toggleChatAssistant ? formatKey(bindings.toggleChatAssistant) : toggleChatKey; // Update chat toggle key
+		toggleChatKey = bindings.toggleChatAssistant ? formatKey(bindings.toggleChatAssistant) : toggleChatKey;
 	}
 
-	// Function to show a toast notification
 	function showToast(message: string, type: 'success' | 'error' | 'warning' = 'success') {
 		toasts = [...toasts, { message, type }];
-		// Remove the toast after 3 seconds
-		setTimeout(() => {
+		setTimeout(() => { // 3 second notification
 			toasts = toasts.filter((t) => t.message !== message);
 		}, 3000);
 	}
 
-	// Function to remove a toast
 	function removeToast(index: number) {
 		toasts = toasts.filter((_, i) => i !== index);
 	}
 
-	// Function to handle colon commands
 	function handleColonCommand(command: string) {
 		// Simple command handling for now
 		const cmd = command.trim().toLowerCase();
 
-		if (cmd === 'q' || cmd === 'quit') {
-			// Navigate back to drive
+		if (cmd === 'qa!') {
 			goto('/drive');
 			return true;
-		} else if (cmd === 'w' || cmd === 'write') {
+		} else if (cmd === 'w') {
 			// Save the document
 			if (documentData && editorElement) {
-				// Get the current content from the editor
+				// Get the current content from the editor and save it
 				documentData.content = editorElement.innerHTML;
-				// Save it
 				update_document(documentData)
 					.then(() => {
 						showToast('Document saved successfully', 'success');
@@ -542,9 +533,8 @@
 		} else if (cmd === 'wq') {
 			// Save and quit
 			if (documentData && editorElement) {
-				// Get the current content
+				// Get the current content and redirect
 				documentData.content = editorElement.innerHTML;
-				// Save and then navigate
 				update_document(documentData)
 					.then(() => {
 						showToast('Document saved successfully', 'success');
@@ -557,9 +547,22 @@
 				return true;
 			}
 		} else if (cmd === 'export') {
-			// Export document to PDF
 			exportToPDF();
 			return true;
+		} else if (cmd === 'grammer') {
+
+		} else if (cmd === 'summarize') {
+
+		} else if (cmd === 'rephrase') {
+
+		} else if (cmd === 'expand') {
+
+		} else if (cmd === 'shrink') {
+
+		} else if (cmd.split(" ").at(0) === 'rewriteas') {
+
+		} else if (cmd === 'factcheck') {
+
 		} else if (cmd.startsWith('%s/')) {
 			// Handle find and replace command
 			// Remove the '%s/' prefix and split the remaining command
@@ -1467,12 +1470,48 @@
 		await keybindings.fetchAndUpdateBindings();
 		// Update the command sheet data after bindings are loaded
 		prepareCommandSheetData();
+
+		console.log('Document page mounted, setting documentReady');
+		// Set document ready immediately for content
+		documentReady = true;
+		
+		// Use a simple timeout to delay the navbar appearance
+		setTimeout(() => {
+			console.log('Setting navbarReady to true');
+			navbarReady = true;
+			console.log('navbarReady is now:', navbarReady);
+			
+			// Log the navbar container opacity after a short delay
+			setTimeout(() => {
+				const navbarContainer = document.querySelector('.navbar-container');
+				if (navbarContainer) {
+					console.log('Navbar container style:', navbarContainer.getAttribute('style'));
+					console.log('Navbar container opacity:', window.getComputedStyle(navbarContainer).opacity);
+				}
+			}, 100);
+		}, 300);
+
+		console.debug('Component mounted, initializing keybindings');
+		
+		// Initialize keybindings
+		keybindings.fetchAndUpdateBindings()
+			.then(() => {
+				console.debug('Keybindings initialized:', keybindings.activeBindings);
+				window.addEventListener('keydown', handleKeybindingKeyDown);
+			})
+			.catch((error) => {
+				console.error('Error initializing keybindings:', error);
+			});
 	});
 
 	// Separate cleanup function for event listeners
 	onDestroy(() => {
 		if (!browser) return;
 		
+		// Remove keydown listener
+		console.debug('Cleaning up keyboard event listener in onDestroy');
+		window.removeEventListener('keydown', handleKeybindingKeyDown);
+
 		// Remove scroll and resize event listeners
 		window.removeEventListener('scroll', () => {});
 		window.removeEventListener('resize', () => {});
@@ -2078,22 +2117,6 @@
 		}, 0); // Use setTimeout to ensure DOM is updated by safelySetEditorContent
 	}
 
-	// Add performUndo function
-	function performUndo() {
-		if (document.queryCommandSupported('undo')) {
-			document.execCommand('undo', false);
-			showCommandError('Undo operation performed');
-		}
-	}
-	
-	// Add performRedo function 
-	function performRedo() {
-		if (document.queryCommandSupported('redo')) {
-			document.execCommand('redo', false);
-			showCommandError('Redo operation performed');
-		}
-	}
-
 	// Add navigation functions
 	function moveToStartOfLine() {
 		if (!editorElement) return;
@@ -2324,86 +2347,6 @@
 			exitCommandMode();
 		}
 	}
-	
-	// Add helper function for calculating max column width
-	function calculateMaxColumnWidth(): number {
-		if (!editorElement) return MAX_COLUMN_WIDTH;
-		
-		// Get font metrics
-		const style = window.getComputedStyle(editorElement);
-		const font = style.font;
-		
-		// Create a temporary span to measure character width
-		const span = document.createElement('span');
-		span.style.font = font;
-		span.style.position = 'absolute';
-		span.style.visibility = 'hidden';
-		span.textContent = 'X'.repeat(100); // Use a representative character
-		
-		document.body.appendChild(span);
-		const charWidth = span.getBoundingClientRect().width / 100;
-		document.body.removeChild(span);
-		
-		// Calculate how many characters fit in the editor width with some margin
-		const editorWidth = editorElement.clientWidth - 40; // 20px padding on each side
-		const maxChars = Math.floor(editorWidth / charWidth);
-		
-		return Math.max(60, Math.min(maxChars, 120)); // Keep between 60-120 chars
-	}
-
-	// Helper function to get node offset within a specific parent
-	function getNodeOffsetWithinParent(node: Node, parentDiv: Node, offset: number): number {
-		if (!node || !parentDiv) return offset;
-		
-		// If node is a text node and it's directly in the parent div
-		if (node.nodeType === Node.TEXT_NODE && node.parentNode === parentDiv) {
-			return offset;
-		}
-		
-		// Calculate text length before this node in the parent div
-		let textBeforeNode = 0;
-		
-		// Function to traverse the parent's contents
-		function traverseParent(currentNode: Node) {
-			if (currentNode === node) {
-				// Found our node, stop here
-				return true;
-			}
-			
-			if (currentNode.nodeType === Node.TEXT_NODE) {
-				// Add text content length
-				textBeforeNode += (currentNode.textContent || '').length;
-			} else if (currentNode.nodeType === Node.ELEMENT_NODE) {
-				// Traverse child nodes
-				for (let i = 0; i < currentNode.childNodes.length; i++) {
-					if (traverseParent(currentNode.childNodes[i])) {
-						return true;
-					}
-				}
-			}
-			
-			return false;
-		}
-		
-		// Start traversal on parent's children
-		for (let i = 0; i < parentDiv.childNodes.length; i++) {
-			if (traverseParent(parentDiv.childNodes[i])) {
-				break;
-			}
-		}
-		
-		// Return the text before + offset
-		return textBeforeNode + offset;
-	}
-
-	// Helper function to get current selection offset
-	function getSelectionOffset(): number {
-		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return 0;
-		
-		const range = selection.getRangeAt(0);
-		return getTextOffset(range.startContainer, range.startOffset);
-	}
 
 	// Helper function to safely set editor content while preserving div structure
 	function safelySetEditorContent(content: string) {
@@ -2491,7 +2434,8 @@
 			if (line.trim() === '') {
 				div.innerHTML = '<br>';
 			} else {
-				div.textContent = line; // textContent automatically escapes HTML
+				// Use innerHTML instead of textContent to render formatting tags
+				div.innerHTML = line; 
 			}
 
 			// Add data attribute to track original line number
@@ -2916,7 +2860,6 @@
 		}
 	}
 
-	// Add export to PDF function
 	function exportToPDF() {
 		if (!browser || !documentData) return;
 
@@ -3001,16 +2944,6 @@
 	let lightness = 50;
 	let colorSelectionActive = false;
 
-	const availableColors = [
-		{ name: 'Black', value: '#000000' },
-		{ name: 'Red', value: '#FF0000' },
-		{ name: 'Green', value: '#008000' },
-		{ name: 'Blue', value: '#0000FF' },
-		{ name: 'Purple', value: '#800080' },
-		{ name: 'Orange', value: '#FFA500' },
-		{ name: 'Yellow', value: '#FFD700' }
-	];
-
 	// Color picker functions
 	function updateColorFromHueOnly() {
 		// Handle special cases for white and black at the extremes
@@ -3039,53 +2972,7 @@
 			selectedColor = hexColor;
 		}
 	}
-
-	function updateColorFromHSL() {
-		// Convert HSL to RGB
-		const rgb = hslToRgb(hue, saturation / 100, lightness / 100);
-		rgbColor = { r: rgb[0], g: rgb[1], b: rgb[2] };
-
-		// Convert RGB to HEX
-		hexColor = rgbToHex(rgbColor.r, rgbColor.g, rgbColor.b);
-		selectedColor = hexColor;
-	}
-
-	function updateColorFromRGB() {
-		// Convert RGB to HEX
-		hexColor = rgbToHex(rgbColor.r, rgbColor.g, rgbColor.b);
-		selectedColor = hexColor;
-
-		// Convert RGB to HSL
-		const hsl = rgbToHsl(rgbColor.r, rgbColor.g, rgbColor.b);
-		hue = hsl[0];
-		saturation = hsl[1] * 100;
-		lightness = hsl[2] * 100;
-	}
-
-	function selectPresetColor(colorValue: string) {
-		hexColor = colorValue;
-
-		// Convert HEX to RGB
-		const rgb = hexToRgb(hexColor);
-		if (rgb) {
-			rgbColor = { r: rgb[0], g: rgb[1], b: rgb[2] };
-
-			// Convert RGB to HSL
-			const hsl = rgbToHsl(rgbColor.r, rgbColor.g, rgbColor.b);
-			hue = hsl[0];
-			saturation = hsl[1] * 100;
-			lightness = hsl[2] * 100;
-
-			selectedColor = hexColor;
-		}
-	}
-
-	// Color conversion helper functions
-	function hexToRgb(hex: string): [number, number, number] | null {
-		const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-		return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : null;
-	}
-
+	
 	function rgbToHex(r: number, g: number, b: number): string {
 		return (
 			'#' +
@@ -3103,7 +2990,6 @@
 		let r, g, b;
 
 		if (s === 0) {
-			// Achromatic (gray)
 			r = g = b = l;
 		} else {
 			const hue2rgb = (p: number, q: number, t: number): number => {
@@ -3125,140 +3011,81 @@
 
 		return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 	}
-
-	function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-		r /= 255;
-		g /= 255;
-		b /= 255;
-
-		const max = Math.max(r, g, b);
-		const min = Math.min(r, g, b);
-		let h = 0;
-		let s = 0;
-		const l = (max + min) / 2;
-
-		if (max !== min) {
-			const d = max - min;
-			s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-
-			switch (max) {
-				case r:
-					h = (g - b) / d + (g < b ? 6 : 0);
-					break;
-				case g:
-					h = (b - r) / d + 2;
-					break;
-				case b:
-					h = (r - g) / d + 4;
-					break;
-			}
-
-			h *= 60;
-		}
-
-		return [Math.round(h), s, l];
-	}
-
-
-	// Simple onMount function that ensures all content is visible immediately
-	onMount(() => {
-		console.log('Document page mounted, setting documentReady');
-		// Set document ready immediately for content
-		documentReady = true;
-		
-		// Use a simple timeout to delay the navbar appearance
-		setTimeout(() => {
-			console.log('Setting navbarReady to true');
-			navbarReady = true;
-			console.log('navbarReady is now:', navbarReady);
-			
-			// Log the navbar container opacity after a short delay
-			setTimeout(() => {
-				const navbarContainer = document.querySelector('.navbar-container');
-				if (navbarContainer) {
-					console.log('Navbar container style:', navbarContainer.getAttribute('style'));
-					console.log('Navbar container opacity:', window.getComputedStyle(navbarContainer).opacity);
-				}
-			}, 100);
-		}, 300);
-	});
 	
 	// Define our command functions object with formatting commands
 	const commandFunctions: CommandFunctions = {
 		applyBoldFormatting: () => {
-			console.debug('Executing bold formatting command (NORMAL mode)');
+			console.debug('Executing bold formatting command check');
+			// Only allow formatting in INSERT mode
+			if (editorMode !== 'INSERT') {
+				console.debug('Bold formatting ignored: Not in INSERT mode.');
+				return;
+			}
 			if (!document.queryCommandSupported('bold')) {
 				showCommandError('Bold formatting not supported');
 				return;
 			}
 
-			const selection = window.getSelection();
-			// ONLY apply if text is actually selected in NORMAL mode
-			if (selection && !selection.isCollapsed) {
-				document.execCommand('bold', false);
-				// MutationObserver handles content updates
-				showCommandError('Bold formatting applied');
-			} else {
-				console.debug('Bold command ignored: No text selected in NORMAL mode.');
-			}
+			console.debug('Applying bold formatting in INSERT mode');
+			document.execCommand('bold', false);
+			// MutationObserver handles content updates
+			showCommandError('Bold formatting applied');
 		},
 		applyItalicFormatting: () => {
-			console.debug('Executing italic formatting command (NORMAL mode)');
+			console.debug('Executing italic formatting command check');
+			// Only allow formatting in INSERT mode
+			if (editorMode !== 'INSERT') {
+				console.debug('Italic formatting ignored: Not in INSERT mode.');
+				return;
+			}
 			if (!document.queryCommandSupported('italic')) {
 				showCommandError('Italic formatting not supported');
 				return;
 			}
 
-			const selection = window.getSelection();
-			// ONLY apply if text is actually selected in NORMAL mode
-			if (selection && !selection.isCollapsed) {
-				document.execCommand('italic', false);
-				// MutationObserver handles content updates
-				showCommandError('Italic formatting applied');
-			} else {
-				console.debug('Italic command ignored: No text selected in NORMAL mode.');
-			}
+			console.debug('Applying italic formatting in INSERT mode');
+			document.execCommand('italic', false);
+			// MutationObserver handles content updates
+			showCommandError('Italic formatting applied');
 		},
 		applyUnderlineFormatting: () => {
-			console.debug('Executing underline formatting command (NORMAL mode)');
+			console.debug('Executing underline formatting command check');
+			if (editorMode !== 'INSERT') {
+				console.debug('Underline formatting ignored: Not in INSERT mode.');
+				return;
+			}
 			if (!document.queryCommandSupported('underline')) {
 				showCommandError('Underline formatting not supported');
 				return;
 			}
 
-			const selection = window.getSelection();
-			// ONLY apply if text is actually selected in NORMAL mode
-			if (selection && !selection.isCollapsed) {
-				document.execCommand('underline', false);
-				// MutationObserver handles content updates
-
-				// Fix potential nested font/u issues (keep this logic)
-				if (editorElement) {
-					const underlineElements = editorElement.querySelectorAll('u');
-					for (const uElem of underlineElements) {
-						const fontElements = uElem.querySelectorAll('font');
-						if (fontElements.length > 1) {
-							const fragment = document.createDocumentFragment();
-							Array.from(fontElements).forEach(fontElem => {
-								const color = fontElem.getAttribute('color');
-								const content = fontElem.innerHTML;
-								const newFont = document.createElement('font');
-								if (color) newFont.setAttribute('color', color);
-								const newU = document.createElement('u');
-								newU.innerHTML = content;
-								newFont.appendChild(newU);
-								fragment.appendChild(newFont);
-							});
-							if (uElem.parentNode) {
-								uElem.parentNode.replaceChild(fragment, uElem);
-							}
+			console.debug('Applying underline formatting in INSERT mode');
+			document.execCommand('underline', false);
+			
+			// Fix potential nested font/u issues (keep this logic)
+			if (editorElement) {
+				const underlineElements = editorElement.querySelectorAll('u');
+				for (const uElem of underlineElements) {
+					const fontElements = uElem.querySelectorAll('font');
+					if (fontElements.length > 1) {
+						const fragment = document.createDocumentFragment();
+						Array.from(fontElements).forEach(fontElem => {
+							const color = fontElem.getAttribute('color');
+							const content = fontElem.innerHTML;
+							const newFont = document.createElement('font');
+							if (color) newFont.setAttribute('color', color);
+							const newU = document.createElement('u');
+							newU.innerHTML = content;
+							newFont.appendChild(newU);
+							fragment.appendChild(newFont);
+						});
+						if (uElem.parentNode) {
+							uElem.parentNode.replaceChild(fragment, uElem);
 						}
 					}
 				}
-				showCommandError('Underline formatting applied');
-			} else {
-				console.debug('Underline command ignored: No text selected in NORMAL mode.');
 			}
+			showCommandError('Underline formatting applied');
 		},
 		// Add document switching commands
 		switchToDocument1: () => {
@@ -3672,26 +3499,6 @@
 		}
 	}
 
-	onMount(() => {
-		console.debug('Component mounted, initializing keybindings');
-		
-		// Initialize keybindings
-		keybindings.fetchAndUpdateBindings()
-			.then(() => {
-				console.debug('Keybindings initialized:', keybindings.activeBindings);
-				window.addEventListener('keydown', handleKeybindingKeyDown);
-			})
-			.catch((error) => {
-				console.error('Error initializing keybindings:', error);
-			});
-
-		// Return cleanup function
-		return () => {
-			console.debug('Cleaning up keyboard event listener');
-			window.removeEventListener('keydown', handleKeybindingKeyDown);
-		};
-	});
-
 	// Movement functions
 	function moveLeft() {
 		if (!editorElement) return;
@@ -4088,8 +3895,6 @@
 			return;
 		}
 
-		// --- This is the logic that should be present ---
-
 		// Explicitly check for formatting shortcuts in INSERT mode
 		const eventInput = {
 			// Use kd and ensure lowercase for comparison
@@ -4112,7 +3917,6 @@
 					binding.shiftDown === eventInput.shiftDown
 			);
 		};
-		// *** End of checkBinding definition ***
 
 		// Now use the helper function
 		if (bindings.bold && checkBinding(bindings.bold)) {
@@ -4335,7 +4139,6 @@
 					<input
 						bind:this={commandInputElement}
 						bind:value={commandInput}
-						on:input={handleCommandInput}
 						on:keydown={executeCommand}
 						class="command-input"
 						autocomplete="off"
