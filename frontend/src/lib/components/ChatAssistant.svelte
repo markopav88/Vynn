@@ -446,7 +446,4 @@
         color: var(--bs-danger);
         opacity: 1;
     }
-
-
-    /* --- END: Enhanced Dropdown Styles --- */
 </style>
