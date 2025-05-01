@@ -11,6 +11,15 @@
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
 	import { get_project_documents } from '$lib/ts/project';
 	import { keybindings, keybindingMap, type CommandFunctions, type KeyboardInput } from '$lib/ts/keybindings';
+	import {
+		check_grammar,
+		summarize_text,
+		rephrase_text,
+		expand_text,
+		shrink_text,
+		rewrite_text_as,
+		fact_check_text
+	} from '$lib/ts/ai'; // <-- Import AI functions
 
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
@@ -508,7 +517,8 @@
 		toasts = toasts.filter((_, i) => i !== index);
 	}
 
-	function handleColonCommand(command: string) {
+	// Function to handle colon commands - make async
+	async function handleColonCommand(command: string) {
 		// Simple command handling for now
 		const cmd = command.trim().toLowerCase();
 
@@ -549,20 +559,123 @@
 		} else if (cmd === 'export') {
 			exportToPDF();
 			return true;
-		} else if (cmd === 'grammer') {
+		} else if (cmd === 'grammar') {
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for grammar check:', textToSend);
+			} else {
+				console.log('Sending full document for grammar check');
+			}
 
+			const result = await check_grammar(textToSend);
+			if (result) {
+				showCommandError(result); // Show placeholder result
+			} else {
+				showCommandError('Grammar check failed.');
+			}
+			// TODO Placeholder: Handle response (e.g., show suggestions)
+			return true;
 		} else if (cmd === 'summarize') {
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for summarization:', textToSend);
+			} else {
+				console.log('Sending full document for summarization');
+			}
 
+			const result = await summarize_text(textToSend);
+			if (result) {
+				showCommandError(result);
+			} else {
+				showCommandError('Summarization failed.');
+			}
+			// TODO Placeholder: Handle response (e.g., display summary)
+			return true;
 		} else if (cmd === 'rephrase') {
-
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for rephrasing:', textToSend);
+			} else {
+				console.log('Sending full document for rephrasing');
+			}
+			
+			const result = await rephrase_text(textToSend);
+			if (result) {
+				showCommandError(result);
+			} else {
+				showCommandError('Rephrasing failed.');
+			}
+			// TODO Placeholder: Handle response (e.g., replace text or show options)
+			return true;
 		} else if (cmd === 'expand') {
-
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for expansion:', textToSend);
+			} else {
+				console.log('Sending full document for expansion');
+			}
+			
+			const result = await expand_text(textToSend);
+			if (result) {
+				showCommandError(result);
+			} else {
+				showCommandError('Expansion failed.');
+			}
+			// TODO Placeholder: Handle response
+			return true;
 		} else if (cmd === 'shrink') {
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for shrinking:', textToSend);
+			} else {
+				console.log('Sending full document for shrinking');
+			}
+			
+			const result = await shrink_text(textToSend);
+			if (result) {
+				showCommandError(result);
+			} else {
+				showCommandError('Shrinking failed.');
+			}
+			// TODO Placeholder: Handle response
+			return true;
+		} else if (cmd.startsWith('rewriteas ')) {
+			const targetStyle = cmd.substring('rewriteas '.length).trim();
+			if (!targetStyle) {
+				showCommandError('Rewrite style missing. Use :rewriteas [style]');
+				return false;
+			}
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log(`Sending selected text for rewrite as ${targetStyle}:`, textToSend);
+			} else {
+				console.log(`Sending full document for rewrite as ${targetStyle}`);
+			}
 
-		} else if (cmd.split(" ").at(0) === 'rewriteas') {
-
+			const result = await rewrite_text_as(textToSend, targetStyle);
+			if (result) {
+				showCommandError(result);
+			} else {
+				showCommandError('Rewrite failed.');
+			}
+			// TODO Placeholder: Handle response
+			return true;
 		} else if (cmd === 'factcheck') {
-
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for fact-checking:', textToSend);
+			} else {
+				console.log('Sending full document for fact-checking');
+			}
+			
+			const result = await fact_check_text(textToSend);
+			if (result) {
+				showCommandError(result);
+			} else {
+				showCommandError('Fact-check failed.');
+			}
+			// TODO Placeholder: Handle response
+			return true;
 		} else if (cmd.startsWith('%s/')) {
 			// Handle find and replace command
 			// Remove the '%s/' prefix and split the remaining command
@@ -1841,6 +1954,16 @@
 		return content;
 	}
 	
+	// Helper function to get text for AI commands (selected or full document)
+	function getTextForAICommand(): { text: string; isSelection: boolean } {
+		const selection = window.getSelection();
+		if (selection && !selection.isCollapsed) {
+			return { text: selection.toString(), isSelection: true };
+		} else {
+			return { text: getEditorContent(), isSelection: false };
+		}
+	}
+
 	// Improved setEditorContent function to handle line counting correctly
 	function setEditorContent(content: string) {
 		if (!editorElement) return;
@@ -2328,12 +2451,12 @@
 	}
 	
 	// Add command execution function
-	function executeCommand(event: KeyboardEvent) {
+	async function executeCommand(event: KeyboardEvent) { // <-- Make async
 		if (event.key === 'Enter') {
 			event.preventDefault();
 			
 			if (commandPrefix === ':') {
-				const success = handleColonCommand(commandInput);
+				const success = await handleColonCommand(commandInput); // <-- Add await
 				if (success) {
 					exitCommandMode();
 				}
@@ -4268,6 +4391,13 @@
 					<li><span class="key">:w</span> Save document</li>
 					<li><span class="key">:wq</span> Save and quit</li>
 					<li><span class="key">:export</span> Export to PDF</li>
+					<li><span class="key">:grammar</span> Check grammar</li>
+					<li><span class="key">:summarize</span> Summarize text</li>
+					<li><span class="key">:rephrase</span> Rephrase text</li>
+					<li><span class="key">:expand</span> Expand text</li>
+					<li><span class="key">:shrink</span> Shrink text</li>
+					<li><span class="key">:rewriteas [style]</span> Rewrite text</li>
+					<li><span class="key">:factcheck</span> Fact-check text</li>
 					<li><span class="key">:%s/old/new/gi</span> Replace all</li>
 				</ul>
 			</div>

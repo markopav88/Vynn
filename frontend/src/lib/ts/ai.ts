@@ -131,3 +131,101 @@ export async function delete_writing_session(sessionId: number): Promise<boolean
         return false;
     }
 }
+
+/**
+ * Placeholder function to check grammar.
+ * Replace with actual backend API call.
+ */
+export async function check_grammar(text: string): Promise<string | null> {
+	console.log('AI Request: Check grammar for text:', text.substring(0, 100) + '...');
+	try {
+		return `(Placeholder) Grammar checked for: ${text.substring(0, 50)}...`;
+	} catch (error) {
+		console.error('Error checking grammar:', error);
+		return null;
+	}
+}
+
+/**
+ * Placeholder function to summarize text.
+ * Replace with actual backend API call.
+ */
+export async function summarize_text(text: string): Promise<string | null> {
+	console.log('AI Request: Summarize text:', text.substring(0, 100) + '...');
+	try {
+		return `(Placeholder) Summary of: ${text.substring(0, 50)}...`;
+	} catch (error) {
+		console.error('Error summarizing text:', error);
+		return null;
+	}
+}
+
+/**
+ * Placeholder function to rephrase text.
+ * Replace with actual backend API call.
+ */
+export async function rephrase_text(text: string): Promise<string | null> {
+	console.log('AI Request: Rephrase text:', text.substring(0, 100) + '...');
+    try {
+		return `(Placeholder) Rephrased: ${text.substring(0, 50)}...`;
+	} catch (error) {
+		console.error('Error rephrasing text:', error);
+		return null;
+	}
+}
+
+/**
+ * Placeholder function to expand text.
+ * Replace with actual backend API call.
+ */
+export async function expand_text(text: string): Promise<string | null> {
+	console.log('AI Request: Expand text:', text.substring(0, 100) + '...');
+	try {
+		return `(Placeholder) Expanded: ${text.substring(0, 50)}... plus more details.`;
+	} catch (error) {
+		console.error('Error expanding text:', error);
+		return null;
+	}
+}
+
+/**
+ * Placeholder function to shrink text.
+ * Replace with actual backend API call.
+ */
+export async function shrink_text(text: string): Promise<string | null> {
+	console.log('AI Request: Shrink text:', text.substring(0, 100) + '...');
+	try {
+		return `(Placeholder) Shrunk: ${text.substring(0, 30)}...`;
+	} catch (error) {
+		console.error('Error shrinking text:', error);
+		return null;
+	}
+}
+
+/**
+ * Placeholder function to rewrite text in a specific style.
+ * Replace with actual backend API call.
+ */
+export async function rewrite_text_as(text: string, style: string): Promise<string | null> {
+	console.log(`AI Request: Rewrite text as ${style}:`, text.substring(0, 100) + '...');
+	try {
+		return `(Placeholder) Rewritten as ${style}: ${text.substring(0, 50)}...`;
+	} catch (error) {
+		console.error(`Error rewriting text as ${style}:`, error);
+		return null;
+	}
+}
+
+/**
+ * Placeholder function to fact-check text.
+ * Replace with actual backend API call.
+ */
+export async function fact_check_text(text: string): Promise<string | null> {
+	console.log('AI Request: Fact-check text:', text.substring(0, 100) + '...');
+	try {
+		return `(Placeholder) Fact-checked: ${text.substring(0, 50)}... Looks okay!`;
+	} catch (error) {
+		console.error('Error fact-checking text:', error);
+		return null;
+	}
+}
