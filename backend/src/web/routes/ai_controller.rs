@@ -28,7 +28,8 @@ use chrono::Utc;
 
 use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
-    CreateSessionPayload, SendMessagePayload, MessageRole, SelectedTextContext
+    CreateSessionPayload, SendMessagePayload, MessageRole, SelectedTextContext,
+    RewritePayload
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
@@ -383,100 +384,140 @@ pub async fn api_delete_writing_session(
 /// Frontend: NULL
 pub async fn api_check_grammer(
     cookies: Cookies,
-    path: Path<i32>,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
+    println!("->> {:<12} - api_check_grammer", "HANDLER");
+
+    // Get user_id to ensure permission (optional, could be removed if direct text analysis is allowed)
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_grammar_check_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
 }
 
 /// POST handler for summarizing some text or a document
-/// Accessible via: POST /api/writing-assistant/:id/summarize
+/// Accessible via: POST /api/writing-assistant/summarize
 /// Test: NULL
 /// Frontend: NULL
 pub async fn api_summarize(
     cookies: Cookies,
-    path: Path<i32>,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
+    println!("->> {:<12} - api_summarize", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_summarize_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
 }
 
 /// POST handler for rephrasing some text or a document
-/// Accessible via: POST /api/writing-assistant/:id/rephrase
+/// Accessible via: POST /api/writing-assistant/rephrase
 /// Test: NULL
 /// Frontend: NULL
 pub async fn api_rephrase(
     cookies: Cookies,
-    path: Path<i32>,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
+    println!("->> {:<12} - api_rephrase", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_rephrase_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
 }
 
 /// POST handler for expanding some text or a document
-/// Accessible via: POST /api/writing-assistant/:id/expand
+/// Accessible via: POST /api/writing-assistant/expand
 /// Test: NULL
 /// Frontend: NULL
 pub async fn api_expand(
     cookies: Cookies,
-    path: Path<i32>,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
+    println!("->> {:<12} - api_expand", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_expand_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
 }
 
 /// POST handler for shrinking some text or a document
-/// Accessible via: POST /api/writing-assistant/:id/shrink
+/// Accessible via: POST /api/writing-assistant/shrink
 /// Test: NULL
 /// Frontend: NULL
 pub async fn api_shrink(
     cookies: Cookies,
-    path: Path<i32>,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
+    println!("->> {:<12} - api_shrink", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_shrink_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
 }
 
 /// POST handler for rewriting some text or a document in a new style
-/// Accessible via: POST /api/writing-assistant/:id/rewrite
+/// Accessible via: POST /api/writing-assistant/rewrite
 /// Test: NULL
 /// Frontend: NULL
 pub async fn api_rewrite(
     cookies: Cookies,
-    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<RewritePayload>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_rewrite", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_rewrite_prompt(&payload.content, &payload.style);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
+}
+
+/// POST handler for fact checking some text or a document
+/// Accessible via: POST /api/writing-assistant/factcheck
+/// Test: NULL
+/// Frontend: NULL
+pub async fn api_fact_check(
+    cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>,
 ) -> Result<Json<Value>> {
-    // This is a placeholder for future implementation
-    Ok(Json(json!({
-        "status": "error",
-        "message": "This feature is not implemented yet"
-    })))
+    println!("->> {:<12} - api_fact_check", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_fact_check_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
 }
 
 /// Generate routes for the writing assistant controller
@@ -487,10 +528,11 @@ pub fn writing_assistant_routes() -> Router {
         .route("/:id", get(api_get_writing_session))
         .route("/:id", delete(api_delete_writing_session))
         .route("/:id/message", post(api_send_writing_message))
-        .route("/:id/grammer", post(api_check_grammer))
-        .route("/:id/summarize", post(api_summarize))
-        .route("/:id/rephrease", post(api_rephrase))
-        .route("/:id/expand", post(api_expand))
-        .route("/:id/shrink", post(api_shrink))
-        .route("/:id/rewrite", post(api_rewrite))
+        .route("/grammer", post(api_check_grammer))
+        .route("/summarize", post(api_summarize))
+        .route("/rephrase", post(api_rephrase))
+        .route("/expand", post(api_expand))
+        .route("/shrink", post(api_shrink))
+        .route("/rewrite", post(api_rewrite))
+        .route("/factcheck", post(api_fact_check))
 }

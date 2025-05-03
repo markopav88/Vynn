@@ -37,6 +37,22 @@ export interface AssistantResponse {
     content: string;
 }
 
+// Define Payload structure for AI text commands
+interface AiTextPayload {
+	content: string;
+}
+
+// Define Payload for rewrite command
+interface AiRewritePayload {
+	content: string;
+	style: string;
+}
+
+// Define expected Response structure
+interface AiCommandResponse {
+	response: string;
+}
+
 /**
  * Fetches all writing assistant sessions for the current user.
  */
@@ -133,13 +149,24 @@ export async function delete_writing_session(sessionId: number): Promise<boolean
 }
 
 /**
- * Placeholder function to check grammar.
- * Replace with actual backend API call.
+ * Function to check grammar using the backend API.
  */
-export async function check_grammar(text: string): Promise<string | null> {
+export async function check_grammar(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Check grammar for text:', text.substring(0, 100) + '...');
+	const payload: AiTextPayload = { content: text };
 	try {
-		return `(Placeholder) Grammar checked for: ${text.substring(0, 50)}...`;
+		const response = await fetch('http://localhost:3001/api/writing-assistant/grammer', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Grammar Check Response:', result.response);
+		return result;
 	} catch (error) {
 		console.error('Error checking grammar:', error);
 		return null;
@@ -147,13 +174,24 @@ export async function check_grammar(text: string): Promise<string | null> {
 }
 
 /**
- * Placeholder function to summarize text.
- * Replace with actual backend API call.
+ * Function to summarize text using the backend API.
  */
-export async function summarize_text(text: string): Promise<string | null> {
+export async function summarize_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Summarize text:', text.substring(0, 100) + '...');
+	const payload: AiTextPayload = { content: text };
 	try {
-		return `(Placeholder) Summary of: ${text.substring(0, 50)}...`;
+		const response = await fetch('http://localhost:3001/api/writing-assistant/summarize', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Summarize Response:', result.response);
+		return result;
 	} catch (error) {
 		console.error('Error summarizing text:', error);
 		return null;
@@ -161,13 +199,24 @@ export async function summarize_text(text: string): Promise<string | null> {
 }
 
 /**
- * Placeholder function to rephrase text.
- * Replace with actual backend API call.
+ * Function to rephrase text using the backend API.
  */
-export async function rephrase_text(text: string): Promise<string | null> {
+export async function rephrase_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Rephrase text:', text.substring(0, 100) + '...');
-    try {
-		return `(Placeholder) Rephrased: ${text.substring(0, 50)}...`;
+    const payload: AiTextPayload = { content: text };
+	try {
+		const response = await fetch('http://localhost:3001/api/writing-assistant/rephrase', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Rephrase Response:', result.response);
+		return result;
 	} catch (error) {
 		console.error('Error rephrasing text:', error);
 		return null;
@@ -175,13 +224,24 @@ export async function rephrase_text(text: string): Promise<string | null> {
 }
 
 /**
- * Placeholder function to expand text.
- * Replace with actual backend API call.
+ * Function to expand text using the backend API.
  */
-export async function expand_text(text: string): Promise<string | null> {
+export async function expand_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Expand text:', text.substring(0, 100) + '...');
+	const payload: AiTextPayload = { content: text };
 	try {
-		return `(Placeholder) Expanded: ${text.substring(0, 50)}... plus more details.`;
+		const response = await fetch('http://localhost:3001/api/writing-assistant/expand', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Expand Response:', result.response);
+		return result;
 	} catch (error) {
 		console.error('Error expanding text:', error);
 		return null;
@@ -189,13 +249,24 @@ export async function expand_text(text: string): Promise<string | null> {
 }
 
 /**
- * Placeholder function to shrink text.
- * Replace with actual backend API call.
+ * Function to shrink text using the backend API.
  */
-export async function shrink_text(text: string): Promise<string | null> {
+export async function shrink_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Shrink text:', text.substring(0, 100) + '...');
+	const payload: AiTextPayload = { content: text };
 	try {
-		return `(Placeholder) Shrunk: ${text.substring(0, 30)}...`;
+		const response = await fetch('http://localhost:3001/api/writing-assistant/shrink', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Shrink Response:', result.response);
+		return result;
 	} catch (error) {
 		console.error('Error shrinking text:', error);
 		return null;
@@ -203,13 +274,24 @@ export async function shrink_text(text: string): Promise<string | null> {
 }
 
 /**
- * Placeholder function to rewrite text in a specific style.
- * Replace with actual backend API call.
+ * Function to rewrite text in a specific style using the backend API.
  */
-export async function rewrite_text_as(text: string, style: string): Promise<string | null> {
+export async function rewrite_text_as(text: string, style: string): Promise<AiCommandResponse | null> {
 	console.log(`AI Request: Rewrite text as ${style}:`, text.substring(0, 100) + '...');
+	const payload: AiRewritePayload = { content: text, style };
 	try {
-		return `(Placeholder) Rewritten as ${style}: ${text.substring(0, 50)}...`;
+		const response = await fetch('http://localhost:3001/api/writing-assistant/rewrite', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Rewrite Response:', result.response);
+		return result;
 	} catch (error) {
 		console.error(`Error rewriting text as ${style}:`, error);
 		return null;
@@ -218,14 +300,29 @@ export async function rewrite_text_as(text: string, style: string): Promise<stri
 
 /**
  * Placeholder function to fact-check text.
- * Replace with actual backend API call.
+ * This should ideally call a dedicated fact-checking API, not just the LLM.
  */
-export async function fact_check_text(text: string): Promise<string | null> {
-	console.log('AI Request: Fact-check text:', text.substring(0, 100) + '...');
+export async function fact_check_text(text: string): Promise<AiCommandResponse | null> {
+	console.warn('Fact-checking called with text:', text.substring(0, 100) + '...');
+	const payload: AiTextPayload = { content: text };
 	try {
-		return `(Placeholder) Fact-checked: ${text.substring(0, 50)}... Looks okay!`;
+		// Call the backend API endpoint for fact-checking
+		const response = await fetch('http://localhost:3001/api/writing-assistant/factcheck', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const result: AiCommandResponse = await response.json();
+		console.log('Fact Check Response:', result.response);
+		return result;
 	} catch (error) {
-		console.error('Error fact-checking text:', error);
+		console.error('Error during fact-checking:', error);
 		return null;
 	}
 }

@@ -49,6 +49,13 @@ pub struct SelectedTextContext {
     pub content: String,
 }
 
+/// Payload for sending a new message
+#[derive(Debug, Deserialize)]
+pub struct RewritePayload {
+    pub content: String,
+    pub style: String,
+}
+
 /// Complete session with messages for API responses
 #[derive(Debug, Serialize)]
 pub struct SessionWithMessages {

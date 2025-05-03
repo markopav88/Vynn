@@ -100,3 +100,31 @@ pub fn construct_generic_prompt(
 
     prompt
 }
+
+pub fn construct_grammar_check_prompt(text: &str) -> String {
+    format!("Please correct the grammar and spelling of the following text, only returning the corrected text without any explanations or introductory phrase:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+}
+
+pub fn construct_summarize_prompt(text: &str) -> String {
+    format!("Please provide a concise summary of the following text:\n\n{}", text)
+}
+
+pub fn construct_rephrase_prompt(text: &str) -> String {
+    format!("Please rephrase the following text to improve clarity and flow, only returning the rephrased text without any explanations or introductory phrases:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+}
+
+pub fn construct_expand_prompt(text: &str) -> String {
+    format!("Please expand on the following text, adding more detail and explanation where appropriate, only returning the expanded text without any explanations or introductory phrases:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+}
+
+pub fn construct_shrink_prompt(text: &str) -> String {
+    format!("Please shrink the following text, making it more concise while retaining the core meaning, only returning the shrinked text without any explanations or introductory phrases:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+}
+
+pub fn construct_rewrite_prompt(text: &str, style: &str) -> String {
+    format!("Please rewrite the following text in the style of '{}', only returning the rewritten text without any explanations or introductory phrases:\n\n{}", style, text)
+}
+
+pub fn construct_fact_check_prompt(text: &str) -> String {
+    format!("Please critically evaluate the factual claims in the following text based on your knowledge. Identify any potential inaccuracies or statements that might require verification. Respond concisely:\n\n{}", text)
+}

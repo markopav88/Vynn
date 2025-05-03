@@ -19,7 +19,7 @@
 		shrink_text,
 		rewrite_text_as,
 		fact_check_text
-	} from '$lib/ts/ai'; // <-- Import AI functions
+	} from '$lib/ts/ai';
 
 	import logo from '$lib/assets/logo.png';
 	import backgroundImage from '$lib/assets/editor-background.jpg';
@@ -105,6 +105,10 @@
 	let chatInputElementRef: HTMLInputElement | null = null; // Add ref for chat input
 	let animateIn = false; // Add animation state variable
 
+	// Add state for command selection highlighting
+	let commandHighlightRange: Range | null = null;
+	let commandHighlightSpans: HTMLSpanElement[] = [];
+
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
@@ -142,8 +146,13 @@
 			// Save current document before switching
 			if (documentData && editorElement) {
 				console.log('Saving current document before switching');
-				documentData.content = editorElement.innerHTML;
+				// Get the cleaned content using the helper
+				const contentToSave = getCleanedEditorHTML();
+				documentData.content = contentToSave;
 				await update_document(documentData);
+				// Clear highlight state manually here since exitCommandMode won't be called
+				commandHighlightSpans = []; 
+				commandHighlightRange = null;
 			}
 
 			// Check if we already have the document loaded
@@ -380,6 +389,22 @@
 		commandPrefix = prefix;
 		commandInput = '';
 
+		// --- Highlight Selection ---
+		commandHighlightRange = null; // Reset previous highlight state
+		commandHighlightSpans = [];
+		const selection = window.getSelection();
+		if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+			const range = selection.getRangeAt(0).cloneRange(); // Clone to avoid modification
+			commandHighlightRange = range; // Store the original range
+			console.log('Storing selection range for command mode:', range);
+			// Apply the highlight
+			commandHighlightSpans = applyHighlight(range);
+			console.log(`Applied highlight using ${commandHighlightSpans.length} spans`);
+			// Deselect text after highlighting (optional, depends on desired behavior)
+			selection.removeAllRanges(); 
+		}
+		// --- End Highlight Selection ---
+
 		// Focus the command input after it renders
 		setTimeout(() => {
 			if (commandInputElement) {
@@ -393,6 +418,35 @@
 		editorMode = 'NORMAL';
 		commandInput = '';
 		commandPrefix = '';
+
+		// --- Remove Highlight ---
+		if (commandHighlightSpans.length > 0) {
+			console.log(`Removing ${commandHighlightSpans.length} highlight spans`);
+			removeHighlight(commandHighlightSpans);
+			commandHighlightSpans = []; // Clear the array
+		}
+		// Restore cursor if we had a highlight range
+		if (commandHighlightRange) {
+			const selection = window.getSelection();
+			if (selection) {
+				selection.removeAllRanges();
+				// Use the *stored* original range to restore selection/cursor
+				// This assumes the content structure hasn't drastically changed
+				try {
+					selection.addRange(commandHighlightRange);
+					// Collapse to the start or end based on prefix? Or just keep selection?
+					// For now, let's collapse to the end of the original selection
+					selection.collapseToEnd(); 
+				} catch (e) {
+					console.error("Error restoring selection range:", e, commandHighlightRange);
+					// Fallback: Move to start of document if range is invalid
+					moveToStartOfDocument(); 
+				}
+			}
+			commandHighlightRange = null; // Clear the stored range
+		}
+		// --- End Remove Highlight ---
+
 		// Return focus to editor
 		if (editorElement) {
 			editorElement.focus();
@@ -528,8 +582,10 @@
 		} else if (cmd === 'w') {
 			// Save the document
 			if (documentData && editorElement) {
-				// Get the current content from the editor and save it
-				documentData.content = editorElement.innerHTML;
+				// Get the cleaned content using the helper function
+				const contentToSave = getCleanedEditorHTML();
+				documentData.content = contentToSave;
+
 				update_document(documentData)
 					.then(() => {
 						showToast('Document saved successfully', 'success');
@@ -538,24 +594,31 @@
 						console.error('Error saving document:', error);
 						showToast('Failed to save document', 'error');
 					});
-				return true;
+				// No finally block needed here for highlights
+				return true; // Indicate command was handled
 			}
+			return false; // Indicate failure if data missing
 		} else if (cmd === 'wq') {
 			// Save and quit
 			if (documentData && editorElement) {
-				// Get the current content and redirect
-				documentData.content = editorElement.innerHTML;
+				// Get the cleaned content using the helper function
+				const contentToSave = getCleanedEditorHTML();
+				documentData.content = contentToSave;
+
+				// Attempt to save, then quit if successful
 				update_document(documentData)
 					.then(() => {
 						showToast('Document saved successfully', 'success');
-					goto('/drive');
+						goto('/drive'); // Redirect after successful save
 					})
 					.catch((error) => {
 						console.error('Error saving document:', error);
 						showToast('Failed to save document', 'error');
-				});
-				return true;
+						// Don't quit if save failed
+					});
+				return true; // Indicate command was handled (attempted save)
 			}
+			return false; // Indicate failure if data missing
 		} else if (cmd === 'export') {
 			exportToPDF();
 			return true;
@@ -569,7 +632,7 @@
 
 			const result = await check_grammar(textToSend);
 			if (result) {
-				showCommandError(result); // Show placeholder result
+				showCommandError(result.response)
 			} else {
 				showCommandError('Grammar check failed.');
 			}
@@ -585,7 +648,7 @@
 
 			const result = await summarize_text(textToSend);
 			if (result) {
-				showCommandError(result);
+				showCommandError(result.response);
 			} else {
 				showCommandError('Summarization failed.');
 			}
@@ -601,7 +664,7 @@
 			
 			const result = await rephrase_text(textToSend);
 			if (result) {
-				showCommandError(result);
+				showCommandError(result.response);
 			} else {
 				showCommandError('Rephrasing failed.');
 			}
@@ -617,7 +680,7 @@
 			
 			const result = await expand_text(textToSend);
 			if (result) {
-				showCommandError(result);
+				showCommandError(result.response);
 			} else {
 				showCommandError('Expansion failed.');
 			}
@@ -633,7 +696,7 @@
 			
 			const result = await shrink_text(textToSend);
 			if (result) {
-				showCommandError(result);
+				showCommandError(result.response);
 			} else {
 				showCommandError('Shrinking failed.');
 			}
@@ -654,7 +717,7 @@
 
 			const result = await rewrite_text_as(textToSend, targetStyle);
 			if (result) {
-				showCommandError(result);
+				showCommandError(result.response);
 			} else {
 				showCommandError('Rewrite failed.');
 			}
@@ -670,7 +733,7 @@
 			
 			const result = await fact_check_text(textToSend);
 			if (result) {
-				showCommandError(result);
+				showCommandError(result.response);
 			} else {
 				showCommandError('Fact-check failed.');
 			}
@@ -1176,7 +1239,7 @@
 			// or by the keybinding system (which runs separately via window listener),
 			// prevent the default browser action (e.g., inserting characters).
 			// Exception: Allow Ctrl+A (Select All) default behavior.
-			if (!( (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') ) {
+			if (!( (event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'a' || event.key.toLowerCase() === 'c') )) {
 				event.preventDefault(); 
 			}
 
@@ -1725,10 +1788,20 @@
 				// Re-add Set up auto-save
 				autoSaveCleanup = setup_auto_save(documentData, () => {
 					if (documentData && editorElement) {
-						// Save the inner HTML of the editor element
-						documentData.content = editorElement.innerHTML;
-						console.log('Auto-saving content:', editorElement.innerHTML);
-						update_document(documentData);
+						// Get the cleaned content using the helper
+						const contentToSave = getCleanedEditorHTML();
+						console.log('Auto-saving cleaned content:', contentToSave.substring(0, 100) + '...');
+
+						// Save the cleaned content
+						documentData.content = contentToSave;
+						update_document(documentData)
+							.then(() => {
+								console.log('Auto-save successful.');
+							})
+							.catch((err) => {
+								console.error('Auto-save failed:', err);
+							});
+						// No finally block needed here for highlights
 					}
 				});
 
@@ -4128,6 +4201,176 @@
 			event.preventDefault();
 			return;
 		}
+	}
+
+	// Helper function to apply highlight spans
+	function applyHighlight(range: Range): HTMLSpanElement[] {
+		const highlightClass = 'command-selection-highlight';
+		const createdSpans: HTMLSpanElement[] = [];
+		if (range.collapsed) return createdSpans;
+
+		// Direct handling for single-text-node selection
+		if (range.startContainer === range.endContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+			const textNode = range.startContainer as Text;
+			try {
+				const span = document.createElement('span');
+				span.className = highlightClass;
+				const highlightRange = range.cloneRange(); // Use the original range directly
+				highlightRange.surroundContents(span);
+				createdSpans.push(span);
+				span.parentNode?.normalize();
+			} catch (e) {
+				console.error('[Debug] Error wrapping single text node:', e, range);
+			}
+			return createdSpans; // Return early, no need for walker
+		}
+		
+		try {
+			// Walker to find ALL text nodes within the common ancestor
+			const walker = document.createTreeWalker(
+				range.commonAncestorContainer,
+				NodeFilter.SHOW_TEXT,
+				null // No filter, process all text nodes
+			);
+
+			const rangesToWrap: Range[] = [];
+			let currentNode;
+			while ((currentNode = walker.nextNode())) {
+				const textNode = currentNode as Text;
+				if (!textNode.textContent?.trim()) continue; // Skip empty/whitespace nodes
+
+				const nodeRange = document.createRange();
+				nodeRange.selectNodeContents(textNode);
+
+				// Check if the text node intersects with the selection range
+				const intersects = range.intersectsNode(textNode);
+
+				if (intersects) {
+					// Calculate intersection offsets relative to the current textNode
+					let start = 0;
+					let end = textNode.length;
+
+					// Log boundary comparisons
+					const startComparison = range.compareBoundaryPoints(Range.START_TO_START, nodeRange);
+					const endComparison = range.compareBoundaryPoints(Range.END_TO_END, nodeRange);
+
+					// Adjust start offset if range starts inside or after this node
+					if (startComparison >= 0) {
+						if (range.startContainer === textNode) {
+							start = range.startOffset;
+						} 
+					}
+
+					// Adjust end offset if range ends inside or before this node
+					if (endComparison <= 0) {
+						if (range.endContainer === textNode) {
+							end = range.endOffset;
+						}
+					}
+
+					// Clamp offsets again just to be absolutely sure
+					start = Math.max(0, start);
+					end = Math.min(textNode.length, end);
+					if (start < end) {
+						const highlightRange = document.createRange();
+						try {
+							highlightRange.setStart(textNode, start);
+							highlightRange.setEnd(textNode, end);
+							if (!highlightRange.collapsed) {
+								rangesToWrap.push(highlightRange);
+								console.log(`[New Logic] Calculated highlight range: "${highlightRange.toString()}" [${start}-${end}] in node:`, textNode.textContent);
+							} else {
+								console.log(`[New Logic] Skipping collapsed intersection range for node:`, textNode.textContent);
+							}
+						} catch (e) {
+							console.error("[New Logic] Error calculating range for text node:", e, { text: textNode.textContent, start: start, end: end });
+						}
+					} else {
+						console.log(`[New Logic] Skipping node (start >= end): ${start}, ${end}`, textNode.textContent);
+					}
+				}
+			}
+
+			console.log(`Found ${rangesToWrap.length} text segments to highlight.`);
+
+			// Wrap in reverse document order to avoid offset issues
+			for (let i = rangesToWrap.length - 1; i >= 0; i--) {
+				const rangeToWrap = rangesToWrap[i];
+				try {
+					const span = document.createElement('span');
+					span.className = highlightClass;
+					// Check if range is still valid before surrounding
+					if (rangeToWrap.startContainer.isConnected && rangeToWrap.endContainer.isConnected) {
+						rangeToWrap.surroundContents(span);
+						createdSpans.push(span);
+						span.parentNode?.normalize();
+					} else {
+						console.warn("Skipping disconnected range:", rangeToWrap);
+					}
+				} catch (e) {
+					console.error("Error surrounding text node content:", e, {
+						node: rangeToWrap.startContainer.textContent,
+						rangeString: rangeToWrap.toString()
+					});
+				}
+			}
+
+		} catch (e) {
+			console.error("Error during highlighting process:", e);
+		}
+		return createdSpans.reverse(); // Return in approximate creation order
+	}
+
+	// Helper function to remove highlight spans
+	function removeHighlight(spans: HTMLSpanElement[]) {
+		spans.forEach(span => {
+			const parent = span.parentNode;
+			if (parent) {
+				// Move all children of the span out before the span
+				while (span.firstChild) {
+					parent.insertBefore(span.firstChild, span);
+				}
+				// Remove the now-empty span
+				parent.removeChild(span);
+				// Normalize the parent to merge adjacent text nodes
+				parent.normalize();
+			}
+		});
+	}
+
+	// Helper function to get clean editor HTML without command highlights
+	function getCleanedEditorHTML(): string {
+		if (!editorElement) return '';
+
+		// Always clone and clean, regardless of the commandHighlightSpans state array
+		// This is more robust against potential state synchronization issues.
+		console.log("getCleanedEditorHTML: Cloning editor and checking for highlight spans to remove.");
+		const clone = editorElement.cloneNode(true) as HTMLDivElement;
+
+		// Find any highlight spans in the clone using the specific class
+		const clonedSpans = Array.from(clone.querySelectorAll('.command-selection-highlight'));
+
+		if (clonedSpans.length > 0) {
+			console.log(`getCleanedEditorHTML: Found ${clonedSpans.length} highlight spans in clone, removing them.`);
+			// Remove the spans from the clone
+			clonedSpans.forEach(span => {
+				const parent = span.parentNode;
+				if (parent) {
+					while (span.firstChild) {
+						parent.insertBefore(span.firstChild, span);
+					}
+					parent.removeChild(span);
+					parent.normalize(); // Merge adjacent text nodes in the clone
+				}
+			});
+		} else {
+			console.log("getCleanedEditorHTML: No highlight spans found in clone.");
+		}
+
+		// Return the innerHTML of the potentially cleaned clone
+		const html = clone.innerHTML;
+		console.log("getCleanedEditorHTML: Returning processed HTML.");
+		return html;
 	}
 </script>
 

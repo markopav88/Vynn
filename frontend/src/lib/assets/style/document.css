@@ -1284,3 +1284,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	color: var(--bs-light); /* Brighter color on hover */
 	opacity: 1;
 }
+
+/* Command Selection Highlighting */
+.command-selection-highlight {
+	background-color: rgba(0, 123, 255, 0.3);
+}
