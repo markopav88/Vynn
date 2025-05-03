@@ -18,7 +18,8 @@
 		expand_text,
 		shrink_text,
 		rewrite_text_as,
-		fact_check_text
+		fact_check_text,
+		check_spelling
 	} from '$lib/ts/ai';
 
 	import logo from '$lib/assets/logo.png';
@@ -108,6 +109,7 @@
 	// Add state for command selection highlighting
 	let commandHighlightRange: Range | null = null;
 	let commandHighlightSpans: HTMLSpanElement[] = [];
+	let commandHighlightText: string | null = null; // <-- Add this
 
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
@@ -396,7 +398,9 @@
 		if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
 			const range = selection.getRangeAt(0).cloneRange(); // Clone to avoid modification
 			commandHighlightRange = range; // Store the original range
+			commandHighlightText = range.toString(); // <-- Extract text BEFORE highlighting
 			console.log('Storing selection range for command mode:', range);
+			console.log('Storing selected text:', commandHighlightText);
 			// Apply the highlight
 			commandHighlightSpans = applyHighlight(range);
 			console.log(`Applied highlight using ${commandHighlightSpans.length} spans`);
@@ -445,6 +449,7 @@
 			}
 			commandHighlightRange = null; // Clear the stored range
 		}
+		commandHighlightText = null; // <-- Clear the stored text
 		// --- End Remove Highlight ---
 
 		// Return focus to editor
@@ -622,6 +627,34 @@
 		} else if (cmd === 'export') {
 			exportToPDF();
 			return true;
+		} else if (cmd === 'spellcheck') { // Added spellcheck
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) {
+				console.log('Sending selected text for spell check:', textToSend);
+			} else {
+				console.log('Sending full document for spell check');
+			}
+
+			// Call the new check_spelling function
+			check_spelling(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response is the specific no-change indicator
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No spelling issues found.', 'success');
+						} else {
+							showCommandError(result.response)
+						}
+					} else {
+						showCommandError('Spell check failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Spell check error:', error);
+					showCommandError('Spell check encountered an error.');
+				});
+
+			return true; // Indicate command was initiated
 		} else if (cmd === 'grammar') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
 			if (isSelection) {
@@ -630,14 +663,27 @@
 				console.log('Sending full document for grammar check');
 			}
 
-			const result = await check_grammar(textToSend);
-			if (result) {
-				showCommandError(result.response)
-			} else {
-				showCommandError('Grammar check failed.');
-			}
-			// TODO Placeholder: Handle response (e.g., show suggestions)
-			return true;
+			// Don't await - return true immediately, show result later
+			check_grammar(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response is the specific no-change indicator
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							// Use toast instead of command bar for this message
+							showToast('No grammar issues found.', 'success');
+						} else {
+							showCommandError(result.response)
+						}
+					} else {
+						showCommandError('Grammar check failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Grammar check error:', error);
+					showCommandError('Grammar check encountered an error.');
+				});
+
+			return true; // Indicate command was initiated
 		} else if (cmd === 'summarize') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
 			if (isSelection) {
@@ -646,13 +692,24 @@
 				console.log('Sending full document for summarization');
 			}
 
-			const result = await summarize_text(textToSend);
-			if (result) {
-				showCommandError(result.response);
-			} else {
-				showCommandError('Summarization failed.');
-			}
-			// TODO Placeholder: Handle response (e.g., display summary)
+			summarize_text(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response indicates no changes
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No summarization changes suggested.', 'success');
+						} else {
+							showCommandError(result.response);
+						}
+					} else {
+						showCommandError('Summarization failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Summarization error:', error);
+					showCommandError('Summarization encountered an error.');
+				});
+
 			return true;
 		} else if (cmd === 'rephrase') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
@@ -662,13 +719,24 @@
 				console.log('Sending full document for rephrasing');
 			}
 			
-			const result = await rephrase_text(textToSend);
-			if (result) {
-				showCommandError(result.response);
-			} else {
-				showCommandError('Rephrasing failed.');
-			}
-			// TODO Placeholder: Handle response (e.g., replace text or show options)
+			rephrase_text(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response indicates no changes
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No rephrasing changes suggested.', 'success');
+						} else {
+							showCommandError(result.response);
+						}
+					} else {
+						showCommandError('Rephrasing failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Rephrasing error:', error);
+					showCommandError('Rephrasing encountered an error.');
+				});
+			
 			return true;
 		} else if (cmd === 'expand') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
@@ -678,13 +746,24 @@
 				console.log('Sending full document for expansion');
 			}
 			
-			const result = await expand_text(textToSend);
-			if (result) {
-				showCommandError(result.response);
-			} else {
-				showCommandError('Expansion failed.');
-			}
-			// TODO Placeholder: Handle response
+			expand_text(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response indicates no changes
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No expansion changes suggested.', 'success');
+						} else {
+							showCommandError(result.response);
+						}
+					} else {
+						showCommandError('Expansion failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Expansion error:', error);
+					showCommandError('Expansion encountered an error.');
+				});
+			
 			return true;
 		} else if (cmd === 'shrink') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
@@ -694,13 +773,24 @@
 				console.log('Sending full document for shrinking');
 			}
 			
-			const result = await shrink_text(textToSend);
-			if (result) {
-				showCommandError(result.response);
-			} else {
-				showCommandError('Shrinking failed.');
-			}
-			// TODO Placeholder: Handle response
+			shrink_text(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response indicates no changes
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No shrinking changes suggested.', 'success');
+						} else {
+							showCommandError(result.response);
+						}
+					} else {
+						showCommandError('Shrinking failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Shrinking error:', error);
+					showCommandError('Shrinking encountered an error.');
+				});
+			
 			return true;
 		} else if (cmd.startsWith('rewriteas ')) {
 			const targetStyle = cmd.substring('rewriteas '.length).trim();
@@ -715,13 +805,24 @@
 				console.log(`Sending full document for rewrite as ${targetStyle}`);
 			}
 
-			const result = await rewrite_text_as(textToSend, targetStyle);
-			if (result) {
-				showCommandError(result.response);
-			} else {
-				showCommandError('Rewrite failed.');
-			}
-			// TODO Placeholder: Handle response
+			rewrite_text_as(textToSend, targetStyle)
+				.then(result => {
+					if (result) {
+						// Check if the response indicates no changes
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No rewrite changes suggested.', 'success');
+						} else {
+							showCommandError(result.response);
+						}
+					} else {
+						showCommandError('Rewrite failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Rewrite error:', error);
+					showCommandError('Rewrite encountered an error.');
+				});
+
 			return true;
 		} else if (cmd === 'factcheck') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
@@ -731,13 +832,24 @@
 				console.log('Sending full document for fact-checking');
 			}
 			
-			const result = await fact_check_text(textToSend);
-			if (result) {
-				showCommandError(result.response);
-			} else {
-				showCommandError('Fact-check failed.');
-			}
-			// TODO Placeholder: Handle response
+			fact_check_text(textToSend)
+				.then(result => {
+					if (result) {
+						// Check if the response indicates no changes
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							showToast('No fact-check changes suggested.', 'success');
+						} else {
+							showCommandError(result.response);
+						}
+					} else {
+						showCommandError('Fact-check failed.');
+					}
+				})
+				.catch(error => {
+					console.error('Fact-check error:', error);
+					showCommandError('Fact-check encountered an error.');
+				});
+			
 			return true;
 		} else if (cmd.startsWith('%s/')) {
 			// Handle find and replace command
@@ -2029,10 +2141,20 @@
 	
 	// Helper function to get text for AI commands (selected or full document)
 	function getTextForAICommand(): { text: string; isSelection: boolean } {
+		// Prioritize the stored highlight text from command mode entry
+		if (commandHighlightText) {
+			console.log('getTextForAICommand: Using stored commandHighlightText');
+			return { text: commandHighlightText, isSelection: true };
+		}
+
+		// Fallback to current selection (e.g., if command was run without prior selection)
 		const selection = window.getSelection();
 		if (selection && !selection.isCollapsed) {
+			console.log('getTextForAICommand: Using current window selection');
 			return { text: selection.toString(), isSelection: true };
 		} else {
+			// Fallback to full document content
+			console.log('getTextForAICommand: No selection found, using full document content');
 			return { text: getEditorContent(), isSelection: false };
 		}
 	}
@@ -4278,15 +4400,10 @@
 							highlightRange.setEnd(textNode, end);
 							if (!highlightRange.collapsed) {
 								rangesToWrap.push(highlightRange);
-								console.log(`[New Logic] Calculated highlight range: "${highlightRange.toString()}" [${start}-${end}] in node:`, textNode.textContent);
-							} else {
-								console.log(`[New Logic] Skipping collapsed intersection range for node:`, textNode.textContent);
 							}
 						} catch (e) {
-							console.error("[New Logic] Error calculating range for text node:", e, { text: textNode.textContent, start: start, end: end });
+							console.error("Error calculating range for text node:", e, { text: textNode.textContent, start: start, end: end });
 						}
-					} else {
-						console.log(`[New Logic] Skipping node (start >= end): ${start}, ${end}`, textNode.textContent);
 					}
 				}
 			}
@@ -4635,6 +4752,7 @@
 					<li><span class="key">:wq</span> Save and quit</li>
 					<li><span class="key">:export</span> Export to PDF</li>
 					<li><span class="key">:grammar</span> Check grammar</li>
+					<li><span class="key">:spellcheck</span> Check spelling</li>
 					<li><span class="key">:summarize</span> Summarize text</li>
 					<li><span class="key">:rephrase</span> Rephrase text</li>
 					<li><span class="key">:expand</span> Expand text</li>

@@ -102,29 +102,97 @@ pub fn construct_generic_prompt(
 }
 
 pub fn construct_grammar_check_prompt(text: &str) -> String {
-    format!("Please correct the grammar and spelling of the following text, only returning the corrected text without any explanations or introductory phrase:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+    format!(
+        "Please correct the grammar and spelling of the following text. Only return the corrected text without any explanations or introductory phrase.\n\n\
+        Text to Correct:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you have no recommended changes or are unable to fix the grammar/spelling for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the corrected text.",
+        text
+    )
+}
+
+pub fn construct_spell_check_prompt(text: &str) -> String {
+    format!(
+        "Please correct only the spelling mistakes in the following text, keeping the original grammar and sentence structure intact. Only return the corrected text without any explanations or introductory phrase.\n\n\
+        Text to Correct:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you find no spelling mistakes or are unable to correct spelling for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the corrected text.",
+        text
+    )
 }
 
 pub fn construct_summarize_prompt(text: &str) -> String {
-    format!("Please provide a concise summary of the following text:\n\n{}", text)
+    format!(
+        "Please provide a concise summary of the following text. Only return the summary without any explanations or introductory phrase.\n\n\
+        Text to Summarize:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you are unable to summarize the text for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the summary.",
+        text
+    )
 }
 
 pub fn construct_rephrase_prompt(text: &str) -> String {
-    format!("Please rephrase the following text to improve clarity and flow, only returning the rephrased text without any explanations or introductory phrases:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+    format!(
+        "Please rephrase the following text to improve clarity and flow. Only return the rephrased text without any explanations or introductory phrases.\n\n\
+        Text to Rephrase:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you have no recommended changes or are unable to rephrase for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the rephrased text.",
+        text
+    )
 }
 
 pub fn construct_expand_prompt(text: &str) -> String {
-    format!("Please expand on the following text, adding more detail and explanation where appropriate, only returning the expanded text without any explanations or introductory phrases:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+    format!(
+        "Please expand on the following text, adding more detail and explanation where appropriate. Only return the expanded text without any explanations or introductory phrases.\n\n\
+        Text to Expand:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you have no recommended changes or are unable to expand for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the expanded text.",
+        text
+    )
 }
 
 pub fn construct_shrink_prompt(text: &str) -> String {
-    format!("Please shrink the following text, making it more concise while retaining the core meaning, only returning the shrinked text without any explanations or introductory phrases:\n\n{} IF YOU HAVE NO RECOMMENDED CHANGES SIMPLY return 'NULL'", text)
+    format!(
+        "Please shrink the following text, making it more concise while retaining the core meaning. Only return the shrinked text without any explanations or introductory phrases.\n\n\
+        Text to Shrink:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you have no recommended changes or are unable to shrink for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the shrinked text.",
+        text
+    )
 }
 
 pub fn construct_rewrite_prompt(text: &str, style: &str) -> String {
-    format!("Please rewrite the following text in the style of '{}', only returning the rewritten text without any explanations or introductory phrases:\n\n{}", style, text)
+    format!(
+        "Please rewrite the following text in the style of '{}'. Only return the rewritten text without any explanations or introductory phrases.\n\n\
+        Text to Rewrite:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you are unable to rewrite the text for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY the rewritten text.",
+        style, text
+    )
 }
 
 pub fn construct_fact_check_prompt(text: &str) -> String {
-    format!("Please critically evaluate the factual claims in the following text based on your knowledge. Identify any potential inaccuracies or statements that might require verification. Respond concisely:\n\n{}", text)
+    format!(
+        "Please critically evaluate the factual claims in the following text based on your knowledge. Identify any potential inaccuracies or statements that might require verification. Respond concisely.\n\n\
+        Text to Fact-Check:\n\
+        ```\n\
+        {}\n\
+        ```\n\n\
+        If you are unable to fact-check the text for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY your concise evaluation.",
+        text
+    )
 }

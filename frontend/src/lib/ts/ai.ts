@@ -326,3 +326,28 @@ export async function fact_check_text(text: string): Promise<AiCommandResponse |
 		return null;
 	}
 }
+
+/**
+ * Function to check spelling using the backend API.
+ */
+export async function check_spelling(text: string): Promise<AiCommandResponse | null> {
+	console.log('AI Request: Check spelling for text:', text.substring(0, 100) + '...');
+	const payload: AiTextPayload = { content: text };
+	try {
+		const response = await fetch('http://localhost:3001/api/writing-assistant/spellcheck', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+			credentials: 'include'
+		});
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+		const result: AiCommandResponse = await response.json();
+		console.log('Spell Check Response:', result.response);
+		return result;
+	} catch (error) {
+		console.error('Error checking spelling:', error);
+		return null;
+	}
+}

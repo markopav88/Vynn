@@ -520,6 +520,26 @@ pub async fn api_fact_check(
     Ok(Json(json!({ "response": response })))
 }
 
+/// POST handler for spell checking some text or a document
+/// Accessible via: POST /api/writing-assistant/spellcheck
+/// Test: NULL
+/// Frontend: NULL
+pub async fn api_spell_check(
+    cookies: Cookies,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - api_spell_check", "HANDLER");
+    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    let prompt = prompt::construct_spell_check_prompt(&payload.content);
+    
+    let query_model = QueryModel::new()?;
+    let response = query_model.query_model(&prompt).await?;
+
+    Ok(Json(json!({ "response": response })))
+}
+
 /// Generate routes for the writing assistant controller
 pub fn writing_assistant_routes() -> Router {
     Router::new()
@@ -529,6 +549,7 @@ pub fn writing_assistant_routes() -> Router {
         .route("/:id", delete(api_delete_writing_session))
         .route("/:id/message", post(api_send_writing_message))
         .route("/grammer", post(api_check_grammer))
+        .route("/spellcheck", post(api_spell_check))
         .route("/summarize", post(api_summarize))
         .route("/rephrase", post(api_rephrase))
         .route("/expand", post(api_expand))
