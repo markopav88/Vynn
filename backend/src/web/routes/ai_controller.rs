@@ -28,7 +28,7 @@ use chrono::Utc;
 
 use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
-    CreateSessionPayload, SendMessagePayload, MessageRole
+    CreateSessionPayload, SendMessagePayload, MessageRole, SelectedTextContext
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
@@ -377,15 +377,15 @@ pub async fn api_delete_writing_session(
     })))
 }
 
-/// GET handler for retrieving writing suggestions for a document.
-/// Accessible via: GET /api/writing-assistant/:id/suggestions
+/// POST handler for suggesting grammer changes for the document or selected text
+/// Accessible via: POST /api/writing-assistant/:id/grammer
 /// Test: NULL
 /// Frontend: NULL
-/// NOT IMPLEMENTED: Will provide AI-generated suggestions for improving the document.
-pub async fn api_get_document_suggestions(
-    _cookies: Cookies,
-    _path: Path<i32>,
-    _pool: Extension<PgPool>,
+pub async fn api_check_grammer(
+    cookies: Cookies,
+    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
     // This is a placeholder for future implementation
     Ok(Json(json!({
@@ -394,15 +394,83 @@ pub async fn api_get_document_suggestions(
     })))
 }
 
-/// POST handler for analyzing a document for writing issues.
-/// Accessible via: POST /api/writing-assistant/analyze
+/// POST handler for summarizing some text or a document
+/// Accessible via: POST /api/writing-assistant/:id/summarize
 /// Test: NULL
 /// Frontend: NULL
-/// NOT IMPLEMENTED: Will analyze a document for grammar, style, and other writing issues.
-pub async fn api_analyze_document(
-    _cookies: Cookies,
-    _pool: Extension<PgPool>,
-    _payload: Json<Value>,
+pub async fn api_summarize(
+    cookies: Cookies,
+    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>
+) -> Result<Json<Value>> {
+    // This is a placeholder for future implementation
+    Ok(Json(json!({
+        "status": "error",
+        "message": "This feature is not implemented yet"
+    })))
+}
+
+/// POST handler for rephrasing some text or a document
+/// Accessible via: POST /api/writing-assistant/:id/rephrase
+/// Test: NULL
+/// Frontend: NULL
+pub async fn api_rephrase(
+    cookies: Cookies,
+    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>
+) -> Result<Json<Value>> {
+    // This is a placeholder for future implementation
+    Ok(Json(json!({
+        "status": "error",
+        "message": "This feature is not implemented yet"
+    })))
+}
+
+/// POST handler for expanding some text or a document
+/// Accessible via: POST /api/writing-assistant/:id/expand
+/// Test: NULL
+/// Frontend: NULL
+pub async fn api_expand(
+    cookies: Cookies,
+    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>
+) -> Result<Json<Value>> {
+    // This is a placeholder for future implementation
+    Ok(Json(json!({
+        "status": "error",
+        "message": "This feature is not implemented yet"
+    })))
+}
+
+/// POST handler for shrinking some text or a document
+/// Accessible via: POST /api/writing-assistant/:id/shrink
+/// Test: NULL
+/// Frontend: NULL
+pub async fn api_shrink(
+    cookies: Cookies,
+    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>
+) -> Result<Json<Value>> {
+    // This is a placeholder for future implementation
+    Ok(Json(json!({
+        "status": "error",
+        "message": "This feature is not implemented yet"
+    })))
+}
+
+/// POST handler for rewriting some text or a document in a new style
+/// Accessible via: POST /api/writing-assistant/:id/rewrite
+/// Test: NULL
+/// Frontend: NULL
+pub async fn api_rewrite(
+    cookies: Cookies,
+    path: Path<i32>,
+    pool: Extension<PgPool>,
+    Json(payload): Json<SelectedTextContext>,
 ) -> Result<Json<Value>> {
     // This is a placeholder for future implementation
     Ok(Json(json!({
@@ -417,10 +485,12 @@ pub fn writing_assistant_routes() -> Router {
         .route("/", get(api_get_all_writing_sessions))
         .route("/", post(api_create_writing_session))
         .route("/:id", get(api_get_writing_session))
-        .route("/:id/message", post(api_send_writing_message))
         .route("/:id", delete(api_delete_writing_session))
-        // The following routes are placeholders for future implementation
-        // .route("/:id/suggestions", get(api_get_document_suggestions))
-        // .route("/analyze", post(api_analyze_document))
-        // .route("/:id/summary", get(api_get_session_summary))
+        .route("/:id/message", post(api_send_writing_message))
+        .route("/:id/grammer", post(api_check_grammer))
+        .route("/:id/summarize", post(api_summarize))
+        .route("/:id/rephrease", post(api_rephrase))
+        .route("/:id/expand", post(api_expand))
+        .route("/:id/shrink", post(api_shrink))
+        .route("/:id/rewrite", post(api_rewrite))
 }
