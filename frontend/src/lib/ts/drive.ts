@@ -18,6 +18,8 @@
 */
 import { Document } from './document';
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
 // Define and export the Project interface
 export interface Project {
 	id: string;
@@ -36,7 +38,7 @@ export interface Project {
  * Test: test_documents.rs/test_create_document()
  */
 export async function create_document(document_payload: Document): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/document/`;
+	const apiUrl = `${API_BASE_URL}/api/document/`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -68,7 +70,7 @@ export async function create_document(document_payload: Document): Promise<Boole
  * Test: test_documents.rs/test_get_all_documents()
  */
 export async function get_all_documents(): Promise<Document[] | null> {
-	const apiUrl = `http://localhost:3001/api/document/`;
+	const apiUrl = `${API_BASE_URL}/api/document/`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -95,7 +97,7 @@ export async function get_all_documents(): Promise<Document[] | null> {
  * Test: test_documents.rs/test_delete_document()
  */
 export async function delete_document(document_id: number): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/document/${document_id}`;
+	const apiUrl = `${API_BASE_URL}/api/document/${document_id}`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -123,7 +125,7 @@ export async function delete_document(document_id: number): Promise<Boolean> {
  * Test: test_projects.rs/test_create_project()
  */
 export async function create_project(name: string): Promise<Project | null> {
-	const apiUrl = `http://localhost:3001/api/project`;
+	const apiUrl = `${API_BASE_URL}/api/project`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -154,7 +156,7 @@ export async function create_project(name: string): Promise<Project | null> {
  * Test: test_projects.rs/test_get_all_projects()
  */
 export async function get_all_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project`;
+	const apiUrl = `${API_BASE_URL}/api/project`;
 
 	try {
 		console.log('Fetching projects from:', apiUrl);
@@ -193,7 +195,7 @@ export async function get_all_projects(): Promise<Project[] | null> {
  * Test: test_projects.rs/test_update_project()
  */
 export async function update_project(project_id: number, name: string): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -225,8 +227,8 @@ export async function update_project(project_id: number, name: string): Promise<
 export async function delete_project(project_id: number, force: boolean = false): Promise<boolean> {
 	try {
 		const apiUrl = force
-			? `http://localhost:3001/api/project/${project_id}/force`
-			: `http://localhost:3001/api/project/${project_id}`;
+			? `${API_BASE_URL}/api/project/${project_id}/force`
+			: `${API_BASE_URL}/api/project/${project_id}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -252,7 +254,7 @@ export async function delete_project(project_id: number, force: boolean = false)
  * Test: test_projects.rs/test_force_delete_project()
  */
 export async function force_delete_project(project_id: number): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}/force`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -278,7 +280,7 @@ export async function force_delete_project(project_id: number): Promise<Boolean>
  * Test: TODO: test_projects.rs/test_toggle_star_project() - Test missing
  */
 export async function toggle_star_project(project_id: number): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}/star`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}/star`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -304,7 +306,7 @@ export async function toggle_star_project(project_id: number): Promise<Boolean> 
  * Test: TODO: test_projects.rs/test_trash_project() - Test missing
  */
 export async function trash_project(project_id: number): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}/trash`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}/trash`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -330,7 +332,7 @@ export async function trash_project(project_id: number): Promise<Boolean> {
  * Test: TODO: test_projects.rs/test_restore_project() - Test missing
  */
 export async function restore_project(project_id: number): Promise<Boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}/restore`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}/restore`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -356,7 +358,7 @@ export async function restore_project(project_id: number): Promise<Boolean> {
  * Test: TODO: test_projects.rs/test_get_starred_projects() - Test missing
  */
 export async function get_starred_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project/starred`;
+	const apiUrl = `${API_BASE_URL}/api/project/starred`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -382,7 +384,7 @@ export async function get_starred_projects(): Promise<Project[] | null> {
  * Test: TODO: test_projects.rs/test_get_trashed_projects() - Test missing
  */
 export async function get_trashed_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project/trash`;
+	const apiUrl = `${API_BASE_URL}/api/project/trash`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -408,7 +410,7 @@ export async function get_trashed_projects(): Promise<Project[] | null> {
  * Test: TODO: test_projects.rs/test_get_shared_projects() - Test missing
  */
 export async function get_shared_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project/shared`;
+	const apiUrl = `${API_BASE_URL}/api/project/shared`;
 
 	try {
 		const response = await fetch(apiUrl, {

@@ -9,6 +9,7 @@ pub struct User {
     pub id: i32,
     pub name: String,
     pub email: String,
+    pub ai_credits: Option<i32>,
 }
 
 // Payload for creating a new user.

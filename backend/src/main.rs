@@ -17,6 +17,8 @@ use http::{Method, Uri, Request};
 use log::log_request;
 use uuid::Uuid;
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port
+use std::env; // Import env module
+use std::str::FromStr; // Import FromStr trait for SocketAddr parsing
 use tower_cookies::{CookieManagerLayer, Cookies};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -30,6 +32,10 @@ use crate::db::pool::create_pool; // Import the connection pool
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Load environment variables from .env file
     dotenv().ok();
+
+    // Read environment variables
+    let frontend_url = env::var("FRONTEND_URL").expect("FRONTEND_URL must be set");
+    let bind_address = env::var("BIND_ADDRESS").expect("BIND_ADDRESS must be set");
 
     /*
     / Creating the Pool using SQLx
@@ -46,7 +52,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We allow all origins, methods, and headers currently, but this should be changed later for security.
     */
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        .allow_origin(frontend_url.parse::<HeaderValue>().expect("Invalid FRONTEND_URL format"))
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([
             http::header::CONTENT_TYPE,
@@ -90,8 +96,8 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We use the 0.0.0.0 address to bind the router to localhost
     / We will bind to port 3001 for now
     */
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
-    println!("Server starting on http://localhost:3001");
+    let addr = SocketAddr::from_str(&bind_address).expect("Invalid BIND_ADDRESS format");
+    println!("Server starting on http://{}", frontend_url); // Log the configured bind address
 
     /*
     / Serve the router ie Start the server

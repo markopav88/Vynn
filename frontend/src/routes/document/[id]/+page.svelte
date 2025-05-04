@@ -2,7 +2,7 @@
 	import { onMount, onDestroy, afterUpdate } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { fade } from 'svelte/transition';
+	import { fade, fly } from 'svelte/transition';
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
 	import Toast from '$lib/components/Toast.svelte';
@@ -99,7 +99,9 @@
 	// User profile data
 	let userId: number | null = null;
 	let userProfileImage = profileDefault;
-
+	let aiCredits: number | null = null; // State for AI credits
+	let showInsufficientCreditsPopup = false; // State for popup visibility
+	let insufficientCreditsTimeoutId: ReturnType<typeof setTimeout> | null = null; // Store timeout ID
 	let showCommandSheet = false;
 	let chatAssistantComponent: ChatAssistant;
 	let isChatOpen = false; // Declare state variable for chat visibility
@@ -575,6 +577,19 @@
 		toasts = toasts.filter((_, i) => i !== index);
 	}
 
+	// Function to show the popup and set/clear the timeout
+	function triggerInsufficientCreditsPopup() {
+		// Clear any existing timeout before setting a new one
+		if (insufficientCreditsTimeoutId) {
+			clearTimeout(insufficientCreditsTimeoutId);
+		}
+		showInsufficientCreditsPopup = true;
+		insufficientCreditsTimeoutId = setTimeout(() => {
+			showInsufficientCreditsPopup = false;
+			insufficientCreditsTimeoutId = null; // Clear the stored ID
+		}, 10000); // 10 seconds
+	}
+
 	// Function to handle colon commands - make async
 	async function handleColonCommand(command: string) {
 		// Simple command handling for now
@@ -586,59 +601,36 @@
 		} else if (cmd === 'w') {
 			// Save the document
 			if (documentData && editorElement) {
-				// Get the cleaned content using the helper function
 				const contentToSave = getCleanedEditorHTML();
 				documentData.content = contentToSave;
-
 				update_document(documentData)
-					.then(() => {
-						showToast('Document saved successfully', 'success');
-					})
-					.catch((error) => {
-						console.error('Error saving document:', error);
-						showToast('Failed to save document', 'error');
-					});
-				// No finally block needed here for highlights
-				return true; // Indicate command was handled
+					.then(() => { showToast('Document saved successfully', 'success'); })
+					.catch((error) => { console.error('Error saving document:', error); showToast('Failed to save document', 'error'); });
+				return true;
 			}
-			return false; // Indicate failure if data missing
+			return false;
 		} else if (cmd === 'wq') {
 			// Save and quit
 			if (documentData && editorElement) {
-				// Get the cleaned content using the helper function
 				const contentToSave = getCleanedEditorHTML();
 				documentData.content = contentToSave;
-
-				// Attempt to save, then quit if successful
 				update_document(documentData)
-					.then(() => {
-						showToast('Document saved successfully', 'success');
-						goto('/drive'); // Redirect after successful save
-					})
-					.catch((error) => {
-						console.error('Error saving document:', error);
-						showToast('Failed to save document', 'error');
-						// Don't quit if save failed
-					});
-				return true; // Indicate command was handled (attempted save)
+					.then(() => { showToast('Document saved successfully', 'success'); goto('/drive'); })
+					.catch((error) => { console.error('Error saving document:', error); showToast('Failed to save document', 'error'); });
+				return true;
 			}
-			return false; // Indicate failure if data missing
+			return false;
 		} else if (cmd === 'export') {
 			exportToPDF();
 			return true;
-		} else if (cmd === 'spellcheck') { // Added spellcheck
+		} else if (cmd === 'spellcheck') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for spell check:', textToSend);
-			} else {
-				console.log('Sending full document for spell check');
-			}
-
-			// Call the new check_spelling function
+			if (isSelection) { console.log('Sending selected text for spell check:', textToSend); } else { console.log('Sending full document for spell check'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			check_spelling(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response is the specific no-change indicator
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No spelling issues found.', 'success');
 						} else {
@@ -647,28 +639,18 @@
 					} else {
 						showCommandError('Spell check failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Spell check error:', error);
-					showCommandError('Spell check encountered an error.');
-				});
-
-			return true; // Indicate command was initiated
+				 })
+				.catch(error => { console.error('Spell check error:', error); showCommandError('Spell check encountered an error.'); checkErrorForInsufficientCredits(error); });
+			return true;
 		} else if (cmd === 'grammar') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for grammar check:', textToSend);
-			} else {
-				console.log('Sending full document for grammar check');
-			}
-
-			// Don't await - return true immediately, show result later
+			if (isSelection) { console.log('Sending selected text for grammar check:', textToSend); } else { console.log('Sending full document for grammar check'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			check_grammar(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response is the specific no-change indicator
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							// Use toast instead of command bar for this message
 							showToast('No grammar issues found.', 'success');
 						} else {
 							showCommandError(result.response)
@@ -676,25 +658,17 @@
 					} else {
 						showCommandError('Grammar check failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Grammar check error:', error);
-					showCommandError('Grammar check encountered an error.');
-				});
-
-			return true; // Indicate command was initiated
+				 })
+				.catch(error => { console.error('Grammar check error:', error); showCommandError('Grammar check encountered an error.'); checkErrorForInsufficientCredits(error); });
+			return true;
 		} else if (cmd === 'summarize') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for summarization:', textToSend);
-			} else {
-				console.log('Sending full document for summarization');
-			}
-
+			if (isSelection) { console.log('Sending selected text for summarization:', textToSend); } else { console.log('Sending full document for summarization'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			summarize_text(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response indicates no changes
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No summarization changes suggested.', 'success');
 						} else {
@@ -703,25 +677,17 @@
 					} else {
 						showCommandError('Summarization failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Summarization error:', error);
-					showCommandError('Summarization encountered an error.');
-				});
-
+				 })
+				.catch(error => { console.error('Summarization error:', error); showCommandError('Summarization encountered an error.'); checkErrorForInsufficientCredits(error); });
 			return true;
 		} else if (cmd === 'rephrase') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for rephrasing:', textToSend);
-			} else {
-				console.log('Sending full document for rephrasing');
-			}
-			
+			if (isSelection) { console.log('Sending selected text for rephrasing:', textToSend); } else { console.log('Sending full document for rephrasing'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			rephrase_text(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response indicates no changes
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No rephrasing changes suggested.', 'success');
 						} else {
@@ -730,25 +696,17 @@
 					} else {
 						showCommandError('Rephrasing failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Rephrasing error:', error);
-					showCommandError('Rephrasing encountered an error.');
-				});
-			
+				 })
+				.catch(error => { console.error('Rephrasing error:', error); showCommandError('Rephrasing encountered an error.'); checkErrorForInsufficientCredits(error); });
 			return true;
 		} else if (cmd === 'expand') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for expansion:', textToSend);
-			} else {
-				console.log('Sending full document for expansion');
-			}
-			
+			if (isSelection) { console.log('Sending selected text for expansion:', textToSend); } else { console.log('Sending full document for expansion'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			expand_text(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response indicates no changes
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No expansion changes suggested.', 'success');
 						} else {
@@ -757,25 +715,17 @@
 					} else {
 						showCommandError('Expansion failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Expansion error:', error);
-					showCommandError('Expansion encountered an error.');
-				});
-			
+				 })
+				.catch(error => { console.error('Expansion error:', error); showCommandError('Expansion encountered an error.'); checkErrorForInsufficientCredits(error); });
 			return true;
 		} else if (cmd === 'shrink') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for shrinking:', textToSend);
-			} else {
-				console.log('Sending full document for shrinking');
-			}
-			
+			if (isSelection) { console.log('Sending selected text for shrinking:', textToSend); } else { console.log('Sending full document for shrinking'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			shrink_text(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response indicates no changes
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No shrinking changes suggested.', 'success');
 						} else {
@@ -784,30 +734,19 @@
 					} else {
 						showCommandError('Shrinking failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Shrinking error:', error);
-					showCommandError('Shrinking encountered an error.');
-				});
-			
+				 })
+				.catch(error => { console.error('Shrinking error:', error); showCommandError('Shrinking encountered an error.'); checkErrorForInsufficientCredits(error); });
 			return true;
 		} else if (cmd.startsWith('rewriteas ')) {
 			const targetStyle = cmd.substring('rewriteas '.length).trim();
-			if (!targetStyle) {
-				showCommandError('Rewrite style missing. Use :rewriteas [style]');
-				return false;
-			}
+			if (!targetStyle) { showCommandError('Rewrite style missing. Use :rewriteas [style]'); return false; }
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log(`Sending selected text for rewrite as ${targetStyle}:`, textToSend);
-			} else {
-				console.log(`Sending full document for rewrite as ${targetStyle}`);
-			}
-
+			if (isSelection) { console.log(`Sending selected text for rewrite as ${targetStyle}:`, textToSend); } else { console.log(`Sending full document for rewrite as ${targetStyle}`); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			rewrite_text_as(textToSend, targetStyle)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response indicates no changes
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No rewrite changes suggested.', 'success');
 						} else {
@@ -816,25 +755,17 @@
 					} else {
 						showCommandError('Rewrite failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Rewrite error:', error);
-					showCommandError('Rewrite encountered an error.');
-				});
-
+				 })
+				.catch(error => { console.error('Rewrite error:', error); showCommandError('Rewrite encountered an error.'); checkErrorForInsufficientCredits(error); });
 			return true;
 		} else if (cmd === 'factcheck') {
 			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) {
-				console.log('Sending selected text for fact-checking:', textToSend);
-			} else {
-				console.log('Sending full document for fact-checking');
-			}
-			
+			if (isSelection) { console.log('Sending selected text for fact-checking:', textToSend); } else { console.log('Sending full document for fact-checking'); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+			decrementAiCredits();
 			fact_check_text(textToSend)
-				.then(result => {
+				.then(result => { 
 					if (result) {
-						// Check if the response indicates no changes
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
 							showToast('No fact-check changes suggested.', 'success');
 						} else {
@@ -843,12 +774,8 @@
 					} else {
 						showCommandError('Fact-check failed.');
 					}
-				})
-				.catch(error => {
-					console.error('Fact-check error:', error);
-					showCommandError('Fact-check encountered an error.');
-				});
-			
+				 })
+				.catch(error => { console.error('Fact-check error:', error); showCommandError('Fact-check encountered an error.'); checkErrorForInsufficientCredits(error); });
 			return true;
 		} else if (cmd.startsWith('%s/')) {
 			// Handle find and replace command
@@ -1939,6 +1866,8 @@
 			const user = await get_current_user();
 			if (user && user.id) {
 				userId = user.id;
+				aiCredits = user.ai_credits ?? 0; // Set AI credits, default to 0 if undefined/null
+				console.log(`Loaded AI Credits: ${aiCredits}`);
 				
 				// Try to load profile image with timestamp to prevent caching
 				const timestamp = new Date().getTime();
@@ -2650,10 +2579,9 @@
 			event.preventDefault();
 			
 			if (commandPrefix === ':') {
-				const success = await handleColonCommand(commandInput); // <-- Add await
-				if (success) {
-					exitCommandMode();
-				}
+				// Handle colon command, but always exit mode afterwards
+				await handleColonCommand(commandInput); // Wait for potential async ops within
+				exitCommandMode(); // Exit regardless of command success/failure
 			} else if (commandPrefix === '/' || commandPrefix === '?') {
 				// Set the search direction based on the command
 				const direction = commandPrefix === '/' ? 'forward' : 'backward';
@@ -4488,6 +4416,44 @@
 		console.log("getCleanedEditorHTML: Returning processed HTML.");
 		return html;
 	}
+
+	// Function to optimistically decrement AI credits
+	function decrementAiCredits() {
+		if (aiCredits !== null && aiCredits > 0) {
+			aiCredits--;
+			console.log(`Optimistically decremented AI credits. Remaining: ${aiCredits}`);
+		} else {
+			console.log("Cannot decrement AI credits (null or zero).");
+		}
+	}
+	// Helper to check error response for insufficient credits
+	async function checkErrorForInsufficientCredits(error: any) {
+		try {
+			// Attempt to parse error response if it looks like a Fetch Response error
+			if (error && typeof error.json === 'function') {
+				const errorBody = await error.json();
+				if (errorBody?.error?.type === 'INSUFFICIENT_AI_CREDITS') {
+					console.log('Insufficient credits error detected from backend.');
+					triggerInsufficientCreditsPopup(); // Use the helper function
+				}
+			}
+		} catch (parseError) {
+			console.error('Could not parse error response body:', parseError);
+		}
+	}
+
+	// Connect decrement function to Chat Assistant
+	// This assumes ChatAssistant has an `on:sendMessage` event or similar
+	// If not, you'll need to pass `decrementAiCredits` as a prop.
+	function handleChatMessageSent() {
+		if (aiCredits !== null && aiCredits <= 0) { 
+			triggerInsufficientCreditsPopup(); // Use helper
+			return; 
+		}
+		decrementAiCredits();
+		// Note: Still need error handling FROM ChatAssistant component
+		// to call checkErrorForInsufficientCredits if the backend rejects the message.
+	}
 </script>
 
 <svelte:head>
@@ -4644,6 +4610,32 @@
 		</div>
 
 		<div class="cursor-position">
+			<!-- AI Credit Indicator -->
+			<div class="credit-indicator-container">
+				<span class="credit-indicator" title="AI Credits Remaining">
+					<i class="bi bi-coin"></i>
+					{#if aiCredits !== null}
+						<span class="credit-count" class:zero={aiCredits <= 0}>{aiCredits}</span>
+					{:else}
+						<span class="credit-count">--</span> <!-- Loading state -->
+					{/if}
+				</span>
+				{#if showInsufficientCreditsPopup}
+					<!-- Use a button for accessibility and apply separate transitions -->
+					<button 
+						type="button" 
+						class="insufficient-credits-popup" 
+						on:click={() => goto('/pricing')} 
+						aria-live="assertive"
+						in:fly={{ y: 10, duration: 300 }} 
+						out:fly={{ y: 10, duration: 300 }} 
+					>
+						<span class="popup-line-1">Insufficient Credits</span>
+						<span class="popup-line-2">See pricing</span>
+					</button>
+				{/if}
+			</div>
+
 			<button
 				class="commands-toggle"
 				on:click={commandFunctions.toggleChatAssistant}
@@ -4655,7 +4647,7 @@
 			</button>
 			<button
 				class="commands-toggle"
-						on:click={commandFunctions.toggleCommandSheet}
+				on:click={commandFunctions.toggleCommandSheet}
 				title="Toggle Commands Reference"
 				aria-label="Toggle commands reference"
 			>
@@ -4814,7 +4806,65 @@
 				bind:isOpen={isChatOpen}
 				on:close={() => (isChatOpen = false)}
 				bind:messageInput={chatInputElementRef}
+				on:sendMessage={handleChatMessageSent}
 			/>
 		</div>
 	{/if}
 </div>
+
+<style>
+/* ... existing styles ... */
+
+/* Styles for the credit indicator */
+.credit-indicator-container {
+	position: relative; /* Needed for absolute positioning of popup */
+	display: inline-block; /* Keep it inline but allow positioning context */
+}
+
+.credit-indicator {
+	/* ... existing styles ... */
+	cursor: default; /* Indicate it's not clickable itself */
+}
+
+.credit-count.zero {
+	color: #e53e3e; /* Red color for zero credits */
+	font-weight: bold;
+}
+
+.insufficient-credits-popup {
+	position: absolute;
+	bottom: 100%; /* Position above the indicator */
+	left: 50%;
+	transform: translateX(-50%) translateY(-5px); /* Center horizontally, add small gap */
+	background-color: #e53e3e; /* Red background */
+	color: white;
+	padding: 6px 12px; /* Slightly increased padding */
+	border-radius: 4px;
+	font-size: 0.8em;
+	white-space: nowrap;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	cursor: pointer; /* Indicate it's clickable */
+	z-index: 10; /* Ensure it appears above other elements */
+	/* REMOVE CSS Animation */
+	/* animation: fadeInPopup 0.3s ease-out; */ 
+	text-align: center; /* Center text */
+	border: none; /* Remove default button border */
+	outline: none; /* Remove default button outline */
+}
+
+/* Style the lines inside the popup */
+.insufficient-credits-popup span {
+	display: block; /* Each span on its own line */
+}
+
+.popup-line-1 {
+	font-weight: bold; /* Make the main message bold */
+}
+
+.popup-line-2 {
+	font-size: 0.9em; /* Make the second line slightly smaller */
+	opacity: 0.9; /* Slightly less emphasis */
+	margin-top: 2px; /* Add a small gap */
+}
+
+</style>

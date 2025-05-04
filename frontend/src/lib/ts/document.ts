@@ -28,6 +28,8 @@
 /
 */
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
 export class Document {
 	id: number;
 	name: string;
@@ -82,7 +84,7 @@ export class DocumentUser {
 export async function get_document(id: number): Promise<Document | null> {
 	try {
 		// Use the original endpoint that was working before
-		const apiUrl = `http://localhost:3001/api/document/${id}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${id}`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -109,7 +111,7 @@ export async function get_document(id: number): Promise<Document | null> {
  */
 export async function update_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}`;
 
 		const payload = {
 			name: document.name,
@@ -173,7 +175,7 @@ export async function saveDocument(document: Document): Promise<boolean | null> 
  */
 export async function get_document_permissions(document_id: number): Promise<DocumentUser[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document_id}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document_id}/permissions`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -198,7 +200,7 @@ export async function get_document_permissions(document_id: number): Promise<Doc
  */
 export async function get_all_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document`;
+		const apiUrl = `${API_BASE_URL}/api/document`;
 
 		console.log('Fetching documents from:', apiUrl);
 
@@ -235,7 +237,7 @@ export async function get_all_documents(): Promise<Document[] | null> {
  */
 export async function create_document(name: string, content: string): Promise<Document | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document`;
+		const apiUrl = `${API_BASE_URL}/api/document`;
 		const now = new Date().toISOString().replace('Z', '');
 
 		const payload = {
@@ -273,7 +275,7 @@ export async function create_document(name: string, content: string): Promise<Do
  */
 export async function delete_document(documentId: number): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -294,7 +296,7 @@ export async function delete_document(documentId: number): Promise<boolean> {
  */
 export async function add_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/permissions`;
 
 		const payload = {
 			user_id: userId,
@@ -324,7 +326,7 @@ export async function add_document_permissions(documentId: number, userId: numbe
  */
 export async function update_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/permissions`;
 
 		const payload = {
 			user_id: userId,
@@ -359,7 +361,7 @@ export async function update_document_permissions(documentId: number, userId: nu
  */
 export async function delete_document_permissions(documentId: number, userId: number): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions/${userId}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/permissions/${userId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -390,7 +392,7 @@ export async function get_project_from_document(
 	documentId: number
 ): Promise<{ project_id: number; project_name: string } | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/project`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/project`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -417,7 +419,7 @@ export async function get_project_from_document(
  */
 export async function toggle_star_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}/star`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}/star`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -438,7 +440,7 @@ export async function toggle_star_document(document: Document): Promise<boolean>
  */
 export async function trash_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}/trash`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}/trash`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -459,7 +461,7 @@ export async function trash_document(document: Document): Promise<boolean> {
  */
 export async function restore_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}/restore`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}/restore`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -480,7 +482,7 @@ export async function restore_document(document: Document): Promise<boolean> {
  */
 export async function get_starred_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/starred`;
+		const apiUrl = `${API_BASE_URL}/api/document/starred`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -505,7 +507,7 @@ export async function get_starred_documents(): Promise<Document[] | null> {
  */
 export async function get_trashed_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/trash`;
+		const apiUrl = `${API_BASE_URL}/api/document/trash`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -529,7 +531,7 @@ export async function get_trashed_documents(): Promise<Document[] | null> {
  * Test: TODO: test_documents.rs/test_get_shared_documents() - Test missing
  */
 export async function get_shared_documents(): Promise<Document[] | null> {
-	const apiUrl = `http://localhost:3001/api/document/shared`;
+	const apiUrl = `${API_BASE_URL}/api/document/shared`;
 
 	try {
 		const response = await fetch(apiUrl, {

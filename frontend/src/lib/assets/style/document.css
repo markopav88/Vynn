@@ -1289,3 +1289,30 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .command-selection-highlight {
 	background-color: rgba(0, 123, 255, 0.3);
 }
+
+
+.credit-indicator {
+	display: inline-flex; /* Use inline-flex to keep it on the same line */
+	align-items: center;
+	gap: 0.3em; /* Space between icon and number */
+	padding: 0.2em 0.5em;
+	/* background-color: rgba(255, 255, 255, 0.1); Optional background */
+	/* border-radius: 4px; */
+	color: var(--color-text-secondary); /* Match other status bar text */
+	font-size: 0.9em;
+}
+
+.credit-indicator i {
+	font-size: 1.1em; /* Slightly larger icon */
+	color: #f0b90b; /* Gold-ish color for coin */
+}
+
+.credit-count {
+	font-weight: 500;
+}
+
+/* Ensure status bar items align nicely */
+.cursor-position {
+	display: flex;
+	align-items: center;
+}

@@ -16,7 +16,7 @@
 
 use axum::routing::{get, post, put};
 use axum::{
-    extract::{Extension, Json},
+    extract::{Extension, Json, Path},
     Router,
 };
 use serde_json::{json, Value};
@@ -49,37 +49,30 @@ fn get_default_profile_image() -> (Vec<u8>, String) {
     }).clone()
 }
 
-/// GET handler for retrieving a user by ID provided in cookies.
-/// Accessible via: GET /api/users/:id (ID derived from cookie)
+/// GET handler for retrieving a user by ID provided in the path.
+/// Accessible via: GET /api/users/:id
 /// Test: test_users.rs/test_get_user()
 /// Frontend: // TODO: No direct frontend call, user info usually fetched via /current
 pub async fn api_get_user(
-    cookies: Cookies,
+    Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<User>> {
-    println!("->> {:<12} - get_user", "HANDLER");
-
-    // Need to check cookie here to get user id
-    let user_id = get_user_id_from_cookie(&cookies);
-
-    // if we cant parse a user's id
-    if user_id == None {
-        return Err(Error::UserIdUpdateError);
-    }
+    println!("->> {:<12} - get_user (by ID: {})", "HANDLER", id);
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email FROM users WHERE id = $1"#,
-        user_id
+        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
+        id
     )
     .fetch_one(&pool)
     .await;
 
     match result {
         Ok(user) => Ok(Json(user)),
-        Err(_) => Err(Error::UserNotFoundError { user_id: user_id.unwrap() }),
+        Err(_) => Err(Error::UserNotFoundError { user_id: id }),
     }
 }
+
 /// POST handler for creating a new user.
 /// Accessible via: POST /api/users
 /// Test: test_users.rs/test_create_user()
@@ -145,7 +138,7 @@ pub async fn api_create_user(
     // Insert the user with hashed password
     let result = sqlx::query_as!(
         User,
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email",
+        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, ai_credits",
         payload.name,
         payload.email,
         password_hash
@@ -603,7 +596,7 @@ pub async fn api_search_users(
     // Search for users with email containing the search term
     let users = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
+        r#"SELECT id, name, email, ai_credits FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
         format!("%{}%", search_term)
     )
     .fetch_all(&pool)
@@ -628,7 +621,7 @@ pub async fn api_get_current_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
         user_id
     )
     .fetch_one(&pool)
