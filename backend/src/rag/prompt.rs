@@ -213,7 +213,7 @@ pub fn construct_apply_suggestion_prompt(
         Do NOT include documents that remain unchanged in the JSON array. \
         Ensure the 'new_content' is the complete text of the document after applying the suggestion. \
         If the suggestion cannot be applied or no documents need changes, return an empty JSON array []. \
-        Output ONLY the JSON array, with no other text before or after it.\n\n"
+        Output ONLY the JSON array, with no other text before or after it. Do not return any markdown text!\n\n"
     );
 
     // --- Add Project Documents ---

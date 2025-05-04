@@ -6,7 +6,8 @@
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
 	import Toast from '$lib/components/Toast.svelte';
-	
+	import * as Diff from 'diff'; // Import jsdiff
+
 	import { get_document, update_document, get_project_from_document, setup_auto_save } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
 	import { get_project_documents } from '$lib/ts/project';
@@ -27,6 +28,7 @@
 	import profileDefault from '$lib/assets/profile-image.png';
 
 	import '$lib/assets/style/document.css';
+	import type { SuggestedDocumentChange } from '$lib/ts/ai'; // Import the type
 
 	import ChatAssistant from '$lib/components/ChatAssistant.svelte';
 
@@ -112,6 +114,21 @@
 	let commandHighlightSpans: HTMLSpanElement[] = [];
 	let commandHighlightText: string | null = null;
 
+	// Add state for suggestion review
+	type DiffPartState = 'pending' | 'accepted' | 'rejected'; // <<< Re-add Type
+	type DiffPart = {                                      // <<< Re-add Type
+		id: string; // Unique ID for interaction
+		value: string; // The HTML content of the part
+		type: 'added' | 'removed' | 'common';
+		state: DiffPartState;
+	};
+	let isReviewingSuggestion = false;
+	// let suggestionDiffHTML = ''; // <<< Remove this line
+	let processedDiffParts: DiffPart[] = []; // <<< Re-add this line
+	let activePartControls: string | null = null; // <<< Re-add this line
+	let hideControlsTimeoutId: ReturnType<typeof setTimeout> | null = null; // <<< Re-add this line
+	let pendingSuggestion: SuggestedDocumentChange | null = null;
+
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
@@ -134,6 +151,13 @@
 	async function switchDocument(docId: number) {
 		if (!browser) return;
 		
+		// --- Cancel any active suggestion review before switching ---
+		if (isReviewingSuggestion) {
+			console.log("Cancelling suggestion review due to document switch.");
+			exitReviewMode(); 
+		}
+		// -----------------------------------------------------------
+
 		try {
 			// Don't switch if already on this document
 			if (docId.toString() === documentId) {
@@ -2663,7 +2687,7 @@
 			}
 		}
 
-		console.log('Total wrapped lines:', wrappedLines.length);
+			console.log('Total wrapped lines:', wrappedLines.length);
 
 		// Store reference to editor element to ensure it's not null during operations
 		const editor = editorElement;
@@ -4454,6 +4478,250 @@
 		// Note: Still need error handling FROM ChatAssistant component
 		// to call checkErrorForInsufficientCredits if the backend rejects the message.
 	}
+	// <<< Replace entire handleSuggestionReceived function >>>
+	function handleSuggestionReceived(event: CustomEvent<SuggestedDocumentChange[]>) {
+		if (isReviewingSuggestion) {
+			showToast('Already reviewing a suggestion. Please accept or reject the current one first.', 'warning');
+			return; 
+		}
+
+		const changes = event.detail;
+		if (!changes || changes.length === 0) {
+			showToast('Received empty suggestion.', 'warning');
+			return;
+		}
+
+		// Find the suggestion that matches the current document
+		pendingSuggestion = changes.find(change => change.document_id === parseInt(documentId)) || null;
+
+		if (!pendingSuggestion) {
+			console.warn(`Received suggestions, but none matched the current document ${documentId}. Suggestions were for:`, changes.map(c => c.document_id));
+			return;
+		}
+
+		console.log("Processing suggestion for current document (Structured Diff):", pendingSuggestion);
+
+		if (!pendingSuggestion.old_content || !pendingSuggestion.new_content) {
+			showToast('Suggestion data is incomplete.', 'error');
+			pendingSuggestion = null;
+			return;
+		}
+
+		// Enter review mode
+		isReviewingSuggestion = true;
+		if (editorElement) {
+			editorElement.contentEditable = 'false';
+			editorElement.style.opacity = '0.6';
+		}
+
+		// --- Clean HTML before diffing to remove problematic attributes ---
+		const attributeToRemoveRegex = / data-original-line=".*?"/g;
+		const cleanedOldContent = pendingSuggestion.old_content.replace(attributeToRemoveRegex, '');
+		const cleanedNewContent = pendingSuggestion.new_content.replace(attributeToRemoveRegex, '');
+		// ----------------------------------------------------------------
+
+		// Calculate diff using diffWords on the *cleaned* HTML
+		const diffResult = Diff.diffWords(cleanedOldContent, cleanedNewContent);
+		
+		// Process diff into structured array
+		processedDiffParts = []; // Reset the array
+		diffResult.forEach((part, index) => {
+			let type: 'added' | 'removed' | 'common';
+			if (part.added) {
+				type = 'added';
+			} else if (part.removed) {
+				type = 'removed';
+			} else {
+				type = 'common';
+			}
+
+			// Skip parts that are only whitespace if desired (might simplify UI)
+			// if (type !== 'common' && part.value.trim() === '') {
+			// 	return; // Skip whitespace-only changes
+			// }
+
+			processedDiffParts.push({
+				id: `diff-part-${index}`,
+				value: part.value,
+				type: type,
+				state: 'pending' // Initial state
+			});
+		});
+
+		console.log("Processed diff parts:", processedDiffParts.slice(0, 10)); // Log first few parts
+		activePartControls = null; // Ensure no controls are shown initially
+		console.log(`[handleSuggestionReceived] editorElement exists: ${!!editorElement}`); // <<< ADD DEBUG LOG
+		console.log("[handleSuggestionReceived] pendingSuggestion set:", pendingSuggestion); // <<< ADD DEBUG LOG
+	}
+	// <<< End replace handleSuggestionReceived function >>>
+
+	// <<< Add helper functions for part controls >>>
+	// Functions to show/hide individual part controls
+	function showPartControls(partId: string) {
+		clearTimeout(hideControlsTimeoutId ?? undefined); // Clear any pending hide
+		hideControlsTimeoutId = null;
+		activePartControls = partId;
+	}
+	function hidePartControls() {
+		clearTimeout(hideControlsTimeoutId ?? undefined); // Clear previous timeout if any
+		hideControlsTimeoutId = setTimeout(() => {
+			activePartControls = null;
+			hideControlsTimeoutId = null;
+		}, 300); // Adjust delay as needed (e.g., 300ms)
+	}
+	function cancelHideControls() { // Renamed for clarity
+		clearTimeout(hideControlsTimeoutId ?? undefined);
+		hideControlsTimeoutId = null;
+	}
+
+	// Functions to handle individual part accept/reject
+	function acceptPart(partId: string) {
+		processedDiffParts = processedDiffParts.map(part => 
+			part.id === partId ? { ...part, state: 'accepted' } : part
+		);
+		activePartControls = null; // Hide controls after action
+	}
+	function rejectPart(partId: string) {
+		processedDiffParts = processedDiffParts.map(part => 
+			part.id === partId ? { ...part, state: 'rejected' } : part
+		);
+		activePartControls = null; // Hide controls after action
+	}
+	// <<< End add helper functions >>>
+
+	// <<< Replace acceptSuggestion function >>>
+	function acceptSuggestion() { // Global Accept
+		console.log("--- acceptSuggestion function triggered ---");
+		// Only check pendingSuggestion here, editorElement will be null
+		console.log(`[acceptSuggestion] Checking: pendingSuggestion = ${pendingSuggestion}`);
+		if (!pendingSuggestion) {
+			console.error("Accept failed: Missing pendingSuggestion");
+			return;
+		}
+
+		console.log("Accepting remaining suggestions");
+		let finalHtml = '';
+		processedDiffParts.forEach(part => {
+			if (part.type === 'common') {
+				finalHtml += part.value;
+			} else if (part.type === 'added') {
+				if (part.state !== 'rejected') { // Include if pending or accepted
+					finalHtml += part.value;
+				}
+			} else if (part.type === 'removed') {
+				if (part.state === 'rejected') { // *Keep* if removal was rejected
+					finalHtml += part.value;
+				}
+				// Otherwise (pending or accepted removal), skip it
+			}
+		});
+
+		const contentToSet = finalHtml; // Store content before exiting
+		exitReviewMode();
+
+		// Schedule the content update after Svelte re-renders the editor
+		setTimeout(() => {
+			if(editorElement) { // Check editorElement again *after* timeout
+				console.log("[acceptSuggestion] Applying accepted content after exiting review mode.");
+				editorContent = contentToSet;
+				safelySetEditorContent(editorContent);
+				showToast('Suggestion applied.', 'success');
+				triggerAutoSave();
+			} else {
+				console.error("[acceptSuggestion] Editor element still null after exiting review mode.");
+				showToast('Failed to apply suggestion - editor error.', 'error');
+			}
+		}, 0); // Timeout 0 waits for the next tick
+	}
+	// <<< End replace acceptSuggestion function >>>
+
+	// <<< Replace rejectSuggestion function >>>
+	function rejectSuggestion() { // Global Reject
+		console.log("--- rejectSuggestion function triggered ---");
+		// Only check pendingSuggestion here, editorElement will be null
+		console.log(`[rejectSuggestion] Checking: pendingSuggestion = ${pendingSuggestion}`);
+		if (!pendingSuggestion) {
+			console.error("Reject failed: Missing pendingSuggestion");
+			return;
+		}
+
+		console.log("Rejecting suggestion (reverting to original)");
+		const contentToSet = pendingSuggestion.old_content; // Store content before exiting
+		exitReviewMode();
+
+		// Schedule the content update after Svelte re-renders the editor
+		setTimeout(() => {
+			if(editorElement) { // Check editorElement again *after* timeout
+				console.log("[rejectSuggestion] Applying original content after exiting review mode.");
+				restoreEditorHTML(contentToSet);
+				moveToStartOfDocument();
+				adjustEditorHeight();
+				showToast('Suggestion rejected.', 'warning');
+			} else {
+				console.error("[rejectSuggestion] Editor element still null after exiting review mode.");
+				showToast('Failed to reject suggestion - editor error.', 'error');
+			}
+		}, 0); // Timeout 0 waits for the next tick
+	}
+	// <<< End replace rejectSuggestion function >>>
+
+	// <<< Replace exitReviewMode function >>>
+	function exitReviewMode() {
+		console.log("--- exitReviewMode function triggered ---"); // Add log
+		isReviewingSuggestion = false; // This triggers the DOM update
+		pendingSuggestion = null;
+		processedDiffParts = []; 
+		activePartControls = null; // Reset active controls
+	}
+
+	// Helper to trigger manual save if needed (e.g., after accept)
+	function triggerAutoSave() {
+		if (documentData && editorElement) {
+			const contentToSave = getCleanedEditorHTML();
+			console.log('Manually triggering save after suggestion accept:', contentToSave.substring(0, 100) + '...');
+			documentData.content = contentToSave;
+			update_document(documentData)
+				.then(() => {
+					console.log('Save after suggestion successful.');
+				})
+				.catch((err) => {
+					console.error('Save after suggestion failed:', err);
+					showToast('Failed to save document after applying suggestion.', 'error');
+				});
+		}
+	}
+
+	function restoreEditorHTML(content: string) {
+		if (!editorElement) {
+			console.error("[restoreEditorHTML] Cannot restore, editorElement is null.");
+			return;
+		}
+		console.log('[restoreEditorHTML] Setting innerHTML directly:', content.substring(0,100)+'...');
+
+		const editor = editorElement;
+		editor.innerHTML = content; 
+		editorContent = content;
+
+		// Update lines array based on actual divs rendered
+		lines = Array.from(editor.querySelectorAll('div')).map(div => div.textContent || '');
+
+		// Ensure at least one div exists 
+		if (editor.children.length === 0) {
+			console.log('[restoreEditorHTML] Editor was empty after setting content, adding default div.');
+			const div = document.createElement('div');
+			div.innerHTML = '<br>';
+			editor.appendChild(div);
+		}
+		
+		// Handle potentially empty divs 
+		const emptyDivs = Array.from(editor.querySelectorAll('div')).filter((div) => !div.textContent?.trim() && !div.querySelector('br'));
+		emptyDivs.forEach((div) => {
+			if (!div.firstChild || div.textContent === '\u200B') { 
+				console.log('[restoreEditorHTML] Adding <br> to an empty or ZWS div.');
+				div.innerHTML = '<br>';
+			}
+		});
+	}
 </script>
 
 <svelte:head>
@@ -4559,19 +4827,80 @@
 					<div class="line-numbers">
 						<!-- Line numbers now managed through JS for better synchronization -->
 					</div>
-					<div 
-						bind:this={editorElement}
-
-						class="editor-contenteditable" 
-						contenteditable="true"
-						on:keydown={handleKeyDown}
-						on:input={handleInput}
-						on:paste={handlePaste}
-						spellcheck="false"
-						role="textbox"
-						aria-multiline="true"
-						tabindex="0"
-					></div>
+					<!-- Conditionally render editor or diff view -->
+					{#if isReviewingSuggestion}
+						<div class="suggestion-review-container">
+							<div class="suggestion-diff-view">
+								<!-- Replace @html with #each block -->
+								{#each processedDiffParts as part (part.id)}
+									{#if part.type === 'common'}
+										<span class="diff-part common">{@html part.value}</span>
+									{:else}
+										<span 
+											class="diff-part {part.type}"
+											class:pending={part.state === 'pending'}
+											class:accepted={part.state === 'accepted'}
+											class:rejected={part.state === 'rejected'}
+											on:mouseenter={() => showPartControls(part.id)}
+											on:mouseleave={hidePartControls} 
+											style="position: relative;"
+											role="button" 
+											tabindex="0"
+										>
+											{@html part.value} 
+											{#if activePartControls === part.id}
+												<div 
+													class="part-controls"
+													on:mouseenter={cancelHideControls} 
+													on:mouseleave={hidePartControls}
+													role="group" 
+												>
+													<button 
+														class="btn-part-accept"
+														on:click|stopPropagation={() => acceptPart(part.id)}
+														title="Accept Change"
+													>
+														✓
+													</button>
+													<button 
+														class="btn-part-reject"
+														on:click|stopPropagation={() => rejectPart(part.id)}
+														title="Reject Change"
+													>
+														✕
+													</button>
+												</div>
+											{/if}
+										</span>
+									{/if}
+								{/each}
+								<!-- End #each block -->
+							</div>
+							<div class="suggestion-controls">
+								<button class="btn btn-sm btn-success me-2" on:click={acceptSuggestion}>
+									<i class="bi bi-check-lg"></i> Accept
+								</button>
+								<button class="btn btn-sm btn-danger" on:click={rejectSuggestion}>
+									<i class="bi bi-x-lg"></i> Reject
+								</button>
+							</div>
+						</div>
+					{:else}
+						<div
+							bind:this={editorElement}
+							class="editor-contenteditable"
+							contenteditable="true"
+							on:keydown={handleKeyDown}
+							on:input={handleInput}
+							on:paste={handlePaste}
+							spellcheck="false"
+							role="textbox"
+							aria-multiline="true"
+							tabindex="0"
+						>
+							<!-- Initial content is set via innerHTML in onMount or loadDocumentData -->
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}
@@ -4807,7 +5136,141 @@
 				on:close={() => (isChatOpen = false)}
 				bind:messageInput={chatInputElementRef}
 				on:sendMessage={handleChatMessageSent}
+				on:suggestionReceived={handleSuggestionReceived}
 			/>
 		</div>
 	{/if}
 </div>
+
+<style>
+/* Add styles for suggestion review */
+.suggestion-review-container {
+	position: relative; /* Needed for absolute positioning of controls if desired */
+	border: 1px solid var(--color-primary-muted); /* Add a subtle border */
+	border-radius: 4px;
+	padding: 1rem;
+	background-color: rgba(0, 0, 0, 0.1); /* Slightly different background */
+	min-height: 200px; /* Ensure it has some height */
+	font-family: var(--font-mono); /* Use monospace font for diff */
+	color: var(--text-color);
+	line-height: var(--line-height-base);
+	white-space: pre-wrap; /* Preserve whitespace and wrap */
+	overflow-y: auto; /* Allow scrolling if diff is long */
+	max-height: 70vh; /* Limit max height */
+}
+
+.suggestion-diff-view {
+	font-size: 0.9rem;
+	font-family: var(--font-mono);
+	line-height: var(--line-height-base);
+	color: var(--text-color);
+	white-space: pre-wrap;
+}
+
+/* Styles for diff parts - REPLACED old :global rules */
+.diff-part {
+	display: inline; /* Keep parts flowing like text */
+	border-radius: 3px;
+	transition: background-color 0.2s ease;
+}
+
+
+.diff-part.added,
+.diff-part.removed {
+	cursor: pointer; /* Indicate interactivity */
+	position: relative; /* For positioning controls */
+}
+
+/* Pending state highlighting */
+.diff-part.added.pending {
+	background-color: rgba(40, 167, 69, 0.4); 
+	color: #e0f2e0; 
+}
+.diff-part.removed.pending {
+	background-color: rgba(220, 53, 69, 0.4); 
+	color: #f5d7da; 
+}
+
+/* Accepted state highlighting */
+.diff-part.added.accepted {
+	background-color: rgba(40, 167, 69, 0.6); /* Slightly stronger */
+	box-shadow: 0 0 0 1px rgba(80, 200, 100, 0.5);
+	color: white;
+}
+.diff-part.removed.accepted {
+	background-color: rgba(150, 150, 150, 0.3); /* Gray out accepted removals */
+	color: #aaa;
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+
+/* Rejected state highlighting */
+.diff-part.added.rejected {
+	background-color: rgba(150, 150, 150, 0.3); /* Gray out rejected additions */
+	color: #aaa;
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+.diff-part.removed.rejected {
+	background-color: rgba(220, 53, 69, 0.6); /* Slightly stronger */
+	box-shadow: 0 0 0 1px rgba(255, 100, 100, 0.5);
+	color: white; 
+}
+
+/* Individual part controls - ADDED these rules */
+.part-controls {
+	position: absolute;
+	top: -22px; /* Position above the part */
+	left: 50%;
+	transform: translateX(-50%);
+	background-color: rgba(50, 50, 50, 0.95);
+	border-radius: 4px;
+	padding: 2px 4px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+	display: flex;
+	gap: 4px;
+	z-index: 20;
+	white-space: nowrap;
+}
+
+.part-controls button {
+	background: none;
+	border: none;
+	color: white;
+	cursor: pointer;
+	font-size: 14px;
+	padding: 0 3px;
+	line-height: 1;
+}
+.part-controls button.btn-part-accept:hover {
+	color: lightgreen;
+}
+.part-controls button.btn-part-reject:hover {
+	color: lightcoral;
+}
+/* End Added Rules */
+
+.suggestion-controls {
+	position: absolute; /* Changed from sticky */
+	top: 1rem;        /* Position from top */
+	right: 1rem;       /* Position from right */
+	/* Removed bottom, left, width */
+	background-color: transparent; /* Optional: remove background if desired */
+	padding: 0; /* Reset padding */
+	border-top: none; /* Removed border */
+	border-radius: 0; /* Removed border-radius */
+	text-align: right;
+	/* Removed margin-top */
+	z-index: 10; /* Keep z-index */
+}
+
+.suggestion-controls .btn {
+	font-size: 0.85rem;
+}
+
+/* Dim the main editor when reviewing */
+.editor-contenteditable:global([contenteditable="false"]) {
+	cursor: not-allowed;
+	background-color: rgba(40, 40, 40, 0.3); /* Slightly darker */
+}
+</style>

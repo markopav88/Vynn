@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
     import { get_all_writing_sessions, create_writing_session, get_writing_session, send_writing_message, delete_writing_session, apply_ai_suggestion } from '$lib/ts/ai';
-    import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload } from '$lib/ts/ai';
+    import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload, SuggestedDocumentChange } from '$lib/ts/ai';
 
     export let documentId: number | null = null;
     export let isOpen = false;
@@ -208,22 +208,21 @@
         console.log("Suggestion Content:", suggestionContent);
 
         try {
-            // Indicate loading state if desired
-            // isLoadingApply = true;
-
-            // Call the new API function (to be created in ai.ts)
             const result = await apply_ai_suggestion(currentSessionId, suggestionContent);
-
             console.log("AI Apply Suggestion Result:", result);
-            // TODO: Process the result (likely proposed changes)
-            // This will involve generating diffs and showing a modal/confirmation
+
+            // Dispatch the raw result if it's valid
+            if (result && Array.isArray(result)) {
+                dispatch('suggestionReceived', result as SuggestedDocumentChange[]);
+            } else {
+                 console.warn("AI Apply Suggestion returned invalid data.");
+                 // Optionally show an error toast here
+            }
 
         } catch (error) {
             console.error("Error applying AI suggestion:", error);
             // Show error toast to user
-        } finally {
-            // Reset loading state
-            // isLoadingApply = false;
+            // TODO: Check error for insufficient credits and dispatch an event or show a message?
         }
     }
 
@@ -380,7 +379,6 @@
     </div>
 </div>
 {/if}
-
 
 <style>
     .offcanvas-end {

@@ -463,7 +463,7 @@ export async function check_spelling(content: string): Promise<AiCommandResponse
  * Test: TODO
  */
 export async function apply_ai_suggestion(sessionId: number, suggestionContent: string): Promise<SuggestedDocumentChange[]> {
-    const url = `/api/ai/writing-assistant/${sessionId}/apply-suggestion`;
+    const url = `${API_BASE_URL}/api/writing-assistant/${sessionId}/apply-suggestion`;
     const payload = { suggestion_content: suggestionContent };
     
     console.log(`POST ${url} with payload:`, payload);
@@ -474,6 +474,7 @@ export async function apply_ai_suggestion(sessionId: number, suggestionContent: 
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        credentials: 'include'
     });
 
     if (!response.ok) {

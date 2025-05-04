@@ -818,10 +818,18 @@ pub async fn api_apply_suggestion(
     let llm_response_str = query_model.query_model(&final_prompt).await?;
     println!("->> {:<12} - LLM response received ({} chars).", "HANDLER", llm_response_str.len());
 
+    // Trim markdown fences if present
+    let trimmed_response = llm_response_str
+        .strip_prefix("```json\n")
+        .unwrap_or(&llm_response_str)
+        .strip_suffix("\n```")
+        .unwrap_or(&llm_response_str)
+        .trim(); // Also trim leading/trailing whitespace just in case
+
     // 7. Parse LLM response (JSON array of LlmDocChange)
-    let llm_changes: Vec<LlmDocChange> = serde_json::from_str(&llm_response_str)
+    let llm_changes: Vec<LlmDocChange> = serde_json::from_str(trimmed_response)
         .map_err(|e| {
-            eprintln!("Error parsing LLM response JSON: {}\nLLM Response: {}", e, llm_response_str);
+            eprintln!("Error parsing LLM response JSON: {}\nTrimmed Response: {}", e, trimmed_response);
             Error::FailedApplyChanges
         })?;
     println!("->> {:<12} - Parsed {} changes from LLM response.", "HANDLER", llm_changes.len());
