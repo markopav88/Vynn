@@ -22,7 +22,8 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL
+    password VARCHAR(255) NOT NULL,
+    ai_credits INT NOT NULL DEFAULT 10
 );
 
 -- Create projects table
@@ -109,12 +110,12 @@ CREATE TABLE user_profile_images (
 );
 
 -- Insert default users
-INSERT INTO users(name,email,password) 
-VALUES('Christian','CFdefence@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$kNRxgrDUnkl79WdlNuLXOw$v+gZeEyNvLQNvw2Q3l6T7HQOerrVSbRfOnp/Cx1xadk') --MyPassword--
+INSERT INTO users(name,email,password, ai_credits)
+VALUES('Christian','CFdefence@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$kNRxgrDUnkl79WdlNuLXOw$v+gZeEyNvLQNvw2Q3l6T7HQOerrVSbRfOnp/Cx1xadk', 999) --MyPassword--
 ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO users(name,email,password) 
-VALUES('Marko','MarkoP@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$6hDoev817tzWWUfs6z/6LA$n1mPBXmxmIw915nVg9nHc3YXba0OjgRw7Yx6q85UCTE') --MarkosPassword--
+INSERT INTO users(name,email,password, ai_credits)
+VALUES('Marko','MarkoP@gmail.com','$argon2id$v=19$m=19456,t=2,p=1$6hDoev817tzWWUfs6z/6LA$n1mPBXmxmIw915nVg9nHc3YXba0OjgRw7Yx6q85UCTE', 999) --MarkosPassword--
 ON CONFLICT (email) DO NOTHING;
 
 -- Create a default project for user 1

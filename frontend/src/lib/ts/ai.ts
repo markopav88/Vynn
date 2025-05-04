@@ -55,6 +55,8 @@ interface AiCommandResponse {
 
 /**
  * Fetches all writing assistant sessions for the current user.
+ * Calls: GET /api/writing-assistant
+ * Test: test_ai.rs/test_get_all_writing_sessions_success()
  */
 export async function get_all_writing_sessions(): Promise<WritingAssistantSession[]> {
     try {
@@ -73,6 +75,8 @@ export async function get_all_writing_sessions(): Promise<WritingAssistantSessio
 
 /**
  * Creates a new writing assistant session.
+ * Calls: POST /api/writing-assistant
+ * Test: test_ai.rs/test_create_writing_session_success()
  */
 export async function create_writing_session(payload: CreateSessionPayload): Promise<WritingAssistantSession | null> {
     try {
@@ -94,6 +98,8 @@ export async function create_writing_session(payload: CreateSessionPayload): Pro
 
 /**
  * Fetches a specific writing session including its messages.
+ * Calls: GET /api/writing-assistant/:sessionId
+ * Test: test_ai.rs/test_get_writing_session_success()
  */
 export async function get_writing_session(sessionId: number): Promise<SessionWithMessages | null> {
     try {
@@ -113,6 +119,8 @@ export async function get_writing_session(sessionId: number): Promise<SessionWit
 
 /**
  * Sends a message to a specific session and gets the AI response.
+ * Calls: POST /api/writing-assistant/:sessionId/message
+ * Test: test_ai.rs/test_send_writing_message_success()
  */
 export async function send_writing_message(sessionId: number, payload: SendMessagePayload): Promise<AssistantResponse | null> {
      try {
@@ -134,6 +142,8 @@ export async function send_writing_message(sessionId: number, payload: SendMessa
 
 /**
  * Deletes a specific writing session.
+ * Calls: DELETE /api/writing-assistant/:sessionId
+ * Test: test_ai.rs/test_delete_writing_session_success()
  */
 export async function delete_writing_session(sessionId: number): Promise<boolean> {
     try {
@@ -150,6 +160,8 @@ export async function delete_writing_session(sessionId: number): Promise<boolean
 
 /**
  * Function to check grammar using the backend API.
+ * Calls: POST /api/writing-assistant/grammer
+ * Test: test_ai.rs/test_check_grammar_success()
  */
 export async function check_grammar(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Check grammar for text:', text.substring(0, 100) + '...');
@@ -175,6 +187,8 @@ export async function check_grammar(text: string): Promise<AiCommandResponse | n
 
 /**
  * Function to summarize text using the backend API.
+ * Calls: POST /api/writing-assistant/summarize
+ * Test: test_ai.rs/test_summarize_success()
  */
 export async function summarize_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Summarize text:', text.substring(0, 100) + '...');
@@ -200,6 +214,8 @@ export async function summarize_text(text: string): Promise<AiCommandResponse | 
 
 /**
  * Function to rephrase text using the backend API.
+ * Calls: POST /api/writing-assistant/rephrase
+ * Test: test_ai.rs/test_rephrase_success()
  */
 export async function rephrase_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Rephrase text:', text.substring(0, 100) + '...');
@@ -225,6 +241,8 @@ export async function rephrase_text(text: string): Promise<AiCommandResponse | n
 
 /**
  * Function to expand text using the backend API.
+ * Calls: POST /api/writing-assistant/expand
+ * Test: test_ai.rs/test_expand_success()
  */
 export async function expand_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Expand text:', text.substring(0, 100) + '...');
@@ -250,6 +268,8 @@ export async function expand_text(text: string): Promise<AiCommandResponse | nul
 
 /**
  * Function to shrink text using the backend API.
+ * Calls: POST /api/writing-assistant/shrink
+ * Test: test_ai.rs/test_shrink_success()
  */
 export async function shrink_text(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Shrink text:', text.substring(0, 100) + '...');
@@ -275,6 +295,8 @@ export async function shrink_text(text: string): Promise<AiCommandResponse | nul
 
 /**
  * Function to rewrite text in a specific style using the backend API.
+ * Calls: POST /api/writing-assistant/rewrite
+ * Test: test_ai.rs/test_rewrite_success()
  */
 export async function rewrite_text_as(text: string, style: string): Promise<AiCommandResponse | null> {
 	console.log(`AI Request: Rewrite text as ${style}:`, text.substring(0, 100) + '...');
@@ -300,6 +322,8 @@ export async function rewrite_text_as(text: string, style: string): Promise<AiCo
 
 /**
  * Placeholder function to fact-check text.
+ * Calls: POST /api/writing-assistant/factcheck
+ * Test: test_ai.rs/test_fact_check_success()
  * This should ideally call a dedicated fact-checking API, not just the LLM.
  */
 export async function fact_check_text(text: string): Promise<AiCommandResponse | null> {
@@ -329,6 +353,8 @@ export async function fact_check_text(text: string): Promise<AiCommandResponse |
 
 /**
  * Function to check spelling using the backend API.
+ * Calls: POST /api/writing-assistant/spellcheck
+ * Test: test_ai.rs/test_spell_check_success()
  */
 export async function check_spelling(text: string): Promise<AiCommandResponse | null> {
 	console.log('AI Request: Check spelling for text:', text.substring(0, 100) + '...');

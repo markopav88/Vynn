@@ -57,7 +57,8 @@ class SignupPayload {
 
 /**
  * Function to attempt login
- * Calls: POST /api/login
+ * Calls: POST /api/users/login
+ * Test: test_users.rs/test_good_login()
  */
 export async function attempt_login(login_payload: Login): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/users/login`;
@@ -89,6 +90,7 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 /**
  * Function to logout user
  * Calls: GET /api/users/logout
+ * Test: test_users.rs/test_logout()
  */
 export async function logout(): Promise<boolean> {
 	const apiUrl = `http://localhost:3001/api/users/logout`;
@@ -111,7 +113,8 @@ export async function logout(): Promise<boolean> {
 
 /**
  * Function to get the current user's information
- * Calls: GET /api/users/:id
+ * Calls: GET /api/users/current
+ * Test: test_users.rs/test_get_current_user()
  */
 export async function get_current_user(): Promise<any | null> {
 	try {
@@ -136,6 +139,7 @@ export async function get_current_user(): Promise<any | null> {
 /**
  * Function to update the current user's information
  * Calls: PUT /api/users/update
+ * Test: test_users.rs/test_update_user()
  */
 export async function update_user(name: string, email: string, password: string): Promise<boolean> {
 	try {
@@ -166,6 +170,7 @@ export async function update_user(name: string, email: string, password: string)
 /**
  * Function for attempting signup
  * Calls: POST /api/users
+ * Test: test_users.rs/test_create_user()
  */
 export async function attempt_signup(signup_input: Signup): Promise<boolean> {
 	// Check if passwords match and make new payload if they do
@@ -207,6 +212,8 @@ export async function attempt_signup(signup_input: Signup): Promise<boolean> {
 
 /**
  * Check if the user is authenticated
+ * Calls: GET /api/users/check-auth
+ * Test: TODO: test_users.rs/test_check_auth() - Test missing
  * @returns Promise<boolean> - True if authenticated, false otherwise
  */
 export async function check_auth(): Promise<boolean> {
@@ -245,6 +252,7 @@ export async function check_auth(): Promise<boolean> {
 /**
  * Function to upload a profile image
  * Calls: POST /api/users/profile-image
+ * Test: TODO: test_users.rs/test_upload_profile_image() - Test missing
  */
 export async function upload_profile_image(file: File): Promise<boolean> {
 	try {
@@ -274,7 +282,10 @@ export async function upload_profile_image(file: File): Promise<boolean> {
 
 /**
  * Function to get user's profile image URL
- * Returns a URL that can be used in img src attribute
+ * Note: This generates the URL, doesn't call a specific check endpoint itself.
+ * Relies on backend route: GET /api/users/:id/profile-image
+ * Test: TODO: test_users.rs/test_get_profile_image() - Test missing
+ * @returns string - URL that can be used in img src attribute
  */
 export function get_profile_image_url(userId: number): string {
 	return `http://localhost:3001/api/users/${userId}/profile-image`;

@@ -46,8 +46,8 @@ use pgvector::Vector;
 
 /// GET handler for retrieving all writing sessions for current user.
 /// Accessible via: GET /api/writing-assistant
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_get_all_writing_sessions_success()
+/// Frontend: ai.ts/get_all_writing_sessions()
 /// Returns a list of all writing assistant sessions belonging to the authenticated user.
 /// Sessions are ordered by last updated, with most recent first.
 pub async fn api_get_all_writing_sessions(
@@ -79,8 +79,8 @@ pub async fn api_get_all_writing_sessions(
 
 /// POST handler for creating a new writing assistant session.
 /// Accessible via: POST /api/writing-assistant
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_create_writing_session_success()
+/// Frontend: ai.ts/create_writing_session()
 /// Creates a new writing assistant session and initializes it with a welcome message.
 /// Can optionally be linked to a document by providing a document_id in the payload.
 pub async fn api_create_writing_session(
@@ -132,8 +132,8 @@ pub async fn api_create_writing_session(
 
 /// GET handler for retrieving specific writing session with messages.
 /// Accessible via: GET /api/writing-assistant/:id
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_get_writing_session_success()
+/// Frontend: ai.ts/get_writing_session()
 /// Returns detailed information about a specific writing session including all messages.
 /// Only the owner of the session can access it.
 pub async fn api_get_writing_session(
@@ -189,8 +189,8 @@ pub async fn api_get_writing_session(
 
 /// POST handler for sending a message and getting AI response.
 /// Accessible via: POST /api/writing-assistant/:id/message
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_send_writing_message_success()
+/// Frontend: ai.ts/send_writing_message()
 /// Sends a user message to the AI writing assistant and returns the AI's response.
 /// If the session is linked to a document, the document content will be used as context for the AI.
 pub async fn api_send_writing_message(
@@ -203,6 +203,9 @@ pub async fn api_send_writing_message(
     println!("->> {:<12} - Payload: {:?}", "HANDLER", payload);
 
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check and decrement credits before proceeding
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let session = sqlx::query_as!(
         WritingAssistantSession,
@@ -339,8 +342,8 @@ pub async fn api_send_writing_message(
 
 /// DELETE handler for removing a writing session and all its messages.
 /// Accessible via: DELETE /api/writing-assistant/:id
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_delete_writing_session_success()
+/// Frontend: ai.ts/delete_writing_session()
 /// This will automatically delete all associated messages due to CASCADE delete constraint.
 /// Only the owner of the session can delete it.
 pub async fn api_delete_writing_session(
@@ -380,8 +383,8 @@ pub async fn api_delete_writing_session(
 
 /// POST handler for suggesting grammer changes for the document or selected text
 /// Accessible via: POST /api/writing-assistant/:id/grammer
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_check_grammar_success()
+/// Frontend: ai.ts/check_grammar()
 pub async fn api_check_grammer(
     cookies: Cookies,
     pool: Extension<PgPool>,
@@ -389,8 +392,9 @@ pub async fn api_check_grammer(
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_check_grammer", "HANDLER");
 
-    // Get user_id to ensure permission (optional, could be removed if direct text analysis is allowed)
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    // Get user_id and check/decrement credits
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_grammar_check_prompt(&payload.content);
     
@@ -402,15 +406,16 @@ pub async fn api_check_grammer(
 
 /// POST handler for summarizing some text or a document
 /// Accessible via: POST /api/writing-assistant/summarize
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_summarize_success()
+/// Frontend: ai.ts/summarize_text()
 pub async fn api_summarize(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_summarize", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_summarize_prompt(&payload.content);
     
@@ -422,15 +427,16 @@ pub async fn api_summarize(
 
 /// POST handler for rephrasing some text or a document
 /// Accessible via: POST /api/writing-assistant/rephrase
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_rephrase_success()
+/// Frontend: ai.ts/rephrase_text()
 pub async fn api_rephrase(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_rephrase", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_rephrase_prompt(&payload.content);
     
@@ -442,15 +448,16 @@ pub async fn api_rephrase(
 
 /// POST handler for expanding some text or a document
 /// Accessible via: POST /api/writing-assistant/expand
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_expand_success()
+/// Frontend: ai.ts/expand_text()
 pub async fn api_expand(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_expand", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_expand_prompt(&payload.content);
     
@@ -462,15 +469,16 @@ pub async fn api_expand(
 
 /// POST handler for shrinking some text or a document
 /// Accessible via: POST /api/writing-assistant/shrink
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_shrink_success()
+/// Frontend: ai.ts/shrink_text()
 pub async fn api_shrink(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_shrink", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_shrink_prompt(&payload.content);
     
@@ -482,15 +490,16 @@ pub async fn api_shrink(
 
 /// POST handler for rewriting some text or a document in a new style
 /// Accessible via: POST /api/writing-assistant/rewrite
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_rewrite_success()
+/// Frontend: ai.ts/rewrite_text_as()
 pub async fn api_rewrite(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<RewritePayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_rewrite", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_rewrite_prompt(&payload.content, &payload.style);
     
@@ -502,15 +511,16 @@ pub async fn api_rewrite(
 
 /// POST handler for fact checking some text or a document
 /// Accessible via: POST /api/writing-assistant/factcheck
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_fact_check_success()
+/// Frontend: ai.ts/fact_check_text()
 pub async fn api_fact_check(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_fact_check", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_fact_check_prompt(&payload.content);
     
@@ -522,15 +532,16 @@ pub async fn api_fact_check(
 
 /// POST handler for spell checking some text or a document
 /// Accessible via: POST /api/writing-assistant/spellcheck
-/// Test: NULL
-/// Frontend: NULL
+/// Test: test_ai.rs/test_spell_check_success()
+/// Frontend: ai.ts/check_spelling()
 pub async fn api_spell_check(
     cookies: Cookies,
     pool: Extension<PgPool>,
     Json(payload): Json<SelectedTextContext>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_spell_check", "HANDLER");
-    get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+    check_and_decrement_ai_credits(&pool, user_id).await?;
 
     let prompt = prompt::construct_spell_check_prompt(&payload.content);
     
@@ -538,6 +549,44 @@ pub async fn api_spell_check(
     let response = query_model.query_model(&prompt).await?;
 
     Ok(Json(json!({ "response": response })))
+}
+
+/// Helper function to check and decrement AI credits
+async fn check_and_decrement_ai_credits(pool: &PgPool, user_id: i32) -> Result<()> {
+    // Fetch current credits
+    let user_credits = sqlx::query!(
+        "SELECT ai_credits FROM users WHERE id = $1",
+        user_id
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?
+    .ok_or(Error::UserNotFoundError { user_id })?
+    .ai_credits;
+
+    // Check if credits are sufficient
+    if user_credits <= 0 {
+        println!("->> {:<12} - User {} has insufficient AI credits ({})", "CREDIT_CHECK", user_id, user_credits);
+        return Err(Error::InsufficientAiCredits);
+    }
+
+    // Decrement credits
+    let update_result = sqlx::query!(
+        "UPDATE users SET ai_credits = ai_credits - 1 WHERE id = $1 AND ai_credits > 0",
+        user_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    // Check if the update actually happened (in case of race condition where credits became 0 between check and update)
+    if update_result.rows_affected() == 0 {
+        println!("->> {:<12} - Failed to decrement credits for user {} (possible race condition or already 0)", "CREDIT_CHECK", user_id);
+        return Err(Error::InsufficientAiCredits); // Treat as insufficient if update failed
+    }
+
+    println!("->> {:<12} - Decremented AI credits for user {}. Remaining: {}", "CREDIT_CHECK", user_id, user_credits - 1);
+    Ok(())
 }
 
 /// Generate routes for the writing assistant controller

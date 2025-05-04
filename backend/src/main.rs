@@ -6,19 +6,23 @@ mod error;
 mod models;
 mod web;
 mod rag;
+mod log;
 
 use axum::middleware;
-
-use axum::response::Response;
-// Axum is a web framework for Rust (It is to rust what express is to node.js)
-use axum::{routing::get_service, Extension, Router};
+use axum::response::{IntoResponse, Response};
+use axum::{routing::get_service, Extension, Json, Router};
 use dotenv::dotenv;
 use http::header::HeaderValue;
-use http::Method;
+use http::{Method, Uri, Request};
+use log::log_request;
+use uuid::Uuid;
 use std::net::SocketAddr; // Allows us to bind the backend to a specific port
-use tower_cookies::CookieManagerLayer;
+use tower_cookies::{CookieManagerLayer, Cookies};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
+use serde_json::json; // Import the json! macro
+use axum::middleware::Next;
+use axum::body::Body;
 
 use crate::db::pool::create_pool; // Import the connection pool
 
@@ -75,7 +79,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .nest("/api/command", key_api_routes)
         .nest("/api/writing-assistant", writing_assistant_routes)
         .layer(Extension(pool.clone())) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
-        .layer(middleware::map_response(main_response_mapper))
+        .layer(middleware::from_fn(mw_log_requests))
         .layer(cookie_layer)
         .layer(cors) // Add the CORS layer
         .fallback_service(routes_static()); // Fallback route if route cannot be found above
@@ -85,7 +89,6 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We use the SocketAddr struct to bind the router to the port
     / We use the 0.0.0.0 address to bind the router to localhost
     / We will bind to port 3001 for now
-    / We print a message to the console to indicate that the server is starting
     */
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
     println!("Server starting on http://localhost:3001");
@@ -108,10 +111,55 @@ fn routes_static() -> Router {
     Router::new().nest_service("/", get_service(ServeDir::new("./")))
 }
 
-async fn main_response_mapper(response: Response) -> Response {
-    println!("->> {:<12} - main_response_mapper", "RES_MAPPER");
+// Custom logging middleware
+async fn mw_log_requests(
+    cookies: Cookies, // Extractor for cookies
+    req_method: Method, // Extractor for method
+    uri: Uri,         // Extractor for URI
+    request: Request<Body>, // The request itself
+    next: Next<Body>         // The next service in the chain
+) -> Result<Response> { // Changed return type to Result<Response>
+    println!("->> {:<12} - mw_log_requests", "MIDDLEWARE");
+    let uuid = Uuid::new_v4();
+
+    // Execute the rest of the stack to get the response
+    let response = next.run(request).await;
+
+    // --- Log Response ---
+    // Get eventual response error from extensions
+    let service_error = response.extensions().get::<Error>();
+    let client_status_error = service_error.map(|e| e.client_status_and_error());
+
+    // If client error, map a new response (This part replaces main_response_mapper's error handling)
+    let error_response = 
+        client_status_error
+        .as_ref()
+        .map(|(status_code, client_error)| {
+            let client_error_body = json!({
+                "error": {
+                    "type": client_error.as_ref(),
+                    "req_uuid": uuid.to_string(),
+                }
+            });
+
+            println!("  ->> client_error_body: {client_error_body}");
+
+            // Build new response for client
+            (*status_code, Json(client_error_body)).into_response()
+        });
+
+    // Build and log server log line
+    let client_error = client_status_error.unzip().1;
+    // Use cloned cookies for logging as original `cookies` might be consumed by the extractor.
+    // We pass the necessary extracted info directly.
+    let log_result = log_request(uuid, req_method, uri, service_error, client_error, &cookies).await;
+
+    // Handle potential logging errors if necessary (e.g., log to stderr)
+    if let Err(e) = log_result {
+        eprintln!("->> {:<12} - FAILED TO LOG REQUEST: {:?}", "ERROR", e);
+    }
 
     println!();
-
-    response
+    // Return the mapped error response if it exists, otherwise the original response
+    Ok(error_response.unwrap_or(response))
 }

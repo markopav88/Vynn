@@ -39,7 +39,7 @@
 	// Project state
 	let projectDocuments: any[] = [];
 	let currentDocumentIndex = -1;
-	let projectDocumentsMap = new Map(); // Map to store preloaded documents
+	let projectDocumentsMap = new Map();
 
 	// Editor state
 	let editorContent = '';
@@ -104,12 +104,11 @@
 	let chatAssistantComponent: ChatAssistant;
 	let isChatOpen = false; // Declare state variable for chat visibility
 	let chatInputElementRef: HTMLInputElement | null = null; // Add ref for chat input
-	let animateIn = false; // Add animation state variable
 
 	// Add state for command selection highlighting
 	let commandHighlightRange: Range | null = null;
 	let commandHighlightSpans: HTMLSpanElement[] = [];
-	let commandHighlightText: string | null = null; // <-- Add this
+	let commandHighlightText: string | null = null;
 
 	// Add a function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {

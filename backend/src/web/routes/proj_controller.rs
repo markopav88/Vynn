@@ -66,7 +66,7 @@ async fn api_get_all_projects(
 
     match result {
         Ok(projects) => Ok(Json(projects)),
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::ProjectNotFoundError {project_id: user_id}),
     }
 }
 
@@ -103,7 +103,7 @@ async fn api_get_project(
 
     match result {
         Ok(project) => Ok(Json(project)),
-        Err(_) => return Err(Error::ProjectNotFoundError),
+        Err(_) => return Err(Error::ProjectNotFoundError {project_id: id}),
     }
 }
 
@@ -153,7 +153,7 @@ async fn api_create_project(
 
             Ok(Json(project))
         }
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::DatabaseError),
     }
 }
 
@@ -196,7 +196,7 @@ async fn api_update_project(
 
     match result {
         Ok(project) => Ok(Json(project)),
-        Err(_) => return Err(Error::ProjectNotFoundError),
+        Err(_) => return Err(Error::ProjectNotFoundError { project_id: id }),
     }
 }
 
@@ -244,7 +244,7 @@ async fn api_delete_project(
 
     match result {
         Ok(project) => Ok(Json(project)),
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::ProjectNotFoundError { project_id: id }),
     }
 }
 
@@ -364,7 +364,7 @@ async fn api_get_permissions(
 
     match result {
         Ok(users) => Ok(Json(users)),
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::ProjectNotFoundError { project_id }),
     }
 }
 
@@ -622,7 +622,7 @@ async fn api_force_delete_project(
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| Error::ProjectNotFoundError)?;
+    .map_err(|_| Error::ProjectNotFoundError { project_id: id })?;
 
     // 2. For each document, delete permissions and then the document
     for doc_record in document_ids {
@@ -635,13 +635,13 @@ async fn api_force_delete_project(
         )
         .execute(&pool)
         .await
-        .map_err(|_| Error::DocumentDeletionError)?;
+        .map_err(|_| Error::DocumentDeletionError { document_id: doc_id })?;
 
         // Delete document
         sqlx::query!("DELETE FROM documents WHERE id = $1", doc_id)
             .execute(&pool)
             .await
-            .map_err(|_| Error::DocumentDeletionError)?;
+            .map_err(|_| Error::DocumentDeletionError { document_id: doc_id })?;
     }
 
     // 3. Delete project permissions
@@ -654,7 +654,7 @@ async fn api_force_delete_project(
     sqlx::query!("DELETE FROM projects WHERE id = $1", id)
         .execute(&pool)
         .await
-        .map_err(|_| Error::ProjectNotFoundError)?;
+        .map_err(|_| Error::ProjectNotFoundError { project_id: id })?;
 
     Ok(Json(json!({
         "result": {
@@ -702,7 +702,7 @@ async fn api_get_documents(
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| Error::ProjectNotFoundError)?;
+    .map_err(|_| Error::ProjectNotFoundError { project_id })?;
 
     Ok(Json(documents))
 }
@@ -829,6 +829,8 @@ async fn api_remove_document(
 
 /// PUT handler for starring a project.
 /// Accessible via: PUT /api/project/:id/star
+/// Test: TODO: test_projects.rs/test_toggle_star_project()
+/// Frontend: drive.ts/toggle_star_project()
 async fn api_toggle_star_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -857,7 +859,7 @@ async fn api_toggle_star_project(
     )
     .fetch_one(&pool)
     .await
-    .map_err(|_| Error::ProjectNotFoundError)?;
+    .map_err(|_| Error::ProjectNotFoundError { project_id: id })?;
 
     // Toggle the star status
     let new_status = !project.is_starred.unwrap_or(false);
@@ -887,6 +889,8 @@ async fn api_toggle_star_project(
 
 /// PUT handler for moving a project to trash.
 /// Accessible via: PUT /api/project/:id/trash
+/// Test: TODO: test_projects.rs/test_trash_project()
+/// Frontend: drive.ts/trash_project()
 async fn api_trash_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -927,6 +931,8 @@ async fn api_trash_project(
 
 /// PUT handler for restoring a project from trash.
 /// Accessible via: PUT /api/project/:id/restore
+/// Test: TODO: test_projects.rs/test_restore_project()
+/// Frontend: drive.ts/restore_project()
 async fn api_restore_project(
     cookies: Cookies,
     Path(id): Path<i32>,
@@ -967,6 +973,8 @@ async fn api_restore_project(
 
 /// GET handler for retrieving all starred projects for a user.
 /// Accessible via: GET /api/project/starred
+/// Test: TODO: test_projects.rs/test_get_starred_projects()
+/// Frontend: drive.ts/get_starred_projects()
 async fn api_get_starred_projects(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -990,12 +998,14 @@ async fn api_get_starred_projects(
 
     match result {
         Ok(projects) => Ok(Json(projects)),
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::ProjectNotFoundError { project_id: user_id }),
     }
 }
 
 /// GET handler for retrieving all trashed projects for a user.
 /// Accessible via: GET /api/project/trash
+/// Test: TODO: test_projects.rs/test_get_trashed_projects()
+/// Frontend: drive.ts/get_trashed_projects()
 async fn api_get_trashed_projects(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -1019,12 +1029,14 @@ async fn api_get_trashed_projects(
 
     match result {
         Ok(projects) => Ok(Json(projects)),
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::ProjectNotFoundError { project_id: user_id }),
     }
 }
 
 /// GET handler for retrieving all shared projects for a user (where user is not owner but has viewer/editor permissions).
 /// Accessible via: GET /api/project/shared
+/// Test: TODO: test_projects.rs/test_get_shared_projects()
+/// Frontend: drive.ts/get_shared_projects()
 async fn api_get_shared_projects(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -1050,7 +1062,7 @@ async fn api_get_shared_projects(
 
     match result {
         Ok(projects) => Ok(Json(projects)),
-        Err(_) => Err(Error::ProjectNotFoundError),
+        Err(_) => Err(Error::ProjectNotFoundError { project_id: user_id }),
     }
 }
 
