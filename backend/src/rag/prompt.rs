@@ -1,4 +1,4 @@
-use crate::models::ai::{ChatHistory, MessageRole};
+use crate::models::ai::{ChatHistory, MessageRole, ContextDocument};
 use crate::rag::retrieval::RetrievedChunk;
 
 const MAX_HISTORY_TOKENS: usize = 1000; // Example token limit for history
@@ -193,4 +193,51 @@ pub fn construct_fact_check_prompt(text: &str) -> String {
         If you are unable to fact-check the text for any reason, ONLY return the exact string '__VYNN_NO_CHANGE__'. Otherwise, return ONLY your concise evaluation.",
         text
     )
+}
+
+/// Constructs a prompt for applying an AI suggestion across project documents.
+pub fn construct_apply_suggestion_prompt(
+    project_documents: &[(i32, String, String)], // List of (id, name, content)
+    suggestion_to_apply: &str,
+) -> Result<String, serde_json::Error> { // Return Result for serialization errors
+    let mut prompt = String::new();
+
+    // --- System Instructions ---
+    prompt.push_str(
+        "You are an AI assistant tasked with applying a given suggestion to a set of documents within a project. \
+        Analyze the provided 'Project Documents' and the 'Suggestion to Apply'. \
+        Determine which documents need modification based on the suggestion. \
+        For ONLY the documents that need changes, generate their complete new content. \
+        Your response MUST be a JSON array containing objects, where each object represents a changed document and has the following structure: \
+        { \"document_id\": <integer>, \"new_content\": \"<full_new_document_content_as_string>\" }. \
+        Do NOT include documents that remain unchanged in the JSON array. \
+        Ensure the 'new_content' is the complete text of the document after applying the suggestion. \
+        If the suggestion cannot be applied or no documents need changes, return an empty JSON array []. \
+        Output ONLY the JSON array, with no other text before or after it.\n\n"
+    );
+
+    // --- Add Project Documents ---
+    prompt.push_str("Project Documents:\n");
+    let context_docs: Vec<ContextDocument> = project_documents
+        .iter()
+        .map(|(id, name, content)| ContextDocument {
+            id: *id,
+            name: name.clone(),
+            content: content.clone(),
+        })
+        .collect();
+
+    // Serialize the documents context into a JSON string for clarity in the prompt
+    let docs_json = serde_json::to_string_pretty(&context_docs)?; // Use pretty print for readability
+    prompt.push_str("```json\n");
+    prompt.push_str(&docs_json);
+    prompt.push_str("\n```\n\n");
+    prompt.push_str("---\n\nSuggestion to Apply:\n");
+    prompt.push_str(suggestion_to_apply);
+    prompt.push_str("\n\n---\n\n");
+    prompt.push_str("JSON Response (array of changed documents, or [] if none):\n");
+
+    println!("->> {:<12} - Apply Suggestion Prompt constructed ({} chars)", "PROMPT", prompt.len()); // Use char count for large prompts
+
+    Ok(prompt)
 }

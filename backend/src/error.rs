@@ -52,6 +52,7 @@ pub enum Error {
     APIKeyError,
     LlmQueryError,
     InsufficientAiCredits,
+    FailedApplyChanges,
 }
 
 impl IntoResponse for Error {
@@ -87,6 +88,9 @@ impl Error {
             Self::APIKeyError => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR), // Could be config issue
             Self::EmbeddingError => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),
             Self::LlmQueryError => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),
+
+            // Apply Suggestion Errors
+            Self::FailedApplyChanges { .. } => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),
 
             // Resource Errors (Could argue some are Forbidden/No_Auth if based on user context)
             Self::DocumentNotFoundError { .. } => (StatusCode::NOT_FOUND, ClientError::RESOURCE_NOT_FOUND),

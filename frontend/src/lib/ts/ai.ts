@@ -16,6 +16,7 @@
 / - AiTextPayload: Generic payload for AI commands taking text content.
 / - AiRewritePayload: Payload for the rewrite command, including style.
 / - AiCommandResponse: Expected structure for responses from AI text commands.
+/ - SuggestedDocumentChange: Represents the proposed changes for a single document.
 / 
 / Functions:
 / - get_all_writing_sessions: Fetches all sessions for the current user.
@@ -31,6 +32,7 @@
 / - rewrite_text_as: Sends text and a style to the backend for rewriting.
 / - fact_check_text: Sends text to the backend for fact-checking.
 / - check_spelling: Sends text to the backend for spell checking.
+/ - apply_ai_suggestion: Sends an AI suggestion to the backend to determine necessary document changes.
 /
 */
 
@@ -85,6 +87,13 @@ interface AiTextPayload {
 interface AiRewritePayload {
 	content: string;
 	style: string;
+}
+
+// Represents the suggested changes for a given document
+export interface SuggestedDocumentChange {
+    document_id: number;
+    old_content: string;
+    new_content: string;
 }
 
 // Define expected Response structure
@@ -446,4 +455,42 @@ export async function check_spelling(content: string): Promise<AiCommandResponse
         console.error('Error checking spelling:', error);
         throw error; 
     }
+}
+
+/**
+ * Function to generate an AI suggestion to the backend to determine necessary document changes.
+ * Calls: POST /api/ai/writing-assistant/:sessionId/apply-suggestion
+ * Test: TODO
+ */
+export async function apply_ai_suggestion(sessionId: number, suggestionContent: string): Promise<SuggestedDocumentChange[]> {
+    const url = `/api/ai/writing-assistant/${sessionId}/apply-suggestion`;
+    const payload = { suggestion_content: suggestionContent };
+    
+    console.log(`POST ${url} with payload:`, payload);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        // Try to parse error body for more details
+        try {
+            const errorBody = await response.json();
+            console.error('Apply suggestion failed:', errorBody);
+            // Re-throw a more specific error or handle based on errorBody
+            throw new Error(errorBody.error?.message || `HTTP error! status: ${response.status}`);
+        } catch (e) {
+            // Fallback if parsing error body fails
+            console.error('Apply suggestion failed, could not parse error body.');
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+    }
+
+    const result = await response.json();
+    console.log(`Apply suggestion successful. Result:`, result);
+    return result as SuggestedDocumentChange[];
 }

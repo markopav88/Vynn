@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
-    import { get_all_writing_sessions, create_writing_session, get_writing_session, send_writing_message, delete_writing_session } from '$lib/ts/ai';
-    import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload } from '$lib/ts/ai'; // Import all needed types
+    import { get_all_writing_sessions, create_writing_session, get_writing_session, send_writing_message, delete_writing_session, apply_ai_suggestion } from '$lib/ts/ai';
+    import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload } from '$lib/ts/ai';
 
     export let documentId: number | null = null;
     export let isOpen = false;
@@ -196,11 +196,35 @@
         }
     }
 
-    // Function to apply the AI response (placeholder)
-    function applyAIResponse(content: string) {
-        console.log("Apply AI Response button clicked for content:", content);
-        // Placeholder: Implement logic to apply the AI response content
-        // This might involve dispatching an event to the parent component
+    // Function to apply the AI response
+    async function applyAIResponse(suggestionContent: string) {
+        if (!currentSessionId) {
+            console.error("Cannot apply AI response: No active session ID.");
+            // Maybe show an error toast to the user?
+            return;
+        }
+
+        console.log(`Apply AI Response button clicked for session ${currentSessionId}`);
+        console.log("Suggestion Content:", suggestionContent);
+
+        try {
+            // Indicate loading state if desired
+            // isLoadingApply = true;
+
+            // Call the new API function (to be created in ai.ts)
+            const result = await apply_ai_suggestion(currentSessionId, suggestionContent);
+
+            console.log("AI Apply Suggestion Result:", result);
+            // TODO: Process the result (likely proposed changes)
+            // This will involve generating diffs and showing a modal/confirmation
+
+        } catch (error) {
+            console.error("Error applying AI suggestion:", error);
+            // Show error toast to user
+        } finally {
+            // Reset loading state
+            // isLoadingApply = false;
+        }
     }
 
     // Mount logic

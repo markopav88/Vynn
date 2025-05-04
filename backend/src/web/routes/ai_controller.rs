@@ -25,11 +25,13 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower_cookies::Cookies;
 use chrono::Utc;
+use std::collections::HashMap;
 
 use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
     CreateSessionPayload, SendMessagePayload, MessageRole, SelectedTextContext,
-    RewritePayload, WritingAssistantSessionWithSnippet, SessionWithMessageContent
+    RewritePayload, WritingAssistantSessionWithSnippet, SessionWithMessageContent,
+    ApplySuggestionPayload, SuggestedDocumentChange, LlmDocChange
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
@@ -712,6 +714,143 @@ async fn check_and_decrement_ai_credits(pool: &PgPool, user_id: i32) -> Result<(
     Ok(())
 }
 
+/// POST handler for applying an AI suggestion to project documents.
+/// Accessible via: POST /api/ai/writing-assistant/:id/apply-suggestion
+/// Test: TODO
+pub async fn api_apply_suggestion(
+    cookies: Cookies,
+    Path(session_id): Path<i32>,
+    Extension(pool): Extension<PgPool>,
+    Json(payload): Json<ApplySuggestionPayload>,
+) -> Result<Json<Vec<SuggestedDocumentChange>>> {
+    println!("->> {:<12} - api_apply_suggestion for session {}", "HANDLER", session_id);
+
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check and decrement credits before proceeding
+    check_and_decrement_ai_credits(&pool, user_id).await?;
+
+    // 1. Fetch session to verify ownership and get linked document ID
+    let session = sqlx::query_as!(
+        WritingAssistantSession,
+        "SELECT id, user_id, document_id, title, created_at, updated_at FROM writing_assistant_sessions WHERE id = $1 AND user_id = $2",
+        session_id,
+        user_id
+    )
+    .fetch_optional(&pool) // Use optional as session might exist but not belong to user
+    .await
+    .map_err(|_| Error::DatabaseError)?
+    .ok_or(Error::PermissionError)?; // Return permission error if session not found for user
+
+    // 2. Ensure session is linked to a document to find the project
+    let current_doc_id = session.document_id.ok_or_else(|| {
+        println!("->> {:<12} - Apply suggestion failed: Session {} not linked to a document.", "HANDLER", session_id);
+        Error::InvalidRequestFormatError
+    })?;
+
+    // 3. Find the project_id for the current document
+    let project_info = sqlx::query!(
+        "SELECT project_id FROM document_projects WHERE document_id = $1",
+        current_doc_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    let project_id = match project_info {
+        Some(info) => info.project_id,
+        None => {
+            println!("->> {:<12} - Apply suggestion failed: Document {} not found in any project.", "HANDLER", current_doc_id);
+            return Err(Error::DocumentNotFoundError { document_id: current_doc_id });
+        }
+    };
+    println!("->> {:<12} - Found project_id {} for apply suggestion.", "HANDLER", project_id);
+
+    // 4. Fetch original content of all documents in the project
+    struct OriginalDoc { id: i32, name: Option<String>, content: Option<String> }
+    let original_docs = sqlx::query_as!(OriginalDoc,
+        r#"
+        SELECT id, name, content FROM documents 
+        WHERE id IN (SELECT document_id FROM document_projects WHERE project_id = $1)
+        AND is_trashed = false
+        "#,
+        project_id
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    if original_docs.is_empty() {
+         println!("->> {:<12} - Apply suggestion failed: Project {} has no documents.", "HANDLER", project_id);
+         return Err(Error::ProjectNotFoundError { project_id });
+    }
+    println!("->> {:<12} - Fetched {} original documents for project {}.", "HANDLER", original_docs.len(), project_id);
+
+    // Prepare data for prompt (id, name, content)
+    let prompt_docs: Vec<(i32, String, String)> = original_docs
+        .iter()
+        .map(|doc| (
+            doc.id,
+            doc.name.clone().unwrap_or_else(|| "Untitled".to_string()),
+            doc.content.clone().unwrap_or_default()
+        ))
+        .collect();
+
+    // Store original content mapped by ID for later diff generation
+    let original_content_map: HashMap<i32, String> = original_docs
+        .into_iter() // Consume original_docs here
+        .map(|doc| (doc.id, doc.content.unwrap_or_default()))
+        .collect();
+
+
+    // 5. Construct the prompt
+    let final_prompt = prompt::construct_apply_suggestion_prompt(
+        &prompt_docs,
+        &payload.suggestion_content
+    ).map_err(|e| {
+        eprintln!("Error serializing documents for prompt: {}", e);
+        Error::FailedApplyChanges
+    })?; // Handle potential serialization error
+
+    // 6. Query LLM
+    println!("->> {:<12} - Querying LLM for apply suggestion.", "HANDLER");
+    let query_model = QueryModel::new()?;
+    let llm_response_str = query_model.query_model(&final_prompt).await?;
+    println!("->> {:<12} - LLM response received ({} chars).", "HANDLER", llm_response_str.len());
+
+    // 7. Parse LLM response (JSON array of LlmDocChange)
+    let llm_changes: Vec<LlmDocChange> = serde_json::from_str(&llm_response_str)
+        .map_err(|e| {
+            eprintln!("Error parsing LLM response JSON: {}\nLLM Response: {}", e, llm_response_str);
+            Error::FailedApplyChanges
+        })?;
+    println!("->> {:<12} - Parsed {} changes from LLM response.", "HANDLER", llm_changes.len());
+
+    // 8. Construct final response (Vec<SuggestedDocumentChange>)
+    let mut suggested_changes: Vec<SuggestedDocumentChange> = Vec::new();
+    for change in llm_changes {
+        if let Some(old_content) = original_content_map.get(&change.document_id) {
+            // Only include if the content actually changed
+            if old_content != &change.new_content {
+                 suggested_changes.push(SuggestedDocumentChange {
+                    document_id: change.document_id,
+                    old_content: old_content.clone(), // Clone original content
+                    new_content: change.new_content, // Use new content from LLM
+                });
+            } else {
+                 println!("->> {:<12} - LLM proposed no change for doc {}, skipping.", "HANDLER", change.document_id);
+            }
+        } else {
+            // LLM returned an ID not in the original set - log warning but ignore
+             println!("->> {:<12} - WARNING: LLM returned change for unknown document ID {}, ignoring.", "HANDLER", change.document_id);
+        }
+    }
+     println!("->> {:<12} - Constructed {} SuggestedDocumentChange entries.", "HANDLER", suggested_changes.len());
+
+    // 9. Return the suggested changes
+    Ok(Json(suggested_changes))
+}
+
 /// Generate routes for the writing assistant controller
 pub fn writing_assistant_routes() -> Router {
     Router::new()
@@ -720,6 +859,7 @@ pub fn writing_assistant_routes() -> Router {
         .route("/:id", get(api_get_writing_session))
         .route("/:id", delete(api_delete_writing_session))
         .route("/:id/message", post(api_send_writing_message))
+        .route("/:id/apply-suggestion", post(api_apply_suggestion))
         .route("/grammer", post(api_check_grammer))
         .route("/spellcheck", post(api_spell_check))
         .route("/summarize", post(api_summarize))

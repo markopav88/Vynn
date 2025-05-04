@@ -131,3 +131,32 @@ pub struct WritingAssistantSessionWithSnippet {
     pub updated_at: NaiveDateTime,
     pub last_message_snippet: Option<String>,
 }
+
+/// Payload for the apply suggestion request
+#[derive(Debug, Deserialize)]
+pub struct ApplySuggestionPayload {
+    pub suggestion_content: String,
+}
+
+/// Represents the proposed changes for a single document (for backend response)
+#[derive(Debug, Serialize)]
+pub struct SuggestedDocumentChange {
+    pub document_id: i32,
+    pub old_content: String,
+    pub new_content: String,
+}
+
+/// Temporary struct to parse LLM response containing only changed documents
+#[derive(Debug, Deserialize)]
+pub struct LlmDocChange {
+    pub document_id: i32,
+    pub new_content: String,
+}
+
+// Define a simple struct for context documents passed to the prompt
+#[derive(Serialize)]
+pub struct ContextDocument {
+    pub id: i32,
+    pub name: String,
+    pub content: String,
+}
