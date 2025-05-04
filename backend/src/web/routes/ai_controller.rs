@@ -29,7 +29,7 @@ use chrono::Utc;
 use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
     CreateSessionPayload, SendMessagePayload, MessageRole, SelectedTextContext,
-    RewritePayload
+    RewritePayload, WritingAssistantSessionWithSnippet, SessionWithMessageContent
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
@@ -49,32 +49,74 @@ use pgvector::Vector;
 /// Test: test_ai.rs/test_get_all_writing_sessions_success()
 /// Frontend: ai.ts/get_all_writing_sessions()
 /// Returns a list of all writing assistant sessions belonging to the authenticated user.
-/// Sessions are ordered by last updated, with most recent first.
+/// Sessions are ordered by last updated, with most recent first, and include a snippet of the last message.
 pub async fn api_get_all_writing_sessions(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
-) -> Result<Json<Vec<WritingAssistantSession>>> {
+) -> Result<Json<Vec<WritingAssistantSessionWithSnippet>>> { // Update return type
     println!("->> {:<12} - get_all_writing_sessions", "HANDLER");
 
     // Get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Get all chat sessions for this user
-    let sessions = sqlx::query_as!(
-        WritingAssistantSession,
+    // Query to get sessions and the content of the last message for each
+    let sessions_raw = sqlx::query_as!(
+        SessionWithMessageContent,
         r#"
-        SELECT id, user_id, document_id, title, created_at, updated_at 
-        FROM writing_assistant_sessions 
-        WHERE user_id = $1
-        ORDER BY updated_at DESC
+        WITH RankedMessages AS (
+            SELECT 
+                session_id, 
+                content,
+                ROW_NUMBER() OVER(PARTITION BY session_id ORDER BY created_at DESC) as rn
+            FROM writing_assistant_messages
+        )
+        SELECT 
+            s.id,
+            s.user_id,
+            s.document_id,
+            s.title,
+            s.created_at,
+            s.updated_at,
+            rm.content AS last_message_content
+        FROM writing_assistant_sessions s
+        LEFT JOIN RankedMessages rm ON s.id = rm.session_id AND rm.rn = 1
+        WHERE s.user_id = $1
+        ORDER BY s.updated_at DESC
         "#,
         user_id
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| Error::DatabaseError)?;
+    .map_err(|e| {
+        eprintln!("Database error fetching sessions with messages: {}", e);
+        Error::DatabaseError
+    })?;
 
-    Ok(Json(sessions))
+    // Map raw results to the final response struct with truncated snippet
+    let sessions_with_snippet = sessions_raw
+        .into_iter()
+        .map(|raw| {
+            let snippet = raw.last_message_content.map(|content| {
+                let max_len = 30;
+                if content.chars().count() > max_len {
+                    format!("{}...", content.chars().take(max_len).collect::<String>())
+                } else {
+                    content
+                }
+            });
+            WritingAssistantSessionWithSnippet {
+                id: raw.id,
+                user_id: raw.user_id,
+                document_id: raw.document_id,
+                title: raw.title,
+                created_at: raw.created_at,
+                updated_at: raw.updated_at,
+                last_message_snippet: snippet,
+            }
+        })
+        .collect();
+
+    Ok(Json(sessions_with_snippet))
 }
 
 /// POST handler for creating a new writing assistant session.
@@ -288,13 +330,94 @@ pub async fn api_send_writing_message(
     println!("->> {:<12} - Retrieving relevant context via semantic search", "RAG FUNCTION");
     let k_value = 3;
     println!("->> {:<12} - Retrieving relevant chunks (k={}) for project_id: {:?}", "RETRIEVAL", k_value, project_id_for_context);
-    let relevant_chunks = retrieval::semantic_search(
+    
+    // Make relevant_chunks mutable
+    let mut relevant_chunks = retrieval::semantic_search(
         &pool, 
         project_id_for_context,
         &user_embedding,
         k_value // Use k_value variable
     ).await?;
-    println!("->> {:<12} - Retrieved {} relevant chunks", "RETRIEVAL", relevant_chunks.len());
+    
+    // --- Fallback Context Retrieval: Full Project Content --- 
+    if relevant_chunks.is_empty() && session.document_id.is_some() {
+        println!("->> {:<12} - No relevant chunks found. Retrieving full project content as fallback.", "RETRIEVAL");
+        
+        let current_doc_id = session.document_id.unwrap(); // Safe due to check above
+        
+        // 1. Find the project_id for the current document
+        let project_info = sqlx::query!(
+            "SELECT project_id FROM document_projects WHERE document_id = $1",
+            current_doc_id
+        )
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| {
+            eprintln!("Database error fetching project_id for fallback: {}", e);
+            Error::DatabaseError
+        })?;
+
+        if let Some(info) = project_info {
+            let project_id = info.project_id;
+            println!("->> {:<12} - Found project_id {} for fallback context.", "RETRIEVAL", project_id);
+
+            // 2. Fetch all documents in that project
+            // Define a temporary struct for document content
+            struct DocumentContent {
+                id: i32,
+                name: Option<String>,
+                content: Option<String>,
+            }
+            let project_docs = sqlx::query_as!(DocumentContent,
+                r#"
+                SELECT id, name, content 
+                FROM documents 
+                WHERE id IN (SELECT document_id FROM document_projects WHERE project_id = $1)
+                  AND is_trashed = false
+                ORDER BY name ASC -- Or some other consistent order
+                "#,
+                project_id
+            )
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| {
+                eprintln!("Database error fetching project documents for fallback: {}", e);
+                Error::DatabaseError
+            })?;
+
+            // Store length before moving the vector
+            let project_docs_count = project_docs.len();
+            
+            // 3. Concatenate content
+            let mut full_project_content = String::new();
+            for doc in project_docs {
+                let doc_name = doc.name.unwrap_or_else(|| "Untitled".to_string());
+                let doc_content = doc.content.unwrap_or_default(); // Use empty string if null
+                // Add a header for each document
+                full_project_content.push_str(&format!("\n--- Document: {} (ID: {}) ---\n", doc_name, doc.id));
+                full_project_content.push_str(&doc_content);
+                full_project_content.push('\n');
+            }
+
+            if !full_project_content.is_empty() {
+                 println!("->> {:<12} - Concatenated content from {} documents ({} chars) for fallback.", "RETRIEVAL", project_docs_count, full_project_content.len());
+                // 4. Create a single fallback chunk
+                let fallback_chunk = retrieval::RetrievedChunk {
+                    document_id: -1, // Placeholder ID for full project context
+                    document_name: "Full Project Context".to_string(),
+                    content: full_project_content,
+                };
+                // 5. Replace relevant_chunks
+                relevant_chunks = vec![fallback_chunk];
+            } else {
+                 println!("->> {:<12} - Fallback triggered, but project documents have no content.", "RETRIEVAL");
+            }
+        } else {
+             println!("->> {:<12} - Fallback triggered, but could not find project_id for document {}.", "RETRIEVAL", current_doc_id);
+        }
+    }
+
+    println!("->> {:<12} - Total context chunks to use: {}", "RETRIEVAL", relevant_chunks.len());
     // Log retrieved chunks (or snippets)
     for (i, chunk) in relevant_chunks.iter().enumerate() {
         println!("->> {:<12} - Chunk {} (Doc ID: {}, Name: {}): \"{}...\"", 

@@ -25,9 +25,19 @@ pub struct WritingAssistantSession {
 pub struct WritingAssistantMessage {
     pub id: i32,
     pub session_id: i32,
-    pub role: MessageRole,  // Changed to use the enum
+    pub role: MessageRole,
     pub content: String,
     pub created_at: NaiveDateTime,
+}
+
+pub struct SessionWithMessageContent {
+    pub id: i32,
+    pub user_id: i32,
+    pub document_id: Option<i32>,
+    pub title: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+    pub last_message_content: Option<String>,
 }
 
 /// Payload for creating a new chat session
@@ -108,4 +118,16 @@ impl ChatHistory {
             content,
         });
     }
+}
+
+/// Struct for API response when getting all sessions, including a snippet of the last message.
+#[derive(Debug, Serialize, sqlx::FromRow)] // Add necessary derives
+pub struct WritingAssistantSessionWithSnippet {
+    pub id: i32,
+    pub user_id: i32,
+    pub document_id: Option<i32>,
+    pub title: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub last_message_snippet: Option<String>,
 }

@@ -21,7 +21,22 @@
     let chatBody: HTMLDivElement;
 
     // Reactive variable for current session title
-    $: currentSessionTitle = sessions.find(s => s.id === currentSessionId)?.title || 'Select Chat';
+    $: currentSessionTitle = (() => {
+        // Check if sessions is an array before using find
+        if (!Array.isArray(sessions)) return 'Select Chat';
+        const session = sessions.find(s => s.id === currentSessionId);
+        if (!session) return 'Select Chat';
+
+        // Use messages if available for the current session
+        if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            const snippet = lastMessage.content.substring(0, 30); // Take first 30 chars
+            // Construct title with snippet
+            return `${session.title} - ${snippet}${lastMessage.content.length > 30 ? '...' : ''}`;
+        }
+        // Otherwise, just return the session title
+        return session.title;
+    })();
 
     function scrollToBottom(element: HTMLElement | null = chatBody) {
         setTimeout(() => {
@@ -42,11 +57,15 @@
         isLoadingSessions = true;
         errorLoadingSessions = null;
         try {
-            sessions = await get_all_writing_sessions();
+            sessions = (await get_all_writing_sessions()) ?? []; // Default to empty array if null
             // If there's an active session, ensure it's still valid
             if (currentSessionId && !sessions.some(s => s.id === currentSessionId)) {
                 currentSessionId = null;
                 messages = [];
+            }
+            if (sessions.length > 0 && currentSessionId === null) {
+                console.log("->> CHAT: No session loaded, auto-loading most recent:", sessions[0].id);
+                loadSessionMessages(sessions[0].id);
             }
         } catch (err) {
             console.error("Error loading sessions:", err);
@@ -177,14 +196,37 @@
         }
     }
 
+    // Function to apply the AI response (placeholder)
+    function applyAIResponse(content: string) {
+        console.log("Apply AI Response button clicked for content:", content);
+        // Placeholder: Implement logic to apply the AI response content
+        // This might involve dispatching an event to the parent component
+    }
+
     // Mount logic
     onMount(() => {
         if (isOpen) {
             loadAllSessions();
         }
         // Optional: Add focus to input when chat opens?
-        // $: if (isOpen && messageInput) messageInput.focus();
+        if (isOpen && messageInput) messageInput.focus();
     });
+
+    // Function to copy text to clipboard
+    async function copyToClipboard(text: string, buttonElement: HTMLButtonElement) {
+        try {
+            await navigator.clipboard.writeText(text);
+            // Optional: Provide feedback (e.g., change icon briefly)
+            const originalIcon = buttonElement.innerHTML;
+            buttonElement.innerHTML = '<i class="bi bi-check-lg text-success"></i>'; // Checkmark icon
+            setTimeout(() => {
+                buttonElement.innerHTML = originalIcon; // Restore original icon
+            }, 1500); // Restore after 1.5 seconds
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            // Optional: Show error feedback to user
+        }
+    }
 
 </script>
 {#if isOpen}
@@ -209,6 +251,9 @@
                                 on:click={() => loadSessionMessages(session.id)}
                             >
                                 {session.title}
+                                {#if session.last_message_snippet}
+                                    <span class="text-muted fst-italic snippet-text"> - {session.last_message_snippet}</span>
+                                {/if}
                             </button>
                             <button 
                                 class="btn btn-sm btn-danger delete-session-btn" 
@@ -247,11 +292,32 @@
                 {#each messages as message (message.id)}
                     <!-- Apply conditional class based on role (case-sensitive check) -->
                     <div class="message mb-2 {message.role === 'User' ? 'message-user' : 'message-assistant'}">
-                        <div class="message-content p-2 rounded">
+                        <div class="message-content p-2 rounded position-relative">
                             <!-- Basic Markdown-like rendering for newlines -->
                             {#each message.content.split('\n') as line, i}
                                 {line}{#if i < message.content.split('\n').length - 1}<br/>{/if}
                             {/each}
+
+                            <!-- Copy Button for Assistant messages -->
+                            {#if message.role !== 'User'}
+                                <button 
+                                    class="btn btn-sm copy-button" 
+                                    title="Copy to clipboard"
+                                    aria-label="Copy assistant message to clipboard"
+                                    on:click={(e) => copyToClipboard(message.content, e.currentTarget)}
+                                >
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <!-- Apply Button for Assistant messages -->
+                                <button 
+                                    class="btn btn-sm apply-ai-button" 
+                                    title="Apply suggestion"
+                                    aria-label="Apply AI suggestion to document"
+                                    on:click={() => applyAIResponse(message.content)}
+                                >
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                            {/if}
                         </div>
 
                     </div>
@@ -394,6 +460,18 @@
         border-radius: 0; /* Remove individual button radius if needed */
          /* Inherit padding or set explicitly */
         padding: 0.5rem 1rem; 
+        /* Add overflow handling */
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        /* Ensure button takes available space but respects delete btn */
+        min-width: 0; /* Allow button to shrink */
+    }
+
+    /* Style the snippet text */
+    .snippet-text {
+        color: rgba(255, 255, 255, 0.7) !important; /* Lighter color, override text-muted */
+        margin-left: 0.25rem; /* Add small space before snippet */
     }
 
     /* Style the delete button */
@@ -444,4 +522,49 @@
         color: var(--bs-danger);
         opacity: 1;
     }
+
+    /* Style for the copy button */
+    .copy-button {
+        position: absolute;
+        top: 2px; /* Adjust as needed */
+        right: 2px; /* Adjust as needed */
+        padding: 0.1rem 0.3rem; /* Smaller padding */
+        font-size: 0.8rem; /* Smaller icon */
+        background-color: transparent; 
+        border: none;
+        color: rgba(255, 255, 255, 0.4); /* Dim color */
+        opacity: 0.4; /* Initially less visible */
+        transition: opacity 0.2s ease, color 0.2s ease;
+    }
+    .message-assistant .message-content:hover .copy-button {
+        opacity: 1; /* Fully visible on hover */
+        color: rgba(255, 255, 255, 0.8); /* Brighter on hover */
+    }
+    .copy-button:hover {
+        color: white !important; /* White on direct button hover */
+         background-color: rgba(0, 0, 0, 0.2); /* Slight background on hover */
+    }
+
+    /* Style for the Apply AI button */
+    .apply-ai-button {
+        position: absolute;
+        top: 2px;
+        right: 30px; /* Position next to copy button */
+        padding: 0.1rem 0.3rem;
+        font-size: 0.8rem;
+        background-color: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.4);
+        opacity: 0.4;
+        transition: opacity 0.2s ease, color 0.2s ease;
+    }
+    .message-assistant .message-content:hover .apply-ai-button {
+        opacity: 1;
+        color: rgba(144, 238, 144, 0.8); /* Light green */
+    }
+    .apply-ai-button:hover {
+        color: #90ee90 !important; /* Brighter light green on hover */
+        background-color: rgba(0, 0, 0, 0.2); 
+    }
+
 </style>

@@ -19,17 +19,15 @@ pub fn construct_generic_prompt(
 ) -> String {
     let mut prompt = String::new();
 
-    // --- Add System Instructions ---
     prompt.push_str(
         "You are a helpful writing assistant. \
         Use the following 'Relevant Context' retrieved from the user's documents \
         and the 'Chat History' to answer the 'User Query'. \
         Synthesize information from the context and history to provide a specific and helpful response. \
-        If the context contains information relevant to the query, use it directly in your answer.\n\n"
+        If the context contains information relevant to the query, use it directly in your answer. \
+        Your response should be plain text only, without any markdown, HTML, or code formatting.\n\n"
     );
-    // --- End System Instructions ---
 
-    // --- Add Current Document Info ---
     prompt.push_str("Current Document Focus:\n");
     match (current_doc_id, current_doc_name) {
         (Some(id), Some(name)) => prompt.push_str(&format!("- ID: {}, Name: {}\n\n", id, name)),
@@ -37,7 +35,6 @@ pub fn construct_generic_prompt(
         _ => prompt.push_str("- No specific document associated with this chat.\n\n"),
     }
     prompt.push_str("---\n\n");
-    // --- End Current Document Info ---
 
     // Add context if available (truncated if too long)
     prompt.push_str("Relevant Context (from related documents):\n");
@@ -49,8 +46,8 @@ pub fn construct_generic_prompt(
             let chunk_tokens = estimate_tokens(&chunk_header) + estimate_tokens(chunk_content);
 
             if current_context_tokens + chunk_tokens > MAX_CONTEXT_TOKENS {
-                 println!("->> {:<12} - Context truncated due to length (skipping remaining chunks)", "PROMPT");
-                 break; // Stop adding context if limit exceeded
+                println!("->> {:<12} - Context truncated due to length (skipping remaining chunks)", "PROMPT");
+                break; // Stop adding context if limit exceeded
             }
             prompt.push_str(&chunk_header);
             prompt.push_str(chunk_content);
@@ -60,7 +57,7 @@ pub fn construct_generic_prompt(
         prompt.push_str("\n"); // Add a final newline after context section
 
     } else {
-         prompt.push_str("(No relevant context found from other documents)\n\n"); // Indicate no context was found
+        prompt.push_str("(No relevant context found from other documents)\n\n"); // Indicate no context was found
     }
     prompt.push_str("---\n\n"); // Separator after context section
 
@@ -81,7 +78,7 @@ pub fn construct_generic_prompt(
             println!("->> {:<12} - History truncated due to length", "PROMPT");
             break; // Stop adding history if limit exceeded
         }
-        history_str.insert_str(0, &message_line); // Prepend to keep chronological order in final string
+        history_str.insert_str(0, &message_line);
         current_history_tokens += message_tokens;
     }
     if history_str.is_empty() {
@@ -94,7 +91,8 @@ pub fn construct_generic_prompt(
     // Add the current user query
     prompt.push_str("User Query:\n");
     prompt.push_str(user_query);
-    prompt.push_str("\n\nAssistant Response:");
+    // Add a stronger, final instruction for plain text output
+    prompt.push_str("\n\nIMPORTANT: Generate the response as plain text ONLY. Do NOT use any Markdown (like **, lists, etc.), HTML, or other formatting.\n\nAssistant Response:");
     // Keep the final log statement
     println!("->> {:<12} - Prompt constructed ({} tokens estimated)", "PROMPT", estimate_tokens(&prompt));
 

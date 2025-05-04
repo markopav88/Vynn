@@ -43,6 +43,7 @@ export interface WritingAssistantSession {
     title: string;
     created_at: string;
     updated_at: string; 
+    last_message_snippet?: string | null;
 }
 
 export interface WritingAssistantMessage {
