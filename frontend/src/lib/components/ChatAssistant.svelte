@@ -2,7 +2,6 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import { get_all_writing_sessions, create_writing_session, get_writing_session, send_writing_message, delete_writing_session, apply_ai_suggestion } from '$lib/ts/ai';
     import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload, SuggestedDocumentChange } from '$lib/ts/ai';
-
     export let documentId: number | null = null;
     export let isOpen = false;
 
@@ -19,6 +18,7 @@
     let errorLoadingMessages: string | null = null;
     export let messageInput: HTMLInputElement | null;
     let chatBody: HTMLDivElement;
+    let isApplyingSuggestion = false;
 
     // Reactive variable for current session title
     $: currentSessionTitle = (() => {
@@ -200,29 +200,32 @@
     async function applyAIResponse(suggestionContent: string) {
         if (!currentSessionId) {
             console.error("Cannot apply AI response: No active session ID.");
-            // Maybe show an error toast to the user?
+            dispatch('showtoast', { message: 'Cannot apply: No active session', type: 'error' });
             return;
         }
+        
+        console.log(`[applyAIResponse] Attempting to apply. Session ID: ${currentSessionId}`);
+        isApplyingSuggestion = true;
+        dispatch('showtoast', { message: 'Applying changes...', type: 'success' });
 
-        console.log(`Apply AI Response button clicked for session ${currentSessionId}`);
         console.log("Suggestion Content:", suggestionContent);
 
         try {
             const result = await apply_ai_suggestion(currentSessionId, suggestionContent);
             console.log("AI Apply Suggestion Result:", result);
 
-            // Dispatch the raw result if it's valid
             if (result && Array.isArray(result)) {
                 dispatch('suggestionReceived', result as SuggestedDocumentChange[]);
             } else {
                  console.warn("AI Apply Suggestion returned invalid data.");
-                 // Optionally show an error toast here
+                 dispatch('showtoast', { message: 'Suggestion data invalid.', type: 'warning' });
             }
 
         } catch (error) {
             console.error("Error applying AI suggestion:", error);
-            // Show error toast to user
-            // TODO: Check error for insufficient credits and dispatch an event or show a message?
+            dispatch('showtoast', { message: 'Failed to apply changes', type: 'error' });
+        } finally {
+            isApplyingSuggestion = false;
         }
     }
 
@@ -337,8 +340,13 @@
                                     title="Apply suggestion"
                                     aria-label="Apply AI suggestion to document"
                                     on:click={() => applyAIResponse(message.content)}
+                                    disabled={isApplyingSuggestion}
                                 >
-                                    <i class="bi bi-check-circle"></i>
+                                    {#if isApplyingSuggestion} 
+                                        <i class="bi bi-arrow-repeat spin"></i>
+                                    {:else}
+                                        <i class="bi bi-check-circle"></i>
+                                    {/if}
                                 </button>
                             {/if}
                         </div>

@@ -594,7 +594,7 @@
 		toasts = [...toasts, { message, type }];
 		setTimeout(() => { // 3 second notification
 			toasts = toasts.filter((t) => t.message !== message);
-		}, 3000);
+		}, 5000);
 	}
 
 	function removeToast(index: number) {
@@ -4495,7 +4495,7 @@
 		pendingSuggestion = changes.find(change => change.document_id === parseInt(documentId)) || null;
 
 		if (!pendingSuggestion) {
-			console.warn(`Received suggestions, but none matched the current document ${documentId}. Suggestions were for:`, changes.map(c => c.document_id));
+			showToast(`No suggestions available for this document.`, 'warning');
 			return;
 		}
 
@@ -4721,6 +4721,12 @@
 				div.innerHTML = '<br>';
 			}
 		});
+	}
+
+	function handleShowToast(event: CustomEvent<{ message: string; type: 'success' | 'error' | 'warning' }>) {
+		const { message, type } = event.detail;
+		// Ensure the page has its own showToast function defined
+		showToast(message, type); 
 	}
 </script>
 
@@ -5137,6 +5143,7 @@
 				bind:messageInput={chatInputElementRef}
 				on:sendMessage={handleChatMessageSent}
 				on:suggestionReceived={handleSuggestionReceived}
+				on:showtoast={handleShowToast} 
 			/>
 		</div>
 	{/if}
