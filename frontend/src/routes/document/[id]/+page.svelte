@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { onMount, onDestroy, afterUpdate } from 'svelte';
+	import { onMount, onDestroy, afterUpdate, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { fade, fly } from 'svelte/transition';
 	import { jsPDF } from 'jspdf';
 	import { browser } from '$app/environment';
 	import Toast from '$lib/components/Toast.svelte';
-	import * as Diff from 'diff'; // Import jsdiff
+	import * as Diff from 'diff';
 
 	import { get_document, update_document, get_project_from_document, setup_auto_save } from '$lib/ts/document';
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
@@ -28,7 +28,7 @@
 	import profileDefault from '$lib/assets/profile-image.png';
 
 	import '$lib/assets/style/document.css';
-	import type { SuggestedDocumentChange } from '$lib/ts/ai'; // Import the type
+	import type { SuggestedDocumentChange } from '$lib/ts/ai';
 
 	import ChatAssistant from '$lib/components/ChatAssistant.svelte';
 
@@ -56,11 +56,11 @@
 
 	// Add these variables for animation
 	let isAnimating = false;
-	let slideDirection = ''; // 'left' or 'right'
+	let slideDirection = '';
 	let previousDocumentContent = '';
 	let previousDocumentLines: string[] = [];
 	let previousActiveLineIndex = 0;
-	let animationHeight = 0; // Store the height for consistent animation
+	let animationHeight = 0;
 
 	// Constants for editor configuration
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
@@ -115,21 +115,20 @@
 	let commandHighlightText: string | null = null;
 
 	// Add state for suggestion review
-	type DiffPartState = 'pending' | 'accepted' | 'rejected'; // <<< Re-add Type
-	type DiffPart = {                                      // <<< Re-add Type
+	type DiffPartState = 'pending' | 'accepted' | 'rejected';
+	type DiffPart = {
 		id: string; // Unique ID for interaction
 		value: string; // The HTML content of the part
 		type: 'added' | 'removed' | 'common';
 		state: DiffPartState;
 	};
 	let isReviewingSuggestion = false;
-	// let suggestionDiffHTML = ''; // <<< Remove this line
-	let processedDiffParts: DiffPart[] = []; // <<< Re-add this line
-	let activePartControls: string | null = null; // <<< Re-add this line
-	let hideControlsTimeoutId: ReturnType<typeof setTimeout> | null = null; // <<< Re-add this line
+	let processedDiffParts: DiffPart[] = [];
+	let activePartControls: string | null = null;
+	let hideControlsTimeoutId: ReturnType<typeof setTimeout> | null = null;
 	let pendingSuggestion: SuggestedDocumentChange | null = null;
 
-	// Add a function to prevent default browser behavior for certain key combinations
+	// Function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
 		// Prevent OS shortcuts by capturing all Ctrl/Cmd combinations
 		if (event.ctrlKey || event.metaKey) {
@@ -151,12 +150,10 @@
 	async function switchDocument(docId: number) {
 		if (!browser) return;
 		
-		// --- Cancel any active suggestion review before switching ---
 		if (isReviewingSuggestion) {
 			console.log("Cancelling suggestion review due to document switch.");
 			exitReviewMode(); 
 		}
-		// -----------------------------------------------------------
 
 		try {
 			// Don't switch if already on this document
@@ -356,7 +353,7 @@
 			// If document not preloaded, navigate to it the traditional way
 			console.log(`Document not preloaded, navigating to /document/${docId}`);
 
-					window.location.href = `/document/${docId}`;
+			window.location.href = `/document/${docId}`;
 		} catch (error) {
 			console.error('Error switching document:', error);
 			isAnimating = false;
@@ -370,10 +367,10 @@
 			const projectInfo = await get_project_from_document(parseInt(documentId));
 
 			if (projectInfo && projectInfo.project_id) {
-				console.log(`Fetching documents for project ID: ${projectInfo.project_id}`); // Add log
+				console.log(`Fetching documents for project ID: ${projectInfo.project_id}`);
 				// Fetch the actual documents for the project
 				const documents = await get_project_documents(projectInfo.project_id);
-				console.log(`Found ${documents ? documents.length : 0} documents in project`); // Add log
+				console.log(`Found ${documents ? documents.length : 0} documents in project`);
 
 				if (documents && documents.length > 0) {
 					projectDocuments = documents;
@@ -385,14 +382,14 @@
 					});
 					// Ensure project name is set if available
 					if(documentData) documentData.project_name = projectInfo.project_name;
-					console.log(`projectDocuments array updated. Current index: ${currentDocumentIndex}`); // Add log
+					console.log(`projectDocuments array updated. Current index: ${currentDocumentIndex}`);
 				} else {
 					// Handle case where project exists but has no documents (or only the current one)
-					projectDocuments = documentData ? [documentData] : []; // Show at least current doc if available
+					projectDocuments = documentData ? [documentData] : [];
 					currentDocumentIndex = 0;
 					projectDocumentsMap.clear();
 					if(documentData) projectDocumentsMap.set(documentData.id, documentData);
-					console.log('Project has no other documents, showing only current.'); // Add log
+					console.log('Project has no other documents, showing only current.');
 				}
 			} else {
 				// Document is not part of a project
@@ -400,10 +397,10 @@
 				currentDocumentIndex = 0;
 				projectDocumentsMap.clear();
 				if(documentData) projectDocumentsMap.set(documentData.id, documentData);
-				console.log('Document is not part of a project.'); // Add log
+				console.log('Document is not part of a project.');
 			}
 			projectDocumentsLoaded = true;
-			console.log('Finished loadProjectDocuments'); // Add log
+			console.log('Finished loadProjectDocuments');
 		} catch (error) {
 			console.error('Error loading project documents:', error);
 			projectDocumentsLoaded = true;
@@ -416,14 +413,13 @@
 		commandPrefix = prefix;
 		commandInput = '';
 
-		// --- Highlight Selection ---
-		commandHighlightRange = null; // Reset previous highlight state
+		commandHighlightRange = null;
 		commandHighlightSpans = [];
 		const selection = window.getSelection();
 		if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
 			const range = selection.getRangeAt(0).cloneRange(); // Clone to avoid modification
 			commandHighlightRange = range; // Store the original range
-			commandHighlightText = range.toString(); // <-- Extract text BEFORE highlighting
+			commandHighlightText = range.toString();
 			console.log('Storing selection range for command mode:', range);
 			console.log('Storing selected text:', commandHighlightText);
 			// Apply the highlight
@@ -432,7 +428,6 @@
 			// Deselect text after highlighting (optional, depends on desired behavior)
 			selection.removeAllRanges(); 
 		}
-		// --- End Highlight Selection ---
 
 		// Focus the command input after it renders
 		setTimeout(() => {
@@ -448,23 +443,19 @@
 		commandInput = '';
 		commandPrefix = '';
 
-		// --- Remove Highlight ---
 		if (commandHighlightSpans.length > 0) {
 			console.log(`Removing ${commandHighlightSpans.length} highlight spans`);
 			removeHighlight(commandHighlightSpans);
 			commandHighlightSpans = []; // Clear the array
 		}
+
 		// Restore cursor if we had a highlight range
 		if (commandHighlightRange) {
 			const selection = window.getSelection();
 			if (selection) {
 				selection.removeAllRanges();
-				// Use the *stored* original range to restore selection/cursor
-				// This assumes the content structure hasn't drastically changed
 				try {
 					selection.addRange(commandHighlightRange);
-					// Collapse to the start or end based on prefix? Or just keep selection?
-					// For now, let's collapse to the end of the original selection
 					selection.collapseToEnd(); 
 				} catch (e) {
 					console.error("Error restoring selection range:", e, commandHighlightRange);
@@ -472,10 +463,9 @@
 					moveToStartOfDocument(); 
 				}
 			}
-			commandHighlightRange = null; // Clear the stored range
+			commandHighlightRange = null;
 		}
-		commandHighlightText = null; // <-- Clear the stored text
-		// --- End Remove Highlight ---
+		commandHighlightText = null;
 
 		// Return focus to editor
 		if (editorElement) {
@@ -504,7 +494,7 @@
 
 	let toasts: ToastData[] = [];
 
-	// --- Keybinding variables for Cheat Sheet --- 
+	// Keybinding variables for Cheat Sheet
 	let boldKey = 'Ctrl+B';
 	let italicKey = 'Ctrl+I';
 	let underlineKey = 'Ctrl+U';
@@ -538,13 +528,12 @@
 
 	function formatKey(input: KeyboardInput): string {
 		let parts: string[] = [];
-		if (!input) return ''; // Add check for undefined input
+		if (!input) return '';
 
 		if (input.ctrlDown) parts.push('Ctrl');
 		if (input.altDown) parts.push('Alt');
 		if (input.shiftDown) parts.push('Shift');
 		
-		// Use kd property instead of keyDown
 		let key = input.kd; 
 		if (!key) return parts.join('+'); // Return early if key is missing
 
@@ -577,7 +566,6 @@
 		yankKey = bindings.yankText ? formatKey(bindings.yankText) : yankKey;
 		deleteLineKey = bindings.deleteLine ? formatKey(bindings.deleteLine) : deleteLineKey;
 		pasteKey = bindings.pasteText ? formatKey(bindings.pasteText) : pasteKey;
-		// Add document switch keys
 		switchDoc1Key = bindings.switchToDocument1 ? formatKey(bindings.switchToDocument1) : switchDoc1Key;
 		switchDoc2Key = bindings.switchToDocument2 ? formatKey(bindings.switchToDocument2) : switchDoc2Key;
 		switchDoc3Key = bindings.switchToDocument3 ? formatKey(bindings.switchToDocument3) : switchDoc3Key;
@@ -592,7 +580,7 @@
 
 	function showToast(message: string, type: 'success' | 'error' | 'warning' = 'success') {
 		toasts = [...toasts, { message, type }];
-		setTimeout(() => { // 3 second notification
+		setTimeout(() => {
 			toasts = toasts.filter((t) => t.message !== message);
 		}, 5000);
 	}
@@ -610,20 +598,123 @@
 		showInsufficientCreditsPopup = true;
 		insufficientCreditsTimeoutId = setTimeout(() => {
 			showInsufficientCreditsPopup = false;
-			insufficientCreditsTimeoutId = null; // Clear the stored ID
-		}, 10000); // 10 seconds
+			insufficientCreditsTimeoutId = null;
+		}, 10000);
 	}
 
-	// Function to handle colon commands - make async
+	// Function to handle colon commands
 	async function handleColonCommand(command: string) {
-		// Simple command handling for now
 		const cmd = command.trim().toLowerCase();
+		const isAiCommand = [
+			'summarize',
+			'factcheck',
+			'grammar',
+			'spellcheck',
+			'rephrase',
+			'expand',
+			'shrink'
+		].includes(cmd) || cmd.startsWith('rewriteas ');
+		let aiFunction: ((text: string, ...args: any[]) => Promise<any>) | null = null;
+		let userPrompt = '';
+		let aiArgs: any[] = [];
 
-		if (cmd === 'qa!') {
+		if (cmd === 'summarize') {
+			aiFunction = summarize_text;
+			userPrompt = "Summarize the selected text or document.";
+		} else if (cmd === 'factcheck') {
+			aiFunction = fact_check_text;
+			userPrompt = "Fact-check the selected text or document.";
+		} else if (cmd === 'grammar') {
+			aiFunction = check_grammar;
+			userPrompt = "Check grammar in the selected text or document.";
+		} else if (cmd === 'spellcheck') {
+			aiFunction = check_spelling;
+			userPrompt = "Check spelling in the selected text or document.";
+		} else if (cmd === 'rephrase') {
+			aiFunction = rephrase_text;
+			userPrompt = "Rephrase the selected text or document.";
+		} else if (cmd === 'expand') {
+			aiFunction = expand_text;
+			userPrompt = "Expand the selected text or document.";
+		} else if (cmd === 'shrink') {
+			aiFunction = shrink_text;
+			userPrompt = "Shrink the selected text or document.";
+		} else if (cmd.startsWith('rewriteas ')) {
+			const targetStyle = cmd.substring('rewriteas '.length).trim();
+			if (!targetStyle) {
+				showCommandError('Rewrite style missing. Use :rewriteas [style]');
+				return false;
+			}
+			aiFunction = rewrite_text_as;
+			userPrompt = `Rewrite the selected text or document as ${targetStyle}.`;
+			aiArgs = [targetStyle];
+		}
+
+		if (isAiCommand && aiFunction) {
+			const { text: textToSend, isSelection } = getTextForAICommand();
+			if (isSelection) { console.log(`Sending selected text for ${cmd}:`, textToSend); } else { console.log(`Sending full document for ${cmd}`); }
+			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
+
+			// 1. Open Chat
+			isChatOpen = true;
+			showCommands = false;
+
+			// 2. Send User Prompt to Chat (after component likely renders and initializes)
+			await tick(); // Wait for DOM update cycle
+			if (chatAssistantComponent) {
+				// Add a short delay before sending the user prompt
+				setTimeout(() => {
+					if (chatAssistantComponent) { // Check again inside timeout
+						chatAssistantComponent.sendProgrammaticMessage(userPrompt, 'user');
+					} else {
+						console.error("Chat assistant component became unavailable during delay.");
+					}
+				}, 100);
+			} else {
+				console.error("Chat assistant component not ready to receive programmatic message.");
+			}
+
+			// 3. Call AI Function & Handle Response (runs in parallel with the setTimeout above)
+			decrementAiCredits();
+			aiFunction(textToSend, ...aiArgs)
+				.then(async result => {
+					await tick();
+					let aiResponse = '';
+					if (result) {
+						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
+							aiResponse = `No suggestions found for ${cmd}.`;
+						} else {
+							aiResponse = result.response;
+						}
+					} else {
+						aiResponse = `The ${cmd} command failed. Please try again.`;
+					}
+					 if (chatAssistantComponent) {
+						// This part usually works because the AI call takes time
+						chatAssistantComponent.sendProgrammaticMessage(aiResponse, 'assistant');
+					 } else {
+						console.error("Chat assistant component not ready to receive AI response.");
+						showToast('AI command finished, but chat could not be updated.', 'warning');
+					 }
+				})
+				.catch(async error => {
+					await tick(); // Wait again
+					console.error(`${cmd} error:`, error);
+					const errorMessage = `An error occurred during the ${cmd} command.`;
+					 if (chatAssistantComponent) {
+						 chatAssistantComponent.sendProgrammaticMessage(errorMessage, 'assistant');
+					 } else {
+						  console.error("Chat assistant component not ready to receive error message.");
+						  showToast(errorMessage, 'error'); // Fallback toast
+					 }
+					checkErrorForInsufficientCredits(error);
+				});
+			return true;
+
+		} else if (cmd === 'qa!') {
 			goto('/drive');
 			return true;
 		} else if (cmd === 'w') {
-			// Save the document
 			if (documentData && editorElement) {
 				const contentToSave = getCleanedEditorHTML();
 				documentData.content = contentToSave;
@@ -634,7 +725,6 @@
 			}
 			return false;
 		} else if (cmd === 'wq') {
-			// Save and quit
 			if (documentData && editorElement) {
 				const contentToSave = getCleanedEditorHTML();
 				documentData.content = contentToSave;
@@ -647,280 +737,125 @@
 		} else if (cmd === 'export') {
 			exportToPDF();
 			return true;
-		} else if (cmd === 'spellcheck') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for spell check:', textToSend); } else { console.log('Sending full document for spell check'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			check_spelling(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No spelling issues found.', 'success');
-						} else {
-							showCommandError(result.response)
-						}
-					} else {
-						showCommandError('Spell check failed.');
-					}
-				 })
-				.catch(error => { console.error('Spell check error:', error); showCommandError('Spell check encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd === 'grammar') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for grammar check:', textToSend); } else { console.log('Sending full document for grammar check'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			check_grammar(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No grammar issues found.', 'success');
-						} else {
-							showCommandError(result.response)
-						}
-					} else {
-						showCommandError('Grammar check failed.');
-					}
-				 })
-				.catch(error => { console.error('Grammar check error:', error); showCommandError('Grammar check encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd === 'summarize') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for summarization:', textToSend); } else { console.log('Sending full document for summarization'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			summarize_text(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No summarization changes suggested.', 'success');
-						} else {
-							showCommandError(result.response);
-						}
-					} else {
-						showCommandError('Summarization failed.');
-					}
-				 })
-				.catch(error => { console.error('Summarization error:', error); showCommandError('Summarization encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd === 'rephrase') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for rephrasing:', textToSend); } else { console.log('Sending full document for rephrasing'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			rephrase_text(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No rephrasing changes suggested.', 'success');
-						} else {
-							showCommandError(result.response);
-						}
-					} else {
-						showCommandError('Rephrasing failed.');
-					}
-				 })
-				.catch(error => { console.error('Rephrasing error:', error); showCommandError('Rephrasing encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd === 'expand') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for expansion:', textToSend); } else { console.log('Sending full document for expansion'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			expand_text(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No expansion changes suggested.', 'success');
-						} else {
-							showCommandError(result.response);
-						}
-					} else {
-						showCommandError('Expansion failed.');
-					}
-				 })
-				.catch(error => { console.error('Expansion error:', error); showCommandError('Expansion encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd === 'shrink') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for shrinking:', textToSend); } else { console.log('Sending full document for shrinking'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			shrink_text(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No shrinking changes suggested.', 'success');
-						} else {
-							showCommandError(result.response);
-						}
-					} else {
-						showCommandError('Shrinking failed.');
-					}
-				 })
-				.catch(error => { console.error('Shrinking error:', error); showCommandError('Shrinking encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd.startsWith('rewriteas ')) {
-			const targetStyle = cmd.substring('rewriteas '.length).trim();
-			if (!targetStyle) { showCommandError('Rewrite style missing. Use :rewriteas [style]'); return false; }
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log(`Sending selected text for rewrite as ${targetStyle}:`, textToSend); } else { console.log(`Sending full document for rewrite as ${targetStyle}`); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			rewrite_text_as(textToSend, targetStyle)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No rewrite changes suggested.', 'success');
-						} else {
-							showCommandError(result.response);
-						}
-					} else {
-						showCommandError('Rewrite failed.');
-					}
-				 })
-				.catch(error => { console.error('Rewrite error:', error); showCommandError('Rewrite encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
-		} else if (cmd === 'factcheck') {
-			const { text: textToSend, isSelection } = getTextForAICommand();
-			if (isSelection) { console.log('Sending selected text for fact-checking:', textToSend); } else { console.log('Sending full document for fact-checking'); }
-			if (aiCredits !== null && aiCredits <= 0) { triggerInsufficientCreditsPopup(); return false; }
-			decrementAiCredits();
-			fact_check_text(textToSend)
-				.then(result => { 
-					if (result) {
-						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							showToast('No fact-check changes suggested.', 'success');
-						} else {
-							showCommandError(result.response);
-						}
-					} else {
-						showCommandError('Fact-check failed.');
-					}
-				 })
-				.catch(error => { console.error('Fact-check error:', error); showCommandError('Fact-check encountered an error.'); checkErrorForInsufficientCredits(error); });
-			return true;
 		} else if (cmd.startsWith('%s/')) {
-			// Handle find and replace command
-			// Remove the '%s/' prefix and split the remaining command
-			const commandText = cmd.substring(3); // Remove '%s/'
+				// Remove the '%s/' prefix and split the remaining command
+				const commandText = cmd.substring(3); // Remove '%s/'
 
-			// Find all forward slashes
-			const slashPositions = [];
-			let pos = -1;
-			while ((pos = commandText.indexOf('/', pos + 1)) !== -1) {
-				slashPositions.push(pos);
-			}
+				// Find all forward slashes
+				const slashPositions = [];
+				let pos = -1;
+				while ((pos = commandText.indexOf('/', pos + 1)) !== -1) {
+					slashPositions.push(pos);
+				}
 
-			// We need at least 2 slashes for a valid command
-			if (slashPositions.length >= 2) {
-				// Extract search and replace terms
-				const searchText = commandText.substring(0, slashPositions[0]);
-				const replaceText = commandText.substring(slashPositions[0] + 1, slashPositions[1]);
-				const flags = commandText.substring(slashPositions[1] + 1);
+				// We need at least 2 slashes for a valid command
+				if (slashPositions.length >= 2) {
+					// Extract search and replace terms
+					const searchText = commandText.substring(0, slashPositions[0]);
+					const replaceText = commandText.substring(slashPositions[0] + 1, slashPositions[1]);
+					const flags = commandText.substring(slashPositions[1] + 1);
 
-				console.log('Find and replace:', {
-					search: searchText,
-					replace: replaceText,
-					flags
-				});
+					console.log('Find and replace:', {
+						search: searchText,
+						replace: replaceText,
+						flags
+					});
 
-				if (searchText && editorElement) {
-					try {
-						// Create flags for the regex - default to global if no flags specified
-						const isGlobal = flags.includes('g') || flags === '';
-						const isCaseInsensitive = flags.includes('i');
-					const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
+					if (searchText && editorElement) {
+						try {
+							// Create flags for the regex - default to global if no flags specified
+							const isGlobal = flags.includes('g') || flags === '';
+							const isCaseInsensitive = flags.includes('i');
+						const regexFlags = (isGlobal ? 'g' : '') + (isCaseInsensitive ? 'i' : '');
 
-						// Escape special regex characters in search text if not using regex
-						const escapedSearchText = flags.includes('r')
-							? searchText
-							: searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+							// Escape special regex characters in search text if not using regex
+							const escapedSearchText = flags.includes('r')
+								? searchText
+								: searchText.replace(/[.*+?^${}()|[\\\]]/g, '\\$&');
 
-						console.log('Creating regex with:', {
-							pattern: escapedSearchText,
-							flags: regexFlags
-						});
-
-						// Create search regex
-						const searchRegex = new RegExp(escapedSearchText, regexFlags);
-
-						// Get the content as an array of lines
-						const divs = Array.from(editorElement.querySelectorAll('div'));
-						const originalLines = divs.map((div) => div.textContent || '');
-
-						// Track replacements
-						let totalReplacements = 0;
-						const newLines = originalLines.map((line, index) => {
-							// Count matches in this line before replacement
-							const matches = line.match(searchRegex);
-							if (matches) {
-								totalReplacements += matches.length;
-							}
-
-							// Reset lastIndex for global regex between lines
-							searchRegex.lastIndex = 0;
-					
-					// Perform the replacement
-							return line.replace(searchRegex, replaceText);
-						});
-
-						if (totalReplacements > 0) {
-							// Update the content of each div
-							divs.forEach((div, index) => {
-								if (index < newLines.length) {
-									// Create a text node with the new content
-									const textNode = document.createTextNode(newLines[index]);
-									// Clear the div and add the new text node
-									div.textContent = '';
-									div.appendChild(textNode);
-								}
+							console.log('Creating regex with:', {
+								pattern: escapedSearchText,
+								flags: regexFlags
 							});
 
-							// Update editor content
-							editorContent = newLines.join('\n');
+							// Create search regex
+							const searchRegex = new RegExp(escapedSearchText, regexFlags);
 
-							// Update document data
-					if (documentData) {
-								documentData.content = editorElement.innerHTML;
+							// Get the content as an array of lines
+							const divs = Array.from(editorElement.querySelectorAll('div'));
+							const originalLines = divs.map((div) => div.textContent || '');
+
+							// Track replacements
+							let totalReplacements = 0;
+							const newLines = originalLines.map((line, index) => {
+								// Count matches in this line before replacement
+								const matches = line.match(searchRegex);
+								if (matches) {
+									totalReplacements += matches.length;
+								}
+
+								// Reset lastIndex for global regex between lines
+								searchRegex.lastIndex = 0;
+
+								// Perform the replacement
+								return line.replace(searchRegex, replaceText);
+							});
+
+							if (totalReplacements > 0) {
+								// Update the content of each div
+								divs.forEach((div, index) => {
+									if (index < newLines.length) {
+										// Create a text node with the new content
+										const textNode = document.createTextNode(newLines[index]);
+										// Clear the div and add the new text node
+										div.textContent = '';
+										div.appendChild(textNode);
+									}
+								});
+
+								// Update editor content
+								editorContent = newLines.join('\n');
+
+								// Update document data
+								if (documentData) {
+									documentData.content = editorElement.innerHTML;
+								}
+
+								// Show success message with the actual search text
+								showCommandError( // Keep using commandError for find/replace
+									`Replaced ${totalReplacements} occurrence${totalReplacements !== 1 ? 's' : ''} of "${searchText}"`
+								);
+
+								// Update UI
+								updateLineNumbers();
+								updateCursorPosition();
+								adjustEditorHeight();
+
+								return true;
+							} else {
+								showCommandError(`No matches found for "${searchText}"`);
+								return false;
 							}
-
-							// Show success message with the actual search text
-							showCommandError(
-								`Replaced ${totalReplacements} occurrence${totalReplacements !== 1 ? 's' : ''} of "${searchText}"`
-							);
-
-							// Update UI
-							updateLineNumbers();
-							updateCursorPosition();
-							adjustEditorHeight();
-
-							return true;
-				} else {
-							showCommandError(`No matches found for "${searchText}"`);
+						} catch (e) {
+							console.error('Error in find and replace:', e);
+							showCommandError('Invalid search pattern');
 							return false;
-						}
-					} catch (e) {
-						console.error('Error in find and replace:', e);
-						showCommandError('Invalid search pattern');
+					}
+				} else {
+						showCommandError('Invalid find and replace syntax. Use :%s/search/replace/[flags]');
 						return false;
-				}
-			} else {
+					}
+				} else {
 					showCommandError('Invalid find and replace syntax. Use :%s/search/replace/[flags]');
 					return false;
 				}
-			} else {
-				showCommandError('Invalid find and replace syntax. Use :%s/search/replace/[flags]');
-				return false;
-			}
 		} else {
-			// Show error for unrecognized command
-			showCommandError(`Unknown command: "${command}"`);
+			// Show error for unrecognized non-AI command
+			if (!isAiCommand) { // Only show if it wasn't caught by AI check
+				showCommandError(`Unknown command: "${command}"`);
+			}
 			return false;
 		}
-
-		return true;
 	}
 
 	// Function to copy text
@@ -956,116 +891,6 @@
 			// Fallback for browsers that don't support clipboard API
 			showCommandError('Text copied');
 		}
-	}
-
-	// Function to delete text
-	function deleteText() {
-		if (!editorElement) return;
-
-		// Check if there's a selection
-		const selection = window.getSelection();
-		if (!selection || selection.rangeCount === 0) return;
-		
-		const range = selection.getRangeAt(0);
-		
-		// Handle normal text selection deletion (works across divs)
-		if (!range.collapsed) {
-			// Store the start position for cursor restoration
-			const start = getTextOffset(range.startContainer, range.startOffset);
-			
-			// Use execCommand for the actual deletion which properly handles multi-line cases
-			document.execCommand('delete', false);
-			
-			// After deleting, check for and remove empty divs
-			const currentDivs = Array.from(editorElement.querySelectorAll('div'));
-			let emptyDivs = currentDivs.filter((div) => (div.textContent || '').trim() === '');
-			
-			// Only remove empty divs if they're not the only div
-			if (emptyDivs.length > 0 && emptyDivs.length < currentDivs.length) {
-				emptyDivs.forEach((div) => {
-					div.remove();
-				});
-			}
-			
-			// Get updated content after removal
-			editorContent = getEditorContent();
-			
-			// Try to restore a reasonable cursor position
-			const newContentLength = editorContent.length;
-			const safePosition = Math.min(start, newContentLength);
-			setRange(editorElement, safePosition, safePosition);
-		} else {
-			// If no selection but cursor is in a div, try to delete current character
-			const currentNode = range.startContainer;
-			const offset = range.startOffset;
-			const currentOffset = getTextOffset(currentNode, offset);
-			
-			// Only delete if we're not at the end of the document
-			if (currentOffset < editorContent.length) {
-				// Delete one character at cursor position
-				editorContent = editorContent.substring(0, currentOffset) + editorContent.substring(currentOffset + 1);
-				
-				// Update the editor using our safe method
-				safelySetEditorContent(editorContent);
-				
-				// Check for divs that became empty
-				const allDivs = Array.from(editorElement.querySelectorAll('div'));
-				const emptyDivs = allDivs.filter((div) => (div.textContent || '').trim() === '');
-				
-				// Remove empty divs if there are other non-empty divs
-				if (emptyDivs.length > 0 && emptyDivs.length < allDivs.length) {
-					emptyDivs.forEach((div) => {
-						div.remove();
-					});
-					
-					// Get updated content after removing empty divs
-					editorContent = getEditorContent();
-				}
-				
-				// Restore cursor position
-				setRange(editorElement, currentOffset, currentOffset);
-			}
-		}
-		
-		// Update lines array for line numbers
-		lines = editorContent.split('\n');
-		
-		// Update UI
-		updateCursorPosition();
-		updateLineNumbers();
-		adjustEditorHeight();
-	}
-
-	// Function to paste text
-	function pasteText() {
-		if (!editorElement || !clipboardText) return;
-
-		// Get the cursor position from selection
-		const selection = window.getSelection();
-		if (!selection || !selection.rangeCount) return;
-		
-		const range = selection.getRangeAt(0);
-		const start = getTextOffset(range.startContainer, range.startOffset);
-		const end = getTextOffset(range.endContainer, range.endOffset);
-
-		// Insert the clipboard text at the current cursor position
-		const beforePaste = editorContent.substring(0, start);
-		const afterPaste = editorContent.substring(end);
-		const newContent = beforePaste + clipboardText + afterPaste;
-		editorContent = newContent;
-		
-		// Update the editor content using our safe method
-		safelySetEditorContent(newContent);
-		
-		// Set cursor position after the pasted text
-		if (editorElement) {
-		setRange(editorElement, start + clipboardText.length, start + clipboardText.length);
-		}
-		
-		// Update line numbers and other UI elements
-		lines = editorContent.split('\n');
-		updateCursorPosition();
-		adjustEditorHeight();
 	}
 
 	// Function to delete the current line - update to adjust height after deletion
@@ -1130,23 +955,6 @@
 		
 		// Show feedback
 		showCommandError('Line deleted');
-	}
-
-	// Helper function to update lines array
-	function updateLines() {
-		lines = editorContent.split('\n');
-	}
-
-	// Helper function to get text position from line index
-	function getPositionFromLineIndex(lineIndex: number): number {
-		const lines = editorContent.split('\n');
-		let position = 0;
-
-		for (let i = 0; i < lineIndex; i++) {
-			position += lines[i].length + 1; // +1 for the newline character
-		}
-
-		return position;
 	}
 
 	// Special handler for Enter key to fix line counting issues
@@ -1233,15 +1041,15 @@
 				updateLineNumbers();
 				ensureCursorVisible();
 			}, 0);
-			return; // Return after handling INSERT mode
+			return;
 		}
 
 		// NORMAL MODE: Handle editor commands
 		if (editorMode === 'NORMAL') {
 			// Clear any existing buffer timeout
 			if (normalModeBufferTimeout) {
-					clearTimeout(normalModeBufferTimeout);
-					normalModeBufferTimeout = null;
+				clearTimeout(normalModeBufferTimeout);
+				normalModeBufferTimeout = null;
 			}
 
 			// Allow text selection with Shift + arrow keys in normal mode
@@ -1282,18 +1090,18 @@
 
 			if (event.key === '/' && !event.ctrlKey && !event.shiftKey) {
 				event.preventDefault();
-				enterCommandMode('/'); // Enter command mode with forward search prefix
+				enterCommandMode('/');
 				return;
 			}
 			if (event.key === '?' && !event.ctrlKey) {
 				event.preventDefault();
-				enterCommandMode('?'); // Enter command mode with backward search prefix
+				enterCommandMode('?');
 				return;
 			}
 
 			if (event.key === ':') {
 				event.preventDefault();
-				enterCommandMode(':'); // Enter command mode with colon prefix
+				enterCommandMode(':');
 				return;
 			}
 
@@ -1346,8 +1154,8 @@
 		editorContent = getEditorContent();
 
 		// Update UI
-				updateCursorPosition();
-				updateLineNumbers();
+		updateCursorPosition();
+		updateLineNumbers();
 		adjustEditorHeight();
 
 		// Show feedback
@@ -1361,15 +1169,16 @@
 		console.log('Updating cursor position');
 		
 		try {
-				const selection = window.getSelection();
+			const selection = window.getSelection();
+
 			if (!selection || selection.rangeCount === 0) return;
 				
-				const range = selection.getRangeAt(0);
-				const textNode = range.startContainer;
-				const offset = range.startOffset;
+			const range = selection.getRangeAt(0);
+			const textNode = range.startContainer;
+			const offset = range.startOffset;
 				
 			// Get all divs first for reference
-					const allDivs = Array.from(editorElement.querySelectorAll('div'));
+			const allDivs = Array.from(editorElement.querySelectorAll('div'));
 			console.log(`Document has ${allDivs.length} divs`);
 
 			// For each div element in the editor, check if it contains the cursor
@@ -1428,37 +1237,6 @@
 		} catch (error) {
 			console.error('Error updating cursor position:', error);
 		}
-	}
-
-	// Helper function to get text before cursor in contenteditable
-	function getTextBeforeCursor(node: Node, offset: number): string {
-		if (!editorElement) return '';
-		
-		let text = '';
-		
-		// Handle text node
-		if (node.nodeType === Node.TEXT_NODE) {
-			text = (node.textContent || '').substring(0, offset);
-		}
-		
-		// Go up the tree and collect text from nodes before this one
-		let current = node;
-		while (current !== editorElement) {
-			const parent = current.parentNode;
-			if (!parent) break;
-			
-			// Get all previous siblings
-			let sibling = parent.firstChild;
-			while (sibling && sibling !== current) {
-				text = (sibling.textContent || '') + text;
-				sibling = sibling.nextSibling;
-			}
-			
-			// Move up the tree
-			current = parent;
-		}
-		
-		return text;
 	}
 
 	// Update the adjustTextareaHeight function to handle full page scrolling
@@ -1651,7 +1429,7 @@
 									}
 
 									// Update line numbers only once
-					updateLineNumbers();
+									updateLineNumbers();
 									console.log('Click handler updated position:', {
 										activeLineIndex,
 										cursorLine,
@@ -1664,7 +1442,7 @@
 						// Add selection change listener to track cursor movement
 						document.addEventListener('selectionchange', () => {
 							if (document.activeElement === editorElement) {
-					updateCursorPosition();
+								updateCursorPosition();
 								updateLineNumbers();
 							}
 						});
@@ -1672,7 +1450,7 @@
 						// Update UI
 						updateCursorPosition();
 						updateLineNumbers();
-					adjustEditorHeight();
+						adjustEditorHeight();
 					}
 					
 					// Set up a MutationObserver to watch for content changes
@@ -1847,7 +1625,6 @@
 				// Load project documents if this document is part of a project
 				await loadProjectDocuments();
 
-				// Re-add Set up auto-save
 				autoSaveCleanup = setup_auto_save(documentData, () => {
 					if (documentData && editorElement) {
 						// Get the cleaned content using the helper
@@ -1923,8 +1700,8 @@
 				continue;
 			}
 
-				// Line is too long and needs wrapping
-				let remainingText = line;
+			// Line is too long and needs wrapping
+			let remainingText = line;
 				
 			while (remainingText.length > 0) {
 				// If remaining text fits in one line
@@ -1956,7 +1733,7 @@
 				}
 
 				// Move to next segment, trimming any leading spaces
-					remainingText = remainingText.substring(breakIndex).trimStart();
+				remainingText = remainingText.substring(breakIndex).trimStart();
 			}
 		}
 
@@ -2056,7 +1833,7 @@
 			const lines = Array.from(divElements).map((div) => {
 					// Get text content, replacing zero-width spaces with nothing
 					let text = div.textContent || '';
-					text = text.replace(/\u200B/g, ''); // Remove zero-width spaces
+					text = text.replace(/\u200B/g, '');
 					return text;
 				});
 				
@@ -2084,9 +1861,7 @@
 			}
 			
 			// Log for debugging
-		console.log(
-			`getEditorContent: ${content.split('\n').length} lines (${content.split('\n').filter((l) => l === '').length} empty)`
-		);
+		console.log(`getEditorContent: ${content.split('\n').length} lines (${content.split('\n').filter((l) => l === '').length} empty)`);
 		
 		return content;
 	}
@@ -2120,8 +1895,8 @@
 			content = '';
 		}
 		
-			// Use our safe helper method
-			safelySetEditorContent(content);
+		// Use our safe helper method
+		safelySetEditorContent(content);
 		
 		// Force a complete update of line numbers and UI
 		setTimeout(() => {
@@ -2192,18 +1967,18 @@
 					if (currentNode.nodeType === Node.TEXT_NODE) {
 						const nodeLength = currentNode.textContent?.length || 0;
 						if (currentOffset + nodeLength >= offsetInDiv) {
-				const range = document.createRange();
+							const range = document.createRange();
 							range.setStart(currentNode, offsetInDiv - currentOffset);
-				range.collapse(true);
+							range.collapse(true);
 				
 							const selection = window.getSelection();
 							if (selection) {
 								selection.removeAllRanges();
 								selection.addRange(range);
 							}
-				return;
-			}
-			currentOffset += nodeLength;
+							return;
+						}
+						currentOffset += nodeLength;
 					}
 					currentNode = currentNode.nextSibling;
 				}
@@ -2212,7 +1987,6 @@
 			currentPos += divLength;
 		}
 	}
-
 
 	function applyTextColor(color: string) {
 		if (document.queryCommandSupported('foreColor')) {
@@ -2524,37 +2298,37 @@
 				// Get the last div
 				const lastDiv = allDivs[allDivs.length - 1];
 
-			// Get all text nodes in the last div
-			const textNodes: Node[] = [];
-			const walker = document.createTreeWalker(lastDiv, NodeFilter.SHOW_TEXT, null);
+				// Get all text nodes in the last div
+				const textNodes: Node[] = [];
+				const walker = document.createTreeWalker(lastDiv, NodeFilter.SHOW_TEXT, null);
 
-			let node;
-			while ((node = walker.nextNode())) {
-				textNodes.push(node);
-			}
-				
+				let node;
+				while ((node = walker.nextNode())) {
+					textNodes.push(node);
+				}
+					
 				// Create a range at the end of the last div
 				const range = document.createRange();
-				
-			// If we have text nodes, move to the end of the last one
-			if (textNodes.length > 0) {
-				const lastTextNode = textNodes[textNodes.length - 1];
-				const length = lastTextNode.textContent?.length || 0;
-				range.setStart(lastTextNode, length);
+					
+				// If we have text nodes, move to the end of the last one
+				if (textNodes.length > 0) {
+					const lastTextNode = textNodes[textNodes.length - 1];
+					const length = lastTextNode.textContent?.length || 0;
+					range.setStart(lastTextNode, length);
 
-				// Calculate total length for cursor column
-				let totalLength = 0;
-				textNodes.forEach((node) => {
-					totalLength += node.textContent?.length || 0;
-				});
-				cursorColumn = totalLength + 1;
+					// Calculate total length for cursor column
+					let totalLength = 0;
+					textNodes.forEach((node) => {
+						totalLength += node.textContent?.length || 0;
+					});
+					cursorColumn = totalLength + 1;
 				} else {
-				// If no text nodes, set to end of div
-				range.setStart(lastDiv, lastDiv.childNodes.length);
-				cursorColumn = 1;
+					// If no text nodes, set to end of div
+					range.setStart(lastDiv, lastDiv.childNodes.length);
+					cursorColumn = 1;
 				}
 				range.collapse(true);
-				
+					
 				// Apply the range to move the cursor
 				const selection = window.getSelection();
 				if (selection) {
@@ -2566,19 +2340,19 @@
 				// Update indices
 				activeLineIndex = allDivs.length - 1;
 				cursorLine = allDivs.length;
-				
-			console.log('Moved to end of document:', {
-				activeLineIndex,
-				cursorLine,
-				cursorColumn,
-				totalLines: allDivs.length,
-				lastLineContent: lastDiv.textContent || ''
-			});
+					
+				console.log('Moved to end of document:', {
+					activeLineIndex,
+					cursorLine,
+					cursorColumn,
+					totalLines: allDivs.length,
+					lastLineContent: lastDiv.textContent || ''
+				});
 			} else {
 				// No divs, just go to the end of the content
 				const length = editorContent.length;
 				setRange(editorElement, length, length);
-		}
+			}
 		
 		// Update UI
 		updateCursorPosition();
@@ -2598,13 +2372,13 @@
 	}
 	
 	// Add command execution function
-	async function executeCommand(event: KeyboardEvent) { // <-- Make async
+	async function executeCommand(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
 			event.preventDefault();
 			
 			if (commandPrefix === ':') {
 				// Handle colon command, but always exit mode afterwards
-				await handleColonCommand(commandInput); // Wait for potential async ops within
+				await handleColonCommand(commandInput);
 				exitCommandMode(); // Exit regardless of command success/failure
 			} else if (commandPrefix === '/' || commandPrefix === '?') {
 				// Set the search direction based on the command
@@ -2622,11 +2396,6 @@
 		if (!editorElement) return;
 		
 		console.log('Setting content safely:', content);
-
-		// REMOVED block that stripped HTML tags - Assume input 'content' 
-		// already represents lines separated by '\n'.
-		// let plainContent = content;
-		// if (content.includes('<') && content.includes('>')) { ... }
 
 		// Split into lines directly from input content and wrap if needed
 		let lines = content.split('\n');
@@ -2664,7 +2433,6 @@
 							breakPoint = MAX_COLUMN_WIDTH;
 						}
 
-						// Add the segment and continue with remaining text
 						const segment = line.substring(0, breakPoint).trimEnd();
 						wrappedLines.push(segment);
 						wrappedToOriginalMap.set(currentWrappedIndex, i);
@@ -2687,7 +2455,7 @@
 			}
 		}
 
-			console.log('Total wrapped lines:', wrappedLines.length);
+		console.log('Total wrapped lines:', wrappedLines.length);
 
 		// Store reference to editor element to ensure it's not null during operations
 		const editor = editorElement;
@@ -2793,21 +2561,6 @@
 		ensureCursorVisible();
 	}
 
-	// Add toast styles near other style definitions
-	const toastSuccess = {
-		theme: {
-			'--toastBackground': '#48BB78',
-			'--toastBarBackground': '#2F855A'
-		}
-	};
-
-	const toastError = {
-		theme: {
-			'--toastBackground': '#F56565',
-			'--toastBarBackground': '#C53030'
-		}
-	};
-
 	// Add search functions
 	function performSearch(query: string, direction: 'forward' | 'backward' = 'forward') {
 		if (!editorElement || !query) {
@@ -2870,8 +2623,8 @@
 					currentSearchIndex = searchResults.findIndex((pos) => pos > currentOffset);
 					if (currentSearchIndex === -1) {
 						currentSearchIndex = 0; // Wrap to start
-			}
-		} else {
+					}
+				} else {
 					currentSearchIndex = searchResults.findIndex((pos) => pos >= currentOffset) - 1;
 					if (currentSearchIndex === -2) {
 						currentSearchIndex = searchResults.length - 1; // Wrap to end
@@ -3076,7 +2829,7 @@
 		navigateToSearchResult();
 	}
 
-	// Redesigned updateLineNumbers function for better empty line handling
+	// Function to ensure we update the line numbers
 	function updateLineNumbers() {
 		if (!editorElement) return;
 
@@ -3654,6 +3407,7 @@
 			// Allow the key event to proceed for other handlers (like the editor's own keydown)
 			return; 
 		}
+
 		// Block keybindings if color picker is open
 		if (showColorPicker) {
 			return;
@@ -3698,7 +3452,7 @@
 		const eventKeyLower = event.key.toLowerCase();
 		let handled = false;
 
-		switch(eventKeyLower) { // Switch on lowercase key
+		switch(eventKeyLower) {
 			case 'escape':
 				event.preventDefault();
 				showColorPicker = false;
@@ -3712,7 +3466,6 @@
 				}
 				handled = true;
 				break;
-			// Keep hardcoded arrow keys
 			case 'arrowleft':
 				event.preventDefault();
 				hue = (hue - 5 + 365) % 365; 
@@ -3737,7 +3490,6 @@
 				updateColorFromHueOnly();
 				handled = true;
 				break;
-			// Handle dynamic keys if not an arrow/escape/enter
 			default:
 				if (leftKey && eventKeyLower === leftKey) {
 					event.preventDefault();
@@ -3762,7 +3514,6 @@
 				} 
 		}
 
-		// If the key wasn't handled by the switch or the dynamic checks, prevent default anyway
 		if (!handled) {
 			event.preventDefault(); 
 		}
@@ -4011,7 +3762,6 @@
 			updateLineNumbers();
 			ensureCursorVisible();
 		} else if (!successfullyMoved && activeLineIndex < allDivs.length - 1) {
-			// Fallback logging
 			console.warn('MoveRight reached end of line but moveDown was not called?');
 		}
 	}
@@ -4466,23 +4216,18 @@
 		}
 	}
 
-	// Connect decrement function to Chat Assistant
-	// This assumes ChatAssistant has an `on:sendMessage` event or similar
-	// If not, you'll need to pass `decrementAiCredits` as a prop.
 	function handleChatMessageSent() {
 		if (aiCredits !== null && aiCredits <= 0) { 
 			triggerInsufficientCreditsPopup(); // Use helper
 			return; 
 		}
 		decrementAiCredits();
-		// Note: Still need error handling FROM ChatAssistant component
-		// to call checkErrorForInsufficientCredits if the backend rejects the message.
 	}
-	// <<< Replace entire handleSuggestionReceived function >>>
+
 	function handleSuggestionReceived(event: CustomEvent<SuggestedDocumentChange[]>) {
 		if (isReviewingSuggestion) {
 			showToast('Already reviewing a suggestion. Please accept or reject the current one first.', 'warning');
-			return; 
+			return;
 		}
 
 		const changes = event.detail;
@@ -4491,7 +4236,6 @@
 			return;
 		}
 
-		// Find the suggestion that matches the current document
 		pendingSuggestion = changes.find(change => change.document_id === parseInt(documentId)) || null;
 
 		if (!pendingSuggestion) {
@@ -4507,25 +4251,25 @@
 			return;
 		}
 
-		// Enter review mode
 		isReviewingSuggestion = true;
 		if (editorElement) {
 			editorElement.contentEditable = 'false';
-			editorElement.style.opacity = '0.6';
+				editorElement.style.opacity = '0.6';
 		}
 
-		// --- Clean HTML before diffing to remove problematic attributes ---
 		const attributeToRemoveRegex = / data-original-line=".*?"/g;
 		const cleanedOldContent = pendingSuggestion.old_content.replace(attributeToRemoveRegex, '');
 		const cleanedNewContent = pendingSuggestion.new_content.replace(attributeToRemoveRegex, '');
-		// ----------------------------------------------------------------
 
-		// Calculate diff using diffWords on the *cleaned* HTML
+		// --- Use diffWords ---
 		const diffResult = Diff.diffWords(cleanedOldContent, cleanedNewContent);
-		
-		// Process diff into structured array
+
+		// --- Group the results ---
+		const groupedDiffResult = groupDiffParts(diffResult); // Call the new helper
+
+		// Process *grouped* diff into structured array
 		processedDiffParts = []; // Reset the array
-		diffResult.forEach((part, index) => {
+		groupedDiffResult.forEach((part, index) => { // Iterate over GROUPED results
 			let type: 'added' | 'removed' | 'common';
 			if (part.added) {
 				type = 'added';
@@ -4535,27 +4279,20 @@
 				type = 'common';
 			}
 
-			// Skip parts that are only whitespace if desired (might simplify UI)
-			// if (type !== 'common' && part.value.trim() === '') {
-			// 	return; // Skip whitespace-only changes
-			// }
-
 			processedDiffParts.push({
 				id: `diff-part-${index}`,
-				value: part.value,
+				value: part.value, // Value is now a potentially larger chunk
 				type: type,
-				state: 'pending' // Initial state
+				state: 'pending'
 			});
 		});
 
-		console.log("Processed diff parts:", processedDiffParts.slice(0, 10)); // Log first few parts
-		activePartControls = null; // Ensure no controls are shown initially
-		console.log(`[handleSuggestionReceived] editorElement exists: ${!!editorElement}`); // <<< ADD DEBUG LOG
-		console.log("[handleSuggestionReceived] pendingSuggestion set:", pendingSuggestion); // <<< ADD DEBUG LOG
+		console.log("Processed grouped diff parts:", processedDiffParts.slice(0, 5)); // Log first few grouped parts
+		activePartControls = null;
+		console.log(`[handleSuggestionReceived] editorElement exists: ${!!editorElement}`);
+		console.log("[handleSuggestionReceived] pendingSuggestion set:", pendingSuggestion);
 	}
-	// <<< End replace handleSuggestionReceived function >>>
 
-	// <<< Add helper functions for part controls >>>
 	// Functions to show/hide individual part controls
 	function showPartControls(partId: string) {
 		clearTimeout(hideControlsTimeoutId ?? undefined); // Clear any pending hide
@@ -4567,9 +4304,9 @@
 		hideControlsTimeoutId = setTimeout(() => {
 			activePartControls = null;
 			hideControlsTimeoutId = null;
-		}, 300); // Adjust delay as needed (e.g., 300ms)
+		}, 300); 
 	}
-	function cancelHideControls() { // Renamed for clarity
+	function cancelHideControls() {
 		clearTimeout(hideControlsTimeoutId ?? undefined);
 		hideControlsTimeoutId = null;
 	}
@@ -4587,10 +4324,93 @@
 		);
 		activePartControls = null; // Hide controls after action
 	}
-	// <<< End add helper functions >>>
 
-	// <<< Replace acceptSuggestion function >>>
-	function acceptSuggestion() { // Global Accept
+	function fixInsideDivs() {
+		if (!editorElement) {
+			console.warn("fixInsideDivs: editorElement is null.");
+			return;
+		}
+
+		console.log("fixInsideDivs: Starting structure check/fix (insert before, remove parent strategy).");
+		let changesMade = false;
+
+		// Iterate carefully as the children collection will change
+		let i = 0;
+		while (i < editorElement.children.length) {
+			const currentElement = editorElement.children[i];
+
+			// Only process DIV elements
+			if (currentElement.tagName !== 'DIV') {
+				i++;
+				continue;
+			}
+			const parentDiv = currentElement as HTMLDivElement;
+
+			// Find direct child divs (snapshot for this parent)
+			const nestedDivs = Array.from(parentDiv.querySelectorAll(':scope > div')) as HTMLDivElement[];
+
+			if (nestedDivs.length > 0) {
+				console.log(`fixInsideDivs: Found ${nestedDivs.length} nested divs inside div index ${i}. Unwrapping...`);
+				changesMade = true;
+
+				// Store the parent's original line attribute to apply to children
+				const originalLineAttr = parentDiv.dataset.originalLine;
+
+				// Move each nested div *before* the parent div in the main editor structure
+				nestedDivs.forEach(nestedDiv => {
+					// Apply the parent's line attribute to the nested div
+					if (originalLineAttr) {
+						nestedDiv.dataset.originalLine = originalLineAttr;
+					} else {
+						delete nestedDiv.dataset.originalLine; // Remove if parent didn't have one
+					}
+					// Ensure the nested div represents a line if its content was empty
+					if (nestedDiv.textContent?.trim() === '' && !nestedDiv.querySelector('br')) {
+						// console.log(`fixInsideDivs: Adding <br> to nested div.`);
+						nestedDiv.innerHTML = '<br>';
+					}
+					// Insert the nested div before the parent in the editor's children list
+					editorElement!.insertBefore(nestedDiv, parentDiv); // This moves the nestedDiv
+				});
+
+				// Remove the original parent div (it should now be empty of its nested divs)
+				parentDiv.remove();
+			} else {
+				// No nested divs found in this parent, move to the next element
+				i++;
+			}
+		}
+
+		if (editorElement.children.length > 0) {
+			const firstChild = editorElement.children[0] as HTMLElement;
+			// Check if it's a DIV and is effectively empty
+			if (firstChild.tagName === 'DIV' && (firstChild.textContent?.trim() === '' || firstChild.innerHTML.trim() === '<br>')) {
+				console.log("fixInsideDivs: Removing empty first div.");
+				firstChild.remove();
+				changesMade = true; // Mark that a change occurred
+			}
+		}
+
+		// Update editor state once if any changes were made during the process
+		if (changesMade) {
+			console.log("fixInsideDivs: Finished checks/unwrapping. Updating final editor state.");
+			// Recalculate content and update UI based on the final DOM state
+			editorContent = getEditorContent();
+		}
+		// Update editor state once if any changes were made during the process
+		if (changesMade) {
+			console.log("fixInsideDivs: Finished unwrapping process. Updating final editor state.");
+			// Recalculate content and update UI based on the final DOM state
+			editorContent = getEditorContent();
+			updateLineNumbers();
+			updateCursorPosition();
+			adjustEditorHeight();
+		} else {
+			console.log("fixInsideDivs: No nested divs needed unwrapping.");
+		}
+	}
+
+	function acceptSuggestion() {
 		console.log("--- acceptSuggestion function triggered ---");
 		// Only check pendingSuggestion here, editorElement will be null
 		console.log(`[acceptSuggestion] Checking: pendingSuggestion = ${pendingSuggestion}`);
@@ -4612,7 +4432,6 @@
 				if (part.state === 'rejected') { // *Keep* if removal was rejected
 					finalHtml += part.value;
 				}
-				// Otherwise (pending or accepted removal), skip it
 			}
 		});
 
@@ -4625,18 +4444,17 @@
 				console.log("[acceptSuggestion] Applying accepted content after exiting review mode.");
 				editorContent = contentToSet;
 				safelySetEditorContent(editorContent);
+				fixInsideDivs();
 				showToast('Suggestion applied.', 'success');
 				triggerAutoSave();
 			} else {
 				console.error("[acceptSuggestion] Editor element still null after exiting review mode.");
 				showToast('Failed to apply suggestion - editor error.', 'error');
 			}
-		}, 0); // Timeout 0 waits for the next tick
+		}, 0);
 	}
-	// <<< End replace acceptSuggestion function >>>
 
-	// <<< Replace rejectSuggestion function >>>
-	function rejectSuggestion() { // Global Reject
+	function rejectSuggestion() {
 		console.log("--- rejectSuggestion function triggered ---");
 		// Only check pendingSuggestion here, editorElement will be null
 		console.log(`[rejectSuggestion] Checking: pendingSuggestion = ${pendingSuggestion}`);
@@ -4663,11 +4481,8 @@
 			}
 		}, 0); // Timeout 0 waits for the next tick
 	}
-	// <<< End replace rejectSuggestion function >>>
-
-	// <<< Replace exitReviewMode function >>>
 	function exitReviewMode() {
-		console.log("--- exitReviewMode function triggered ---"); // Add log
+		console.log("--- exitReviewMode function triggered ---");
 		isReviewingSuggestion = false; // This triggers the DOM update
 		pendingSuggestion = null;
 		processedDiffParts = []; 
@@ -4725,8 +4540,45 @@
 
 	function handleShowToast(event: CustomEvent<{ message: string; type: 'success' | 'error' | 'warning' }>) {
 		const { message, type } = event.detail;
-		// Ensure the page has its own showToast function defined
 		showToast(message, type); 
+	}
+
+	// Helper function to group consecutive diff parts of the same type
+	function groupDiffParts(diffResult: Diff.Change[]): Diff.Change[] {
+	  	const grouped: Diff.Change[] = [];
+	  	if (!diffResult || diffResult.length === 0) {
+			return grouped;
+	  	}
+
+		// Start with the first part as the initial group
+		let currentGroup: Diff.Change = { ...diffResult[0] };
+		// Ensure value is initialized
+		currentGroup.value = currentGroup.value || '';
+
+		for (let i = 1; i < diffResult.length; i++) {
+			const part = diffResult[i];
+			// Check added/removed flags; if neither, it's common.
+			const isSameType = (!!part.added === !!currentGroup.added) && (!!part.removed === !!currentGroup.removed);
+
+			if (isSameType) {
+				// Same type, append value to the current group
+				currentGroup.value += (part.value || '');
+				// Optionally update count if needed, though value is primary here
+				currentGroup.count = (currentGroup.count || 0) + (part.count || 0);
+			} else {
+				// Type changed, push the completed group and start a new one
+				grouped.push(currentGroup);
+				currentGroup = { ...part };
+				// Ensure value is initialized for the new group
+				currentGroup.value = currentGroup.value || '';
+			}
+		}
+
+		// Push the last group after the loop finishes
+		grouped.push(currentGroup);
+
+		console.log(`Grouped diff from ${diffResult.length} parts down to ${grouped.length} parts.`);
+		return grouped;
 	}
 </script>
 
@@ -4738,7 +4590,6 @@
 	<Toast message={toast.message} type={toast.type} onClose={() => removeToast(i)} />
 {/each}
 
-<!-- Moved Navbar outside of editor-page -->
 <div class="navbar-container" class:fade-in-first={navbarReady} class:navbar-ready={navbarReady} style="opacity: {navbarReady ? 1 : 0}; transition: opacity 0.6s ease-out;">
 	<nav class="navbar">
 		<a href="/drive" class="logo-link" aria-label="Go to Drive">
@@ -4837,7 +4688,6 @@
 					{#if isReviewingSuggestion}
 						<div class="suggestion-review-container">
 							<div class="suggestion-diff-view">
-								<!-- Replace @html with #each block -->
 								{#each processedDiffParts as part (part.id)}
 									{#if part.type === 'common'}
 										<span class="diff-part common">{@html part.value}</span>
@@ -4880,7 +4730,6 @@
 										</span>
 									{/if}
 								{/each}
-								<!-- End #each block -->
 							</div>
 							<div class="suggestion-controls">
 								<button class="btn btn-sm btn-success me-2" on:click={acceptSuggestion}>
@@ -4903,9 +4752,7 @@
 							role="textbox"
 							aria-multiline="true"
 							tabindex="0"
-						>
-							<!-- Initial content is set via innerHTML in onMount or loadDocumentData -->
-						</div>
+						></div>
 					{/if}
 				</div>
 			</div>
@@ -4992,7 +4839,7 @@
 		</div>
 	</div>
 
-	<!-- Add commands cheat sheet overlay -->
+	<!-- Commands cheat sheet overlay -->
 	<div class="commands-overlay" class:show-commands={showCommands}>
 		<div class="commands-header">
 				<h5>Command Reference</h5>
@@ -5016,7 +4863,6 @@
 				</div>
 		</div>
 		<div class="commands-body">
-			<!-- Restored original structure with dynamic keys -->
 			<div class="commands-section">
 				<h6>Mode Switching</h6>
 				<ul>
@@ -5148,136 +4994,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-/* Add styles for suggestion review */
-.suggestion-review-container {
-	position: relative; /* Needed for absolute positioning of controls if desired */
-	border: 1px solid var(--color-primary-muted); /* Add a subtle border */
-	border-radius: 4px;
-	padding: 1rem;
-	background-color: rgba(0, 0, 0, 0.1); /* Slightly different background */
-	min-height: 200px; /* Ensure it has some height */
-	font-family: var(--font-mono); /* Use monospace font for diff */
-	color: var(--text-color);
-	line-height: var(--line-height-base);
-	white-space: pre-wrap; /* Preserve whitespace and wrap */
-	overflow-y: auto; /* Allow scrolling if diff is long */
-	max-height: 70vh; /* Limit max height */
-}
-
-.suggestion-diff-view {
-	font-size: 0.9rem;
-	font-family: var(--font-mono);
-	line-height: var(--line-height-base);
-	color: var(--text-color);
-	white-space: pre-wrap;
-}
-
-/* Styles for diff parts - REPLACED old :global rules */
-.diff-part {
-	display: inline; /* Keep parts flowing like text */
-	border-radius: 3px;
-	transition: background-color 0.2s ease;
-}
-
-
-.diff-part.added,
-.diff-part.removed {
-	cursor: pointer; /* Indicate interactivity */
-	position: relative; /* For positioning controls */
-}
-
-/* Pending state highlighting */
-.diff-part.added.pending {
-	background-color: rgba(40, 167, 69, 0.4); 
-	color: #e0f2e0; 
-}
-.diff-part.removed.pending {
-	background-color: rgba(220, 53, 69, 0.4); 
-	color: #f5d7da; 
-}
-
-/* Accepted state highlighting */
-.diff-part.added.accepted {
-	background-color: rgba(40, 167, 69, 0.6); /* Slightly stronger */
-	box-shadow: 0 0 0 1px rgba(80, 200, 100, 0.5);
-	color: white;
-}
-.diff-part.removed.accepted {
-	background-color: rgba(150, 150, 150, 0.3); /* Gray out accepted removals */
-	color: #aaa;
-	text-decoration: line-through;
-	opacity: 0.7;
-}
-
-/* Rejected state highlighting */
-.diff-part.added.rejected {
-	background-color: rgba(150, 150, 150, 0.3); /* Gray out rejected additions */
-	color: #aaa;
-	text-decoration: line-through;
-	opacity: 0.7;
-}
-.diff-part.removed.rejected {
-	background-color: rgba(220, 53, 69, 0.6); /* Slightly stronger */
-	box-shadow: 0 0 0 1px rgba(255, 100, 100, 0.5);
-	color: white; 
-}
-
-/* Individual part controls - ADDED these rules */
-.part-controls {
-	position: absolute;
-	top: -22px; /* Position above the part */
-	left: 50%;
-	transform: translateX(-50%);
-	background-color: rgba(50, 50, 50, 0.95);
-	border-radius: 4px;
-	padding: 2px 4px;
-	box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-	display: flex;
-	gap: 4px;
-	z-index: 20;
-	white-space: nowrap;
-}
-
-.part-controls button {
-	background: none;
-	border: none;
-	color: white;
-	cursor: pointer;
-	font-size: 14px;
-	padding: 0 3px;
-	line-height: 1;
-}
-.part-controls button.btn-part-accept:hover {
-	color: lightgreen;
-}
-.part-controls button.btn-part-reject:hover {
-	color: lightcoral;
-}
-/* End Added Rules */
-
-.suggestion-controls {
-	position: absolute; /* Changed from sticky */
-	top: 1rem;        /* Position from top */
-	right: 1rem;       /* Position from right */
-	/* Removed bottom, left, width */
-	background-color: transparent; /* Optional: remove background if desired */
-	padding: 0; /* Reset padding */
-	border-top: none; /* Removed border */
-	border-radius: 0; /* Removed border-radius */
-	text-align: right;
-	/* Removed margin-top */
-	z-index: 10; /* Keep z-index */
-}
-
-.suggestion-controls .btn {
-	font-size: 0.85rem;
-}
-
-/* Dim the main editor when reviewing */
-.editor-contenteditable:global([contenteditable="false"]) {
-	cursor: not-allowed;
-	background-color: rgba(40, 40, 40, 0.3); /* Slightly darker */
-}
-</style>

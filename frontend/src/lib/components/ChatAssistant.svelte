@@ -254,6 +254,27 @@
         }
     }
 
+    export function sendProgrammaticMessage(messageContent: string, role: 'user' | 'assistant') {
+        if (!currentSessionId) {
+            console.warn("Cannot send programmatic message: No active session.");
+            // Optionally dispatch a toast error back to the parent?
+            // dispatch('showtoast', { message: 'Chat session not active.', type: 'warning' });
+            return;
+        }
+
+        const newMessage: WritingAssistantMessage = {
+            id: Date.now() + Math.random(), // Temporary unique ID for UI
+            session_id: currentSessionId,
+            role: role === 'user' ? 'User' : 'assistant', // Map role correctly
+            content: messageContent,
+            created_at: new Date().toISOString()
+        };
+
+        messages = [...messages, newMessage];
+        scrollToBottom(); // Scroll down to show the new message
+        console.log(`Programmatic message added (role: ${role}):`, messageContent.substring(0, 50) + '...');
+    }
+
 </script>
 {#if isOpen}
 <!-- Use 'showing' class for transitions if desired -->

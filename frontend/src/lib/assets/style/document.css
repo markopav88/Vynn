@@ -1369,3 +1369,134 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	opacity: 0.9; /* Slightly less emphasis */
 	margin-top: 2px; /* Add a small gap */
 }
+
+/* Add styles for suggestion review */
+.suggestion-review-container {
+	position: relative; /* Needed for absolute positioning of controls if desired */
+	border: 1px solid var(--color-primary-muted); /* Add a subtle border */
+	border-radius: 4px;
+	padding: 1rem;
+	background-color: rgba(0, 0, 0, 0.1); /* Slightly different background */
+	min-height: 200px; /* Ensure it has some height */
+	font-family: var(--font-mono); /* Use monospace font for diff */
+	color: var(--text-color);
+	line-height: var(--line-height-base);
+	white-space: pre-wrap; /* Preserve whitespace and wrap */
+	overflow-y: auto; /* Allow scrolling if diff is long */
+	max-height: 70vh; /* Limit max height */
+}
+
+.suggestion-diff-view {
+	font-size: 0.9rem;
+	font-family: var(--font-mono);
+	line-height: var(--line-height-base);
+	color: var(--text-color);
+	white-space: pre-wrap;
+}
+
+/* Styles for diff parts - REPLACED old :global rules */
+.diff-part {
+	display: inline; /* Keep parts flowing like text */
+	border-radius: 3px;
+	transition: background-color 0.2s ease;
+}
+
+
+.diff-part.added,
+.diff-part.removed {
+	cursor: pointer; /* Indicate interactivity */
+	position: relative; /* For positioning controls */
+}
+
+/* Pending state highlighting */
+.diff-part.added.pending {
+	background-color: rgba(40, 167, 69, 0.4); 
+	color: #e0f2e0; 
+}
+.diff-part.removed.pending {
+	background-color: rgba(220, 53, 69, 0.4); 
+	color: #f5d7da; 
+}
+
+/* Accepted state highlighting */
+.diff-part.added.accepted {
+	background-color: rgba(40, 167, 69, 0.6); /* Slightly stronger */
+	box-shadow: 0 0 0 1px rgba(80, 200, 100, 0.5);
+	color: white;
+}
+.diff-part.removed.accepted {
+	background-color: rgba(150, 150, 150, 0.3); /* Gray out accepted removals */
+	color: #aaa;
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+
+/* Rejected state highlighting */
+.diff-part.added.rejected {
+	background-color: rgba(150, 150, 150, 0.3); /* Gray out rejected additions */
+	color: #aaa;
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+.diff-part.removed.rejected {
+	background-color: rgba(220, 53, 69, 0.6); /* Slightly stronger */
+	box-shadow: 0 0 0 1px rgba(255, 100, 100, 0.5);
+	color: white; 
+}
+
+/* Individual part controls - ADDED these rules */
+.part-controls {
+	position: absolute;
+	top: -22px; /* Position above the part */
+	left: 50%;
+	transform: translateX(-50%);
+	background-color: rgba(50, 50, 50, 0.95);
+	border-radius: 4px;
+	padding: 2px 4px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+	display: flex;
+	gap: 4px;
+	z-index: 20;
+	white-space: nowrap;
+}
+
+.part-controls button {
+	background: none;
+	border: none;
+	color: white;
+	cursor: pointer;
+	font-size: 14px;
+	padding: 0 3px;
+	line-height: 1;
+}
+.part-controls button.btn-part-accept:hover {
+	color: lightgreen;
+}
+.part-controls button.btn-part-reject:hover {
+	color: lightcoral;
+}
+/* End Added Rules */
+
+.suggestion-controls {
+	position: absolute; /* Changed from sticky */
+	top: 1rem;        /* Position from top */
+	right: 1rem;       /* Position from right */
+	/* Removed bottom, left, width */
+	background-color: transparent; /* Optional: remove background if desired */
+	padding: 0; /* Reset padding */
+	border-top: none; /* Removed border */
+	border-radius: 0; /* Removed border-radius */
+	text-align: right;
+	/* Removed margin-top */
+	z-index: 10; /* Keep z-index */
+}
+
+.suggestion-controls .btn {
+	font-size: 0.85rem;
+}
+
+/* Dim the main editor when reviewing */
+.editor-contenteditable[contenteditable="false"] {
+	cursor: not-allowed;
+	background-color: rgba(40, 40, 40, 0.3); /* Slightly darker */
+}
