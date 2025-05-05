@@ -167,6 +167,8 @@
         isLoadingMessages = true;
         errorLoadingMessages = null;
 
+        dispatch('sendMessage'); 
+        
         // Focus input again after sending
         messageInput?.focus(); 
         scrollToBottom(); // Scroll down to show user message

@@ -4194,8 +4194,10 @@
 	// Function to optimistically decrement AI credits
 	function decrementAiCredits() {
 		if (aiCredits !== null && aiCredits > 0) {
-			aiCredits--;
+			aiCredits = aiCredits - 1; // Explicit assignment
 			console.log(`Optimistically decremented AI credits. Remaining: ${aiCredits}`);
+			// Force Svelte to re-evaluate the value
+			aiCredits = aiCredits;
 		} else {
 			console.log("Cannot decrement AI credits (null or zero).");
 		}
