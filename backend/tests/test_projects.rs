@@ -22,6 +22,12 @@ async fn test_projects() -> Result<()> {
     let add_doc_result = test_add_document_to_project(&hc).await;
     let get_docs_result = test_get_project_documents(&hc).await;
     let remove_doc_result = test_remove_document_from_project(&hc).await;
+    let toggle_star_result = test_toggle_star_project(&hc).await;
+    let trash_result = test_trash_project(&hc).await;
+    let restore_result = test_restore_project(&hc).await;
+    let get_starred_result = test_get_starred_projects(&hc).await;
+    let get_trashed_result = test_get_trashed_projects(&hc).await;
+    let get_shared_result = test_get_shared_projects(&hc).await;
     let frc_d_p_res = test_force_delete_project(&hc).await;
     let delete_p_result = test_delete_project(&hc).await;
     let reset_db_result = backend::test_reset_db(&hc).await;
@@ -40,6 +46,12 @@ async fn test_projects() -> Result<()> {
     println!("Add Document:\t\t{}", result_to_string(&add_doc_result));
     println!("Get Documents:\t\t{}", result_to_string(&get_docs_result));
     println!("Remove Document:\t{}", result_to_string(&remove_doc_result));
+    println!("Toggle Star:\t\t{}", result_to_string(&toggle_star_result));
+    println!("Trash Project:\t{}", result_to_string(&trash_result));
+    println!("Restore Project:\t{}", result_to_string(&restore_result));
+    println!("Get Starred:\t\t{}", result_to_string(&get_starred_result));
+    println!("Get Trashed:\t\t{}", result_to_string(&get_trashed_result));
+    println!("Get Shared:\t\t{}", result_to_string(&get_shared_result));
     println!("Force Delete Project:\t{}", result_to_string(&frc_d_p_res));
     println!("Delete Project:\t\t{}", result_to_string(&delete_p_result));
     println!("Reset Database:\t\t{}", result_to_string(&reset_db_result));
@@ -335,5 +347,66 @@ async fn test_remove_document_from_project(hc: &Client) -> Result<()> {
         ));
     }
 
+    Ok(())
+}
+
+async fn test_toggle_star_project(hc: &Client) -> Result<()> {
+    println!("TEST - Toggle Star Project");
+    // TODO: Implement test logic (e.g., star project 1, check status, unstar, check status)
+    let project_id = 1; // Assuming project 1 exists and user has permission
+    // Star it
+    let star_res = hc.do_put(&format!("/api/project/{}/star", project_id), json!({})).await?;
+    star_res.print().await?;
+    if !star_res.status().is_success() { return Err(anyhow::anyhow!("Failed to star project")); }
+    // Unstar it
+    let unstar_res = hc.do_put(&format!("/api/project/{}/star", project_id), json!({})).await?;
+    unstar_res.print().await?;
+    if !unstar_res.status().is_success() { return Err(anyhow::anyhow!("Failed to unstar project")); }
+    Ok(())
+}
+
+async fn test_trash_project(hc: &Client) -> Result<()> {
+    println!("TEST - Trash Project");
+    // TODO: Implement test logic (e.g., create a project, trash it, verify)
+    let project_id = 2; // Assuming project 2 exists/was created and user has owner permission
+    // Trash it
+    let trash_res = hc.do_put(&format!("/api/project/{}/trash", project_id), json!({})).await?;
+    trash_res.print().await?;
+    if !trash_res.status().is_success() { return Err(anyhow::anyhow!("Failed to trash project")); }
+    Ok(())
+}
+
+async fn test_restore_project(hc: &Client) -> Result<()> {
+    println!("TEST - Restore Project");
+    // TODO: Implement test logic (e.g., restore the project trashed above, verify)
+    let project_id = 2; // Assuming project 2 was trashed above
+    // Restore it
+    let restore_res = hc.do_put(&format!("/api/project/{}/restore", project_id), json!({})).await?;
+    restore_res.print().await?;
+    if !restore_res.status().is_success() { return Err(anyhow::anyhow!("Failed to restore project")); }
+    Ok(())
+}
+
+async fn test_get_starred_projects(hc: &Client) -> Result<()> {
+    println!("TEST - Get Starred Projects");
+    let res = hc.do_get("/api/project/starred").await?;
+    res.print().await?;
+    if !res.status().is_success() { return Err(anyhow::anyhow!("Failed to get starred projects")); }
+    Ok(())
+}
+
+async fn test_get_trashed_projects(hc: &Client) -> Result<()> {
+    println!("TEST - Get Trashed Projects");
+    let res = hc.do_get("/api/project/trash").await?;
+    res.print().await?;
+    if !res.status().is_success() { return Err(anyhow::anyhow!("Failed to get trashed projects")); }
+    Ok(())
+}
+
+async fn test_get_shared_projects(hc: &Client) -> Result<()> {
+    println!("TEST - Get Shared Projects");
+    let res = hc.do_get("/api/project/shared").await?;
+    res.print().await?;
+    if !res.status().is_success() { return Err(anyhow::anyhow!("Failed to get shared projects")); }
     Ok(())
 }

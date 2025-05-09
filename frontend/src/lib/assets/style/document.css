@@ -12,6 +12,7 @@
 	margin-top: 0;
 	scrollbar-width: none; /* Firefox */
 	-ms-overflow-style: none; /* IE and Edge */
+	transition: padding-right 0.4s ease-out; /* Add transition for padding */
 }
 
 .editor-page::-webkit-scrollbar {
@@ -151,7 +152,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 /* Exit animations */
 .editor-wrapper.left-exit {
-	animation: slideOutLeft 0.5s ease-in-out forwards;
+	animation: slideOutLeft 0.2s ease-in-out forwards;
 	position: absolute !important;
 	width: 100%;
 	max-width: 1400px;
@@ -162,7 +163,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .editor-wrapper.right-exit {
-	animation: slideOutRight 0.5s ease-in-out forwards;
+	animation: slideOutRight 0.2s ease-in-out forwards;
 	position: absolute !important;
 	width: 100%;
 	max-width: 1400px;
@@ -174,7 +175,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 /* Enter animations */
 .editor-wrapper.left-enter {
-	animation: slideInRight 0.5s ease-in-out forwards;
+	animation: slideInRight 0.2s ease-in-out forwards;
 	width: 100%;
 	max-width: 1400px;
 	margin: 0 auto;
@@ -184,7 +185,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .editor-wrapper.right-enter {
-	animation: slideInLeft 0.5s ease-in-out forwards;
+	animation: slideInLeft 0.2s ease-in-out forwards;
 	width: 100%;
 	max-width: 1400px;
 	margin: 0 auto;
@@ -1251,4 +1252,251 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	100% {
 		background-color: transparent;
 	}
+}
+
+/* Add styles for shifting elements when chat is open by adjusting page padding */
+.editor-page.chat-open {
+	padding-right: 360px; /* Add padding equal to chat width + small gap */
+}
+
+.commands-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+.header-buttons {
+	display: flex;
+	gap: 0.1rem;
+	margin-right: -10px;
+}
+.header-action-btn {
+	background: none;
+	border: none;
+	color: var(--bs-gray-500); /* Subtle grey color */
+	padding: 0.25rem 0.5rem; /* Adjust padding */
+	line-height: 1;
+	font-size: 1.1rem; /* Adjust size if needed */
+	cursor: pointer;
+	opacity: 0.8;
+	transition: opacity 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+.header-action-btn:hover {
+	color: var(--bs-light); /* Brighter color on hover */
+	opacity: 1;
+}
+
+/* Command Selection Highlighting */
+.command-selection-highlight {
+	background-color: rgba(0, 123, 255, 0.3);
+}
+
+
+.credit-indicator {
+	display: inline-flex; /* Use inline-flex to keep it on the same line */
+	align-items: center;
+	gap: 0.3em; /* Space between icon and number */
+	padding: 0.2em 0.5em;
+	/* background-color: rgba(255, 255, 255, 0.1); Optional background */
+	/* border-radius: 4px; */
+	color: var(--color-text-secondary); /* Match other status bar text */
+	font-size: 0.9em;
+}
+
+.credit-indicator i {
+	font-size: 1.1em; /* Slightly larger icon */
+	color: #f0b90b; /* Gold-ish color for coin */
+}
+
+.credit-count {
+	font-weight: 500;
+}
+
+/* Ensure status bar items align nicely */
+.cursor-position {
+	display: flex;
+	align-items: center;
+}
+
+
+/* Styles for the credit indicator */
+.credit-indicator-container {
+	position: relative; /* Needed for absolute positioning of popup */
+	display: inline-block; /* Keep it inline but allow positioning context */
+}
+
+.credit-indicator {
+	/* ... existing styles ... */
+	cursor: default; /* Indicate it's not clickable itself */
+}
+
+.credit-count.zero {
+	color: #e53e3e; /* Red color for zero credits */
+	font-weight: bold;
+}
+
+.insufficient-credits-popup {
+	position: absolute;
+	bottom: 100%; /* Position above the indicator */
+	left: 50%;
+	transform: translateX(-50%) translateY(-5px); /* Center horizontally, add small gap */
+	background-color: #e53e3e; /* Red background */
+	color: white;
+	padding: 6px 12px; /* Slightly increased padding */
+	border-radius: 4px;
+	font-size: 0.8em;
+	white-space: nowrap;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+	cursor: pointer; /* Indicate it's clickable */
+	z-index: 10; /* Ensure it appears above other elements */
+	/* REMOVE CSS Animation */
+	/* animation: fadeInPopup 0.3s ease-out; */ 
+	text-align: center; /* Center text */
+	border: none; /* Remove default button border */
+	outline: none; /* Remove default button outline */
+}
+
+/* Style the lines inside the popup */
+.insufficient-credits-popup span {
+	display: block; /* Each span on its own line */
+}
+
+.popup-line-1 {
+	font-weight: bold; /* Make the main message bold */
+}
+
+.popup-line-2 {
+	font-size: 0.9em; /* Make the second line slightly smaller */
+	opacity: 0.9; /* Slightly less emphasis */
+	margin-top: 2px; /* Add a small gap */
+}
+
+/* Add styles for suggestion review */
+.suggestion-review-container {
+	position: relative; /* Needed for absolute positioning of controls if desired */
+	border: 1px solid var(--color-primary-muted); /* Add a subtle border */
+	border-radius: 4px;
+	padding: 1rem;
+	background-color: rgba(0, 0, 0, 0.1); /* Slightly different background */
+	min-height: 200px; /* Ensure it has some height */
+	font-family: var(--font-mono); /* Use monospace font for diff */
+	color: var(--text-color);
+	line-height: var(--line-height-base);
+	white-space: pre-wrap; /* Preserve whitespace and wrap */
+	overflow-y: auto; /* Allow scrolling if diff is long */
+	max-height: 70vh; /* Limit max height */
+}
+
+.suggestion-diff-view {
+	font-size: 0.9rem;
+	font-family: var(--font-mono);
+	line-height: var(--line-height-base);
+	color: var(--text-color);
+	white-space: pre-wrap;
+}
+
+/* Styles for diff parts - REPLACED old :global rules */
+.diff-part {
+	display: inline; /* Keep parts flowing like text */
+	border-radius: 3px;
+	transition: background-color 0.2s ease;
+}
+
+
+.diff-part.added,
+.diff-part.removed {
+	cursor: pointer; /* Indicate interactivity */
+	position: relative; /* For positioning controls */
+}
+
+/* Pending state highlighting */
+.diff-part.added.pending {
+	background-color: rgba(40, 167, 69, 0.4); 
+	color: #e0f2e0; 
+}
+.diff-part.removed.pending {
+	background-color: rgba(220, 53, 69, 0.4); 
+	color: #f5d7da; 
+}
+
+/* Accepted state highlighting */
+.diff-part.added.accepted {
+	background-color: rgba(40, 167, 69, 0.6); /* Slightly stronger */
+	box-shadow: 0 0 0 1px rgba(80, 200, 100, 0.5);
+	color: white;
+}
+.diff-part.removed.accepted {
+	background-color: rgba(150, 150, 150, 0.3); /* Gray out accepted removals */
+	color: #aaa;
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+
+/* Rejected state highlighting */
+.diff-part.added.rejected {
+	background-color: rgba(150, 150, 150, 0.3); /* Gray out rejected additions */
+	color: #aaa;
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+.diff-part.removed.rejected {
+	background-color: rgba(220, 53, 69, 0.6); /* Slightly stronger */
+	box-shadow: 0 0 0 1px rgba(255, 100, 100, 0.5);
+	color: white; 
+}
+
+/* Individual part controls - ADDED these rules */
+.part-controls {
+	position: absolute;
+	top: -22px; /* Position above the part */
+	left: 50%;
+	transform: translateX(-50%);
+	background-color: rgba(50, 50, 50, 0.95);
+	border-radius: 4px;
+	padding: 2px 4px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+	display: flex;
+	gap: 4px;
+	z-index: 20;
+	white-space: nowrap;
+}
+
+.part-controls button {
+	background: none;
+	border: none;
+	color: white;
+	cursor: pointer;
+	font-size: 14px;
+	padding: 0 3px;
+	line-height: 1;
+}
+.part-controls button.btn-part-accept:hover {
+	color: lightgreen;
+}
+.part-controls button.btn-part-reject:hover {
+	color: lightcoral;
+}
+/* End Added Rules */
+
+.suggestion-controls {
+	position: absolute; /* Changed from sticky */
+	top: 1rem;        /* Position from top */
+	right: 1rem;       /* Position from right */
+	/* Removed bottom, left, width */
+	background-color: transparent; /* Optional: remove background if desired */
+	padding: 0; /* Reset padding */
+	border-top: none; /* Removed border */
+	border-radius: 0; /* Removed border-radius */
+	text-align: right;
+	/* Removed margin-top */
+	z-index: 10; /* Keep z-index */
+}
+
+.suggestion-controls .btn {
+	font-size: 0.85rem;
+}
+
+/* Dim the main editor when reviewing */
+.editor-contenteditable[contenteditable="false"] {
+	cursor: not-allowed;
+	background-color: rgba(40, 40, 40, 0.3); /* Slightly darker */
 }

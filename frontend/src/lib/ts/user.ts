@@ -16,6 +16,15 @@
 /
 */
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
+export interface User {
+	id: number;
+	name: string;
+	email: string;
+	ai_credits?: number;
+}
+
 // Class for holding login information
 export class Login {
 	email: string;
@@ -57,10 +66,11 @@ class SignupPayload {
 
 /**
  * Function to attempt login
- * Calls: POST /api/login
+ * Calls: POST /api/users/login
+ * Test: test_users.rs/test_good_login()
  */
 export async function attempt_login(login_payload: Login): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/users/login`;
+	const apiUrl = `${API_BASE_URL}/api/users/login`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -89,9 +99,10 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 /**
  * Function to logout user
  * Calls: GET /api/users/logout
+ * Test: test_users.rs/test_logout()
  */
 export async function logout(): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/users/logout`;
+	const apiUrl = `${API_BASE_URL}/api/users/logout`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -111,11 +122,12 @@ export async function logout(): Promise<boolean> {
 
 /**
  * Function to get the current user's information
- * Calls: GET /api/users/:id
+ * Calls: GET /api/users/current
+ * Test: test_users.rs/test_get_current_user()
  */
-export async function get_current_user(): Promise<any | null> {
+export async function get_current_user(): Promise<User | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/users/current`;
+		const apiUrl = `${API_BASE_URL}/api/users/current`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -126,7 +138,9 @@ export async function get_current_user(): Promise<any | null> {
 			return null;
 		}
 
-		return await response.json();
+		const user: User = await response.json();
+		console.log('Fetched current user:', user);
+		return user;
 	} catch (error) {
 		console.error('Error fetching current user:', error);
 		return null;
@@ -136,10 +150,11 @@ export async function get_current_user(): Promise<any | null> {
 /**
  * Function to update the current user's information
  * Calls: PUT /api/users/update
+ * Test: test_users.rs/test_update_user()
  */
 export async function update_user(name: string, email: string, password: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/users/update`;
+		const apiUrl = `${API_BASE_URL}/api/users/update`;
 
 		const payload = {
 			name: name,
@@ -166,6 +181,7 @@ export async function update_user(name: string, email: string, password: string)
 /**
  * Function for attempting signup
  * Calls: POST /api/users
+ * Test: test_users.rs/test_create_user()
  */
 export async function attempt_signup(signup_input: Signup): Promise<boolean> {
 	// Check if passwords match and make new payload if they do
@@ -177,7 +193,7 @@ export async function attempt_signup(signup_input: Signup): Promise<boolean> {
 	}
 
 	// Use the correct backend API URL
-	const apiUrl = `http://localhost:3001/api/users`;
+	const apiUrl = `${API_BASE_URL}/api/users`;
 
 	// Attempt to call POST API
 	try {
@@ -207,12 +223,14 @@ export async function attempt_signup(signup_input: Signup): Promise<boolean> {
 
 /**
  * Check if the user is authenticated
+ * Calls: GET /api/users/check-auth
+ * Test: TODO: test_users.rs/test_check_auth() - Test missing
  * @returns Promise<boolean> - True if authenticated, false otherwise
  */
 export async function check_auth(): Promise<boolean> {
 	try {
 		// Add fallback logic in case the backend is not available
-		const apiUrl = `http://localhost:3001/api/users/check-auth`;
+		const apiUrl = `${API_BASE_URL}/api/users/check-auth`;
 		console.log('Attempting to connect to backend at:', apiUrl);
 
 		// Add timeout to prevent long waiting times if server is down
@@ -245,15 +263,14 @@ export async function check_auth(): Promise<boolean> {
 /**
  * Function to upload a profile image
  * Calls: POST /api/users/profile-image
+ * Test: TODO: test_users.rs/test_upload_profile_image() - Test missing
  */
 export async function upload_profile_image(file: File): Promise<boolean> {
+	const apiUrl = `${API_BASE_URL}/api/users/profile-image`;
+	const formData = new FormData();
+	formData.append('profile_image', file);
+
 	try {
-		const apiUrl = `http://localhost:3001/api/users/profile-image`;
-
-		// Create a FormData object to send the file
-		const formData = new FormData();
-		formData.append('image', file);
-
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			body: formData,
@@ -274,8 +291,11 @@ export async function upload_profile_image(file: File): Promise<boolean> {
 
 /**
  * Function to get user's profile image URL
- * Returns a URL that can be used in img src attribute
+ * Note: This generates the URL, doesn't call a specific check endpoint itself.
+ * Relies on backend route: GET /api/users/:id/profile-image
+ * Test: TODO: test_users.rs/test_get_profile_image() - Test missing
+ * @returns string - URL that can be used in img src attribute
  */
 export function get_profile_image_url(userId: number): string {
-	return `http://localhost:3001/api/users/${userId}/profile-image`;
+	return `${API_BASE_URL}/api/users/${userId}/profile-image?t=${new Date().getTime()}`;
 }

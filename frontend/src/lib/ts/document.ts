@@ -28,6 +28,8 @@
 /
 */
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
 export class Document {
 	id: number;
 	name: string;
@@ -77,11 +79,12 @@ export class DocumentUser {
 /**
  * Function to get a document by ID
  * Calls: GET /api/document/:id
+ * Test: test_documents.rs/test_get_document()
  */
 export async function get_document(id: number): Promise<Document | null> {
 	try {
 		// Use the original endpoint that was working before
-		const apiUrl = `http://localhost:3001/api/document/${id}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${id}`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -104,10 +107,11 @@ export async function get_document(id: number): Promise<Document | null> {
 /**
  * Function to update a document
  * Calls: PUT /api/document/:id
+ * Test: test_documents.rs/test_update_document()
  */
 export async function update_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}`;
 
 		const payload = {
 			name: document.name,
@@ -167,10 +171,11 @@ export async function saveDocument(document: Document): Promise<boolean | null> 
 /**
  * Function to get all users with permissions to a given document
  * Calls: GET /api/document/:id/permissions
+ * Test: test_documents.rs/test_get_permissions()
  */
 export async function get_document_permissions(document_id: number): Promise<DocumentUser[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document_id}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document_id}/permissions`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -191,10 +196,11 @@ export async function get_document_permissions(document_id: number): Promise<Doc
 /**
  * Function to get all documents the user has access to
  * Calls: GET /api/document
+ * Test: test_documents.rs/test_get_all_documents()
  */
 export async function get_all_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document`;
+		const apiUrl = `${API_BASE_URL}/api/document`;
 
 		console.log('Fetching documents from:', apiUrl);
 
@@ -227,10 +233,11 @@ export async function get_all_documents(): Promise<Document[] | null> {
 /**
  * Function to create a new document
  * Calls: POST /api/document
+ * Test: test_documents.rs/test_create_document()
  */
 export async function create_document(name: string, content: string): Promise<Document | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document`;
+		const apiUrl = `${API_BASE_URL}/api/document`;
 		const now = new Date().toISOString().replace('Z', '');
 
 		const payload = {
@@ -264,10 +271,11 @@ export async function create_document(name: string, content: string): Promise<Do
 /**
  * Function to delete a document
  * Calls: DELETE /api/document/:id
+ * Test: test_documents.rs/test_delete_document()
  */
 export async function delete_document(documentId: number): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -284,10 +292,11 @@ export async function delete_document(documentId: number): Promise<boolean> {
 /**
  * Function to add permissions for a user on a document
  * Calls: POST /api/document/:id/permissions
+ * Test: test_documents.rs/test_add_permissions()
  */
 export async function add_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/permissions`;
 
 		const payload = {
 			user_id: userId,
@@ -313,10 +322,11 @@ export async function add_document_permissions(documentId: number, userId: numbe
 /**
  * Function to update a user's permissions for a document
  * Calls: PUT /api/document/:id/permissions
+ * Test: test_documents.rs/test_update_permission()
  */
 export async function update_document_permissions(documentId: number, userId: number, role: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/permissions`;
 
 		const payload = {
 			user_id: userId,
@@ -347,10 +357,11 @@ export async function update_document_permissions(documentId: number, userId: nu
 /**
  * Function to delete a user's permissions for a document
  * Calls: DELETE /api/document/:id/permissions/:user_id
+ * Test: test_documents.rs/test_remove_permissions()
  */
 export async function delete_document_permissions(documentId: number, userId: number): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/permissions/${userId}`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/permissions/${userId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -375,12 +386,13 @@ export async function delete_document_permissions(documentId: number, userId: nu
 /**
  * Function to get the project associated with a document
  * Calls: GET /api/document/:id/project
+ * Test: test_documents.rs/test_get_project_from_document()
  */
 export async function get_project_from_document(
 	documentId: number
 ): Promise<{ project_id: number; project_name: string } | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${documentId}/project`;
+		const apiUrl = `${API_BASE_URL}/api/document/${documentId}/project`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -402,10 +414,12 @@ export async function get_project_from_document(
 
 /**
  * Function to toggle 'starred' status of a document
+ * Calls: PUT /api/document/:id/star
+ * Test: TODO: test_documents.rs/test_toggle_star_document() - Test missing
  */
 export async function toggle_star_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}/star`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}/star`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -421,10 +435,12 @@ export async function toggle_star_document(document: Document): Promise<boolean>
 
 /**
  * Function to move a document to trash
+ * Calls: PUT /api/document/:id/trash
+ * Test: TODO: test_documents.rs/test_trash_document() - Test missing
  */
 export async function trash_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}/trash`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}/trash`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -440,10 +456,12 @@ export async function trash_document(document: Document): Promise<boolean> {
 
 /**
  * Function to restore a document from trash
+ * Calls: PUT /api/document/:id/restore
+ * Test: TODO: test_documents.rs/test_restore_document() - Test missing
  */
 export async function restore_document(document: Document): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/${document.id}/restore`;
+		const apiUrl = `${API_BASE_URL}/api/document/${document.id}/restore`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -459,10 +477,12 @@ export async function restore_document(document: Document): Promise<boolean> {
 
 /**
  * Function to get all starred documents
+ * Calls: GET /api/document/starred
+ * Test: TODO: test_documents.rs/test_get_starred_documents() - Test missing
  */
 export async function get_starred_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/starred`;
+		const apiUrl = `${API_BASE_URL}/api/document/starred`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -482,10 +502,12 @@ export async function get_starred_documents(): Promise<Document[] | null> {
 
 /**
  * Function to get all trashed documents
+ * Calls: GET /api/document/trash
+ * Test: TODO: test_documents.rs/test_get_trashed_documents() - Test missing
  */
 export async function get_trashed_documents(): Promise<Document[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/document/trash`;
+		const apiUrl = `${API_BASE_URL}/api/document/trash`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -503,8 +525,13 @@ export async function get_trashed_documents(): Promise<Document[] | null> {
 	}
 }
 
+/**
+ * Function to get all shared documents
+ * Calls: GET /api/document/shared
+ * Test: TODO: test_documents.rs/test_get_shared_documents() - Test missing
+ */
 export async function get_shared_documents(): Promise<Document[] | null> {
-	const apiUrl = `http://localhost:3001/api/document/shared`;
+	const apiUrl = `${API_BASE_URL}/api/document/shared`;
 
 	try {
 		const response = await fetch(apiUrl, {

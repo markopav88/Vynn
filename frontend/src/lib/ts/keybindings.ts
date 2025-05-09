@@ -1,3 +1,31 @@
+/*
+/ keybindings.ts
+/
+/ File containing logic for managing and handling keybindings in the frontend.
+/ Includes default keybindings, fetching custom keybindings, parsing keybinding strings,
+/ mapping keybindings to command functions, and processing keyboard input events.
+/
+/ Summary:
+/ Types/Interfaces:
+/ - ExecuteFunction: Type for functions executed by keybindings.
+/ - KeyboardInput: Represents a specific keyboard input combination (key, modifiers).
+/ - BackendKeybinding: Structure for keybinding data from the backend.
+/ - CommandIdMap: Maps command IDs to command names.
+/ - CommandFunctions: Interface defining the functions that can be bound to commands.
+/ 
+/ Classes:
+/ - keybindings: Manages active keybindings (default and custom).
+/   - Provides default bindings.
+/   - Parses keybinding strings.
+/   - Fetches and updates bindings from the backend (via account.ts).
+/   - Maps command IDs/names to function names.
+/ - keybindingMap: Handles the mapping and execution of commands based on keyboard input.
+/   - Maps keyboard events to KeyboardInput.
+/   - Maps command functions to active keybindings.
+/   - Handles keyboard input events and executes the corresponding command function.
+/
+*/
+
 // Function to get all commands from db
 import { get_all_keybindings } from './account';
 

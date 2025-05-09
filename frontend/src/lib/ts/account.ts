@@ -16,6 +16,8 @@
 /
 */
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
 // --- Classes related to Keybindings --- 
 /**
  * Command class representing a command from the database (used for keybindings)
@@ -57,7 +59,7 @@ export class UserKeybinding {
  */
 export async function get_all_keybindings(): Promise<UserKeybinding[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/command`;
+		const apiUrl = `${API_BASE_URL}/api/command`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -81,7 +83,7 @@ export async function get_all_keybindings(): Promise<UserKeybinding[] | null> {
  */
 export async function add_update_keybinding(commandId: number, keybinding: string): Promise<UserKeybinding | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/command/${commandId}`;
+		const apiUrl = `${API_BASE_URL}/api/command/${commandId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'PUT',
@@ -111,7 +113,7 @@ export async function add_update_keybinding(commandId: number, keybinding: strin
  */
 export async function delete_keybinding(commandId: number): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/command/${commandId}`;
+		const apiUrl = `${API_BASE_URL}/api/command/${commandId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -126,5 +128,3 @@ export async function delete_keybinding(commandId: number): Promise<boolean> {
 		return false; // Return false on network or other errors
 	}
 }
-
-// Note: get_all_commands was not moved as it wasn't being used by account page 

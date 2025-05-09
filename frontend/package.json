@@ -18,6 +18,7 @@
 		"@sveltejs/kit": "^2.16.0",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@types/bootstrap": "^5.2.10",
+		"@types/diff": "^7.0.2",
 		"autoprefixer": "^10.4.17",
 		"postcss": "^8.4.35",
 		"prettier": "^3.4.2",
@@ -30,6 +31,7 @@
 	"dependencies": {
 		"@popperjs/core": "^2.11.8",
 		"bootstrap": "^5.3.3",
+		"diff": "^7.0.0",
 		"jspdf": "^3.0.1",
 		"postcss-nesting": "^13.0.1"
 	}

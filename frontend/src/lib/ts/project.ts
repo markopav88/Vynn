@@ -23,6 +23,8 @@
 
 import type { Document } from './document';
 
+const API_BASE_URL = process.env.API_BASE_URL;
+
 export class Project {
 	id: number;
 	name: string;
@@ -55,7 +57,7 @@ export class ProjectUser {
  * Calls: GET /api/project/:id
  */
 export async function get_project(project_id: number): Promise<Project | null> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -81,7 +83,7 @@ export async function get_project(project_id: number): Promise<Project | null> {
  * Calls: GET /api/project
  */
 export async function get_all_projects(): Promise<Project[] | null> {
-	const apiUrl = `http://localhost:3001/api/project`;
+	const apiUrl = `${API_BASE_URL}/api/project`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -107,7 +109,7 @@ export async function get_all_projects(): Promise<Project[] | null> {
  * Calls: PUT /api/project/:id
  */
 export async function update_project(project_id: number, name: string): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -136,7 +138,7 @@ export async function update_project(project_id: number, name: string): Promise<
  * Calls: DELETE /api/project/:id
  */
 export async function delete_project(project_id: number): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -161,7 +163,7 @@ export async function delete_project(project_id: number): Promise<boolean> {
  * Calls: DELETE /api/project/:id/force
  */
 export async function force_delete_project(project_id: number): Promise<boolean> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}/force`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}/force`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -187,7 +189,7 @@ export async function force_delete_project(project_id: number): Promise<boolean>
  */
 export async function add_project_permissions(projectId: number, userId: number, role: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/project/${projectId}/permissions`;
 
 		const payload = {
 			user_id: userId,
@@ -216,7 +218,7 @@ export async function add_project_permissions(projectId: number, userId: number,
  */
 export async function get_project_permissions(projectId: number): Promise<ProjectUser[] | null> {
 	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/project/${projectId}/permissions`;
 
 		const response = await fetch(apiUrl, {
 			credentials: 'include'
@@ -241,7 +243,7 @@ export async function get_project_permissions(projectId: number): Promise<Projec
  */
 export async function update_project_permission(projectId: number, userId: number, role: string): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions`;
+		const apiUrl = `${API_BASE_URL}/api/project/${projectId}/permissions`;
 
 		const payload = {
 			user_id: userId,
@@ -275,7 +277,7 @@ export async function update_project_permission(projectId: number, userId: numbe
  */
 export async function remove_project_permissions(projectId: number, userId: number): Promise<boolean> {
 	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/permissions/${userId}`;
+		const apiUrl = `${API_BASE_URL}/api/project/${projectId}/permissions/${userId}`;
 
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
@@ -302,7 +304,7 @@ export async function remove_project_permissions(projectId: number, userId: numb
  * Calls: GET /api/project/:id/documents
  */
 export async function get_project_documents(project_id: number): Promise<Document[] | null> {
-	const apiUrl = `http://localhost:3001/api/project/${project_id}/documents`;
+	const apiUrl = `${API_BASE_URL}/api/project/${project_id}/documents`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -329,9 +331,9 @@ export async function get_project_documents(project_id: number): Promise<Documen
  * Calls: POST /api/project/:id/documents/:doc_id
  */
 export async function add_document_to_project(projectId: number, documentId: number): Promise<boolean> {
-	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents/${documentId}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${projectId}/document`;
 
+	try {
 		const response = await fetch(apiUrl, {
 			method: 'POST',
 			headers: {
@@ -360,9 +362,9 @@ export async function add_document_to_project(projectId: number, documentId: num
  * Calls: DELETE /api/project/:id/documents/:doc_id
  */
 export async function remove_document_from_project(projectId: number, documentId: number): Promise<boolean> {
-	try {
-		const apiUrl = `http://localhost:3001/api/project/${projectId}/documents/${documentId}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${projectId}/document/${documentId}`;
 
+	try {
 		const response = await fetch(apiUrl, {
 			method: 'DELETE',
 			credentials: 'include'

@@ -16,7 +16,7 @@
 
 use axum::routing::{get, post, put};
 use axum::{
-    extract::{Extension, Json},
+    extract::{Extension, Json, Path},
     Router,
 };
 use serde_json::{json, Value};
@@ -49,41 +49,34 @@ fn get_default_profile_image() -> (Vec<u8>, String) {
     }).clone()
 }
 
-/// GET handler for retrieving a user by ID in cookies.
+/// GET handler for retrieving a user by ID provided in the path.
 /// Accessible via: GET /api/users/:id
 /// Test: test_users.rs/test_get_user()
-/// Frontend: login.ts/get_current_user()
+/// Frontend: // TODO: No direct frontend call, user info usually fetched via /current
 pub async fn api_get_user(
-    cookies: Cookies,
+    Path(id): Path<i32>,
     Extension(pool): Extension<PgPool>,
 ) -> Result<Json<User>> {
-    println!("->> {:<12} - get_user", "HANDLER");
-
-    // Need to check cookie here to get user id
-    let user_id = get_user_id_from_cookie(&cookies);
-
-    // if we cant parse a user's id
-    if user_id == None {
-        return Err(Error::UserIdUpdateError);
-    }
+    println!("->> {:<12} - get_user (by ID: {})", "HANDLER", id);
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email FROM users WHERE id = $1"#,
-        user_id
+        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
+        id
     )
     .fetch_one(&pool)
     .await;
 
     match result {
         Ok(user) => Ok(Json(user)),
-        Err(_) => Err(Error::UserNotFoundError),
+        Err(_) => Err(Error::UserNotFoundError { user_id: id }),
     }
 }
+
 /// POST handler for creating a new user.
 /// Accessible via: POST /api/users
 /// Test: test_users.rs/test_create_user()
-/// Frontend: signup.ts/attempt_signup()
+/// Frontend: user.ts/attempt_signup()
 pub async fn api_create_user(
     Extension(pool): Extension<PgPool>,
     Json(payload): Json<CreateUserPayload>,
@@ -145,7 +138,7 @@ pub async fn api_create_user(
     // Insert the user with hashed password
     let result = sqlx::query_as!(
         User,
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email",
+        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, ai_credits",
         payload.name,
         payload.email,
         password_hash
@@ -181,10 +174,10 @@ pub async fn api_create_user(
     }
 }
 
-/// PUT handler for updating a user.
+/// PUT handler for updating the current user.
 /// Accessible via: PUT /api/users/update
 /// Test: test_users.rs/test_update_user()
-/// Frontend: login.ts/update_user()
+/// Frontend: user.ts/update_user()
 pub async fn api_update_user(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -216,7 +209,7 @@ pub async fn api_update_user(
 
         // if the update doesnt affect any rows it failed
         if result.unwrap().rows_affected() == 0 {
-            return Err(Error::UserNotFoundError);
+            return Err(Error::UserNotFoundError { user_id: user_id.unwrap() });
         }
 
         // otherwise it passes
@@ -258,7 +251,7 @@ pub async fn api_update_user(
     let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)
         .map_err(|e| {
             println!("->> {:<12} - password hashing error: {:?}", "ERROR", e);
-            Error::UserUpdateError
+            Error::UserUpdateError { user_id: user_id.unwrap() }
         })?
         .to_string();
 
@@ -277,7 +270,7 @@ pub async fn api_update_user(
 
     // if the update doesnt affect any rows it failed
     if result.unwrap().rows_affected() == 0 {
-        return Err(Error::UserNotFoundError);
+        return Err(Error::UserNotFoundError { user_id: user_id.unwrap() });
     }
 
     // otherwise it passes
@@ -289,9 +282,9 @@ pub async fn api_update_user(
 }
 
 /// POST handler for user login.
-/// Accessible via: POST /api/login
+/// Accessible via: POST /api/users/login
 /// Test: test_users.rs/test_good_login(), test_users.rs/test_bad_login()
-/// Frontend: login.ts/attempt_login()
+/// Frontend: user.ts/attempt_login()
 pub async fn api_login(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -358,7 +351,7 @@ pub async fn api_login(
 /// GET handler for user logout.
 /// Accessible via: GET /api/users/logout
 /// Test: test_users.rs/test_logout()
-/// Frontend: login.ts/logout()
+/// Frontend: user.ts/logout()
 pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     println!("->> {:<12} - logout", "HANDLER");
     // Get environment variables with fallbacks for development
@@ -385,8 +378,9 @@ pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     })));
 }
 
-/// Check if user is authenticated
-/// Accessible via: GET /api/user/check-auth
+/// GET handler to check if user is authenticated via cookie.
+/// Accessible via: GET /api/users/check-auth
+/// Test: TODO: test_users.rs/test_check_auth()
 /// Frontend: user.ts/check_auth()
 pub async fn api_check_auth(
     cookies: Cookies,
@@ -404,8 +398,10 @@ pub async fn api_check_auth(
     }
 }
 
-/// Upload or update a user's profile image
+/// POST handler to upload or update a user's profile image.
 /// Accessible via: POST /api/users/profile-image
+/// Test: TODO: test_users.rs/test_upload_profile_image()
+/// Frontend: user.ts/upload_profile_image()
 /// 
 /// This endpoint accepts a multipart form with an "image" field containing the image file.
 /// The image must be a valid image format (JPEG, PNG, etc.) and less than 5MB in size.
@@ -509,8 +505,10 @@ pub async fn api_upload_profile_image(
     }
 }
 
-/// Get a user's profile image
+/// GET handler to retrieve a user's profile image.
 /// Accessible via: GET /api/users/:id/profile-image
+/// Test: TODO: test_users.rs/test_get_profile_image()
+/// Frontend: user.ts/get_profile_image_url()
 /// 
 /// This endpoint returns the binary image data with the appropriate content-type header.
 /// If the user has no profile image, it returns a default image.
@@ -526,7 +524,7 @@ pub async fn api_get_profile_image(
     // Validate user_id
     if user_id <= 0 {
         println!("->> {:<12} - invalid user_id: {}", "ERROR", user_id);
-        return Err(Error::UserNotFoundError);
+        return Err(Error::UserNotFoundError { user_id });
     }
     
     // Query the database for the user's profile image with better error handling
@@ -576,9 +574,11 @@ pub async fn api_get_profile_image(
     }
 }
 
-/// Search users by email
+/// GET handler to search users by email.
 /// Accessible via: GET /api/users/search?q=search_term
-/// Returns a list of users matching the search term
+/// Test: TODO: test_users.rs/test_search_users() - Test missing
+/// Frontend: // TODO: No frontend function implemented yet
+/// Returns a list of users matching the search term.
 pub async fn api_search_users(
     Extension(pool): Extension<PgPool>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
@@ -596,7 +596,7 @@ pub async fn api_search_users(
     // Search for users with email containing the search term
     let users = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
+        r#"SELECT id, name, email, ai_credits FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
         format!("%{}%", search_term)
     )
     .fetch_all(&pool)
@@ -621,7 +621,7 @@ pub async fn api_get_current_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
         user_id
     )
     .fetch_one(&pool)
@@ -629,7 +629,7 @@ pub async fn api_get_current_user(
 
     match result {
         Ok(user) => Ok(Json(user)),
-        Err(_) => Err(Error::UserNotFoundError),
+        Err(_) => Err(Error::UserNotFoundError { user_id }),
     }
 }
 
