@@ -66,7 +66,7 @@
 	// Constants for editor configuration
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
 	const MIN_LINES = 30; // minimum lines to display
-	const MAX_COLUMN_WIDTH = 111; // maximum characters per line
+	const MAX_COLUMN_WIDTH = 110; // maximum characters per line
 	let documentReady = false; // to track when the document is ready to display
 	let projectDocumentsLoaded = false; // to track when project documents are loaded
 
@@ -4488,9 +4488,8 @@
 		setTimeout(() => {
 			if(editorElement) { // Check editorElement again *after* timeout
 				console.log("[acceptSuggestion] Applying accepted content after exiting review mode.");
-				editorContent = contentToSet;
-				safelySetEditorContent(editorContent);
-				fixInsideDivs();
+				applyWrappedHtmlContent(contentToSet); // MODIFIED_LINE
+				// fixInsideDivs(); // Called inside applyWrappedHtmlContent
 				showToast('Suggestion applied.', 'success');
 				triggerAutoSave();
 			} else {
@@ -4582,6 +4581,237 @@
 				div.innerHTML = '<br>';
 			}
 		});
+	}
+
+	// Function to apply HTML content with wrapping
+	function applyWrappedHtmlContent(fullHtml: string) {
+		if (!editorElement) {
+			console.error("[applyWrappedHtmlContent] Editor element is null.");
+			return;
+		}
+		console.log('[applyWrappedHtmlContent] Applying content with wrapping:', fullHtml.substring(0, 100) + '...');
+
+		editorElement.innerHTML = ''; // Clear the editor first
+
+		const wrappedLinesHtml = chunkHtmlContentIntoLines(fullHtml, MAX_COLUMN_WIDTH);
+		
+		console.log(`[applyWrappedHtmlContent] Chunked into ${wrappedLinesHtml.length} lines.`);
+
+		wrappedLinesHtml.forEach((lineHtml, index) => {
+			const div = document.createElement('div');
+			if (lineHtml.trim() === '' || lineHtml === '<br>') {
+				div.innerHTML = '<br>'; // Ensure empty lines are preserved
+			} else {
+				div.innerHTML = lineHtml;
+			}
+			if (editorElement) editorElement.appendChild(div); // ADDED_CHECK
+		});
+
+		// Ensure at least one div if content was effectively empty after wrapping
+		if (editorElement && editorElement.children.length === 0) { // ADDED_CHECK
+			const div = document.createElement('div');
+			div.innerHTML = '<br>';
+			editorElement.appendChild(div);
+		}
+		
+			fixInsideDivs(); // Clean up potential nested structures
+
+		editorContent = getEditorContent(); // Update internal content state
+		
+		// Update UI
+		updateLineNumbers();
+		updateCursorPosition(); // This will also try to set activeLineIndex
+		adjustEditorHeight();
+		
+		// Attempt to move cursor to a sensible position (e.g., start of document)
+		moveToStartOfDocument(); 
+		console.log('[applyWrappedHtmlContent] Content applied and UI updated.');
+	}
+
+	// Helper function for HTML-aware line wrapping
+	function chunkHtmlContentIntoLines(html: string, maxWidth: number): string[] {
+		const linesArray: string[] = [];
+		if (!html.trim()) {
+			return ['<br>']; // Handle completely empty input
+		}
+
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+		const rootNode = doc.body.firstChild as Node;
+
+		let currentLineHtml = '';
+		let currentLineWidth = 0;
+		const activeTags: { name: string, attributes: Attr[] }[] = [];
+
+		function closeActiveTags(): string {
+			let closingTags = '';
+			for (let i = activeTags.length - 1; i >= 0; i--) {
+				closingTags += `</${activeTags[i].name}>`;
+			}
+			return closingTags;
+		}
+
+		function openActiveTags(): string {
+			let openingTags = '';
+			activeTags.forEach(tag => {
+				let attrsString = '';
+				tag.attributes.forEach(attr => {
+					attrsString += ` ${attr.name}="${attr.value}"`;
+				});
+				openingTags += `<${tag.name}${attrsString}>`;
+			});
+			return openingTags;
+		}
+		
+		function addTextNode(text: string) {
+			for (let char of text) {
+				if (char === '\n') { // Explicit newline character
+					currentLineHtml += closeActiveTags();
+					linesArray.push(currentLineHtml.trim() || '<br>');
+					currentLineHtml = openActiveTags();
+					currentLineWidth = 0;
+					continue;
+				}
+
+				currentLineHtml += char;
+				currentLineWidth++;
+
+				if (currentLineWidth >= maxWidth) {
+					// Try to find a space to break
+					let breakPoint = -1;
+					for (let i = currentLineHtml.length - 1; i >= 0; i--) {
+						if (currentLineHtml[i] === ' ') {
+							// Check if the space is outside an HTML tag
+							const temp = currentLineHtml.substring(i);
+							if (temp.indexOf('>') === -1 || temp.indexOf('>') > temp.indexOf('<')) {
+								breakPoint = i;
+								break;
+							}
+						}
+					}
+
+					let lineToAdd;
+					let remainder = '';
+
+					if (breakPoint !== -1 && (currentLineHtml.length - breakPoint) < maxWidth ) { // Ensure break is reasonable
+						lineToAdd = currentLineHtml.substring(0, breakPoint);
+						remainder = currentLineHtml.substring(breakPoint + 1);
+					} else { // Force break
+						lineToAdd = currentLineHtml.substring(0, currentLineHtml.length - char.length); // Break before current char
+						remainder = char; // Current char starts new line
+					}
+					
+					lineToAdd += closeActiveTags();
+					linesArray.push(lineToAdd.trim() || "<br>");
+					currentLineHtml = openActiveTags() + remainder;
+					currentLineWidth = remainder.length;
+				}
+			}
+		}
+
+		function processNode(node: Node) {
+			if (node.nodeType === Node.TEXT_NODE) {
+				addTextNode(node.textContent || '');
+			} else if (node.nodeType === Node.ELEMENT_NODE) {
+				const element = node as HTMLElement;
+				const tagName = element.tagName.toLowerCase();
+
+				// Handle <br> as explicit line break
+				if (tagName === 'br') {
+					currentLineHtml += closeActiveTags();
+					linesArray.push(currentLineHtml.trim() || '<br>');
+					currentLineHtml = openActiveTags();
+					currentLineWidth = 0;
+					return; // No children for <br>
+				}
+				
+				const isBlockFormatter = (tagName === 'div' && element.parentNode !== doc.body);
+
+				if (isBlockFormatter) {
+					// If there's pending content on the current line, flush it before starting this block element.
+					if (currentLineWidth > 0 || currentLineHtml.trim() !== openActiveTags().trim()) {
+						currentLineHtml += closeActiveTags();
+						linesArray.push(currentLineHtml.trim() || '<br>');
+						currentLineHtml = openActiveTags(); // Tags for the new line this block starts
+						currentLineWidth = 0;
+					}
+				}
+
+				const attributes = Array.from(element.attributes);
+				currentLineHtml += `<${tagName}`;
+				attributes.forEach(attr => {
+					currentLineHtml += ` ${attr.name}="${attr.value}"`;
+				});
+				currentLineHtml += `>`;
+				
+				if (!['br', 'hr', 'img', 'input', 'meta', 'link'].includes(tagName)) {
+					activeTags.push({ name: tagName, attributes });
+				}
+
+				if (element.childNodes.length > 0) {
+					element.childNodes.forEach(processNode);
+				} else if (tagName === 'div' && (currentLineHtml.trim() === openActiveTags().trim() || currentLineHtml.trim() === `<${tagName}>${openActiveTags()}`) ) {
+					// This case for empty div might need adjustment if it causes issues.
+					// If a <div> is truly empty of text content after its tags, it should resolve to <br> effectively.
+				}
+
+
+				if (!['br', 'hr', 'img', 'input', 'meta', 'link'].includes(tagName)) {
+					activeTags.pop();
+					currentLineHtml += `</${tagName}>`;
+				}
+				
+				if (isBlockFormatter) {
+					// After a block element (div) and its children are processed, 
+					// the currentLineHtml contains the div and its content.
+					// This should be flushed as a line (or multiple if addTextNode wrapped it).
+					// The key is that addTextNode should handle internal wrapping. This flush is for the block itself.
+					
+					// Ensure any tags opened for the content *inside* the div are closed before we consider this line done.
+					// The div's own closing tag was added above.
+					// currentLineHtml already contains the processed div.
+					
+					// If currentLineHtml (which is the div itself + content) has actual text or is not just open tags.
+					let tempDiv = document.createElement('div');
+					tempDiv.innerHTML = currentLineHtml; // currentLineHtml includes the div tags at this point
+					
+					if (tempDiv.textContent?.trim() || currentLineHtml.includes("<br>")) {
+						linesArray.push(currentLineHtml.trim()); // Push the div content line
+					} else {
+						// The div was empty or contained only whitespace text after processing
+						linesArray.push("<br>"); // Represent empty div as a br line
+					}
+					currentLineHtml = openActiveTags(); // Reset for the line *after* this div block
+					currentLineWidth = 0;
+				}
+			}
+		}
+
+		if (rootNode) {
+			rootNode.childNodes.forEach(processNode);
+		}
+
+		// Add any remaining content on the current line, ensuring tags are balanced.
+		if (activeTags.length > 0) {
+		    currentLineHtml += closeActiveTags();
+		    // Clear activeTags as they are now closed in the string.
+		    while(activeTags.length > 0) activeTags.pop(); 
+		}
+
+		const trimmedFinalLine = currentLineHtml.trim();
+		let tempDiv = document.createElement('div');
+		tempDiv.innerHTML = trimmedFinalLine; // Check content of the final trimmed line
+
+		if (tempDiv.textContent?.trim() || trimmedFinalLine.includes("<br>")) {
+		    linesArray.push(trimmedFinalLine || "<br>");
+		} else if (linesArray.length === 0 && html.trim() !== '') { 
+		    // Original HTML had content, but we produced nothing and the final buffer is also textually empty.
+		    linesArray.push("<br>");
+		}
+		
+		// Ensure at least one line if the original HTML was meant to be non-empty or was just <br>.
+		// If linesArray is empty here, it means original html was empty or only whitespace not resulting in <br>.
+		return linesArray.length > 0 ? linesArray : (html.trim() === '' ? [] : ['<br>']);
 	}
 
 	function handleShowToast(event: CustomEvent<{ message: string; type: 'success' | 'error' | 'warning' }>) {
