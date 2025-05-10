@@ -55,6 +55,19 @@ pub enum Error {
     FailedApplyChanges,
 }
 
+#[derive(Debug, Clone, strum_macros::AsRefStr)]
+#[allow(non_camel_case_types)]
+pub enum ClientError {
+    LOGIN_FAIL,
+    NO_AUTH,
+    EMAIL_ALREADY_EXISTS,
+    PASSWORD_VALIDATION_ERROR,
+    INVALID_PARAMS,
+    RESOURCE_NOT_FOUND,
+    INSUFFICIENT_AI_CREDITS,
+    SERVICE_ERROR,
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         println!("->> {:<12} - {self:?}", "INTO_RESPONSE");
@@ -116,17 +129,4 @@ impl Error {
             _ => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),
         }
     }
-}
-
-#[derive(Debug, Clone, strum_macros::AsRefStr)]
-#[allow(non_camel_case_types)]
-pub enum ClientError {
-    LOGIN_FAIL,
-    NO_AUTH,
-    EMAIL_ALREADY_EXISTS,
-    PASSWORD_VALIDATION_ERROR,
-    INVALID_PARAMS,
-    RESOURCE_NOT_FOUND,
-    INSUFFICIENT_AI_CREDITS,
-    SERVICE_ERROR,
 }

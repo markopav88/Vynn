@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
 
-// Define the Rust enum corresponding to the SQL enum
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "message_role_enum", rename_all = "lowercase")]
 pub enum MessageRole {
@@ -9,7 +8,6 @@ pub enum MessageRole {
     Assistant,
 }
 
-/// Represents a chat session between a user and the writing assistant
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct WritingAssistantSession {
     pub id: i32,
@@ -20,7 +18,6 @@ pub struct WritingAssistantSession {
     pub updated_at: NaiveDateTime,
 }
 
-/// Represents a single message in a chat session
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct WritingAssistantMessage {
     pub id: i32,
@@ -40,44 +37,38 @@ pub struct SessionWithMessageContent {
     pub last_message_content: Option<String>,
 }
 
-/// Payload for creating a new chat session
 #[derive(Debug, Deserialize)]
 pub struct CreateSessionPayload {
     pub document_id: Option<i32>,
     pub title: String,
 }
 
-/// Payload for sending a new message
 #[derive(Debug, Deserialize)]
 pub struct SendMessagePayload {
     pub content: String,
 }
 
-/// Payload for sending a new message
 #[derive(Debug, Deserialize)]
 pub struct SelectedTextContext {
     pub content: String,
 }
 
-/// Payload for sending a new message
 #[derive(Debug, Deserialize)]
 pub struct RewritePayload {
     pub content: String,
     pub style: String,
 }
 
-/// Complete session with messages for API responses
 #[derive(Debug, Serialize)]
 pub struct SessionWithMessages {
     pub session: WritingAssistantSession,
     pub messages: Vec<WritingAssistantMessage>,
 }
 
-/// Represents a chat message from either the user or assistant (langchain format)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
-    pub role: MessageRole, // Changed to use the enum here too for consistency
-    pub content: String,   // The actual message content
+    pub role: MessageRole,
+    pub content: String,
 }
 
 /// Represents a complete conversation history 
@@ -121,7 +112,7 @@ impl ChatHistory {
 }
 
 /// Struct for API response when getting all sessions, including a snippet of the last message.
-#[derive(Debug, Serialize, sqlx::FromRow)] // Add necessary derives
+#[derive(Debug, Serialize, sqlx::FromRow)] 
 pub struct WritingAssistantSessionWithSnippet {
     pub id: i32,
     pub user_id: i32,
@@ -132,13 +123,13 @@ pub struct WritingAssistantSessionWithSnippet {
     pub last_message_snippet: Option<String>,
 }
 
-/// Payload for the apply suggestion request
 #[derive(Debug, Deserialize)]
 pub struct ApplySuggestionPayload {
     pub suggestion_content: String,
+    #[serde(rename = "current_document_id")]
+    pub current_document_id: Option<i32>,
 }
 
-/// Represents the proposed changes for a single document (for backend response)
 #[derive(Debug, Serialize)]
 pub struct SuggestedDocumentChange {
     pub document_id: i32,
@@ -146,17 +137,49 @@ pub struct SuggestedDocumentChange {
     pub new_content: String,
 }
 
-/// Temporary struct to parse LLM response containing only changed documents
 #[derive(Debug, Deserialize)]
 pub struct LlmDocChange {
     pub document_id: i32,
     pub new_content: String,
 }
 
-// Define a simple struct for context documents passed to the prompt
 #[derive(Serialize)]
 pub struct ContextDocument {
     pub id: i32,
     pub name: String,
     pub content: String,
+}
+
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ProactiveDiffContextPayload {
+    pub r#type: String,
+    #[serde(rename = "commandName")]
+    pub command_name: Option<String>,
+    #[serde(rename = "userPrompt")]
+    pub user_prompt: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DecisionAgentPayload {
+    #[serde(rename = "aiResponseContent")]
+    pub ai_response_content: String,
+    pub context: ProactiveDiffContextPayload,
+    #[serde(rename = "documentContentSnippet")]
+    pub document_content_snippet: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DecisionAgentResponse {
+    pub decision: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SanitizeTextPayload {
+    pub text_to_sanitize: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SanitizeTextResponse {
+    pub sanitized_text: String,
 }

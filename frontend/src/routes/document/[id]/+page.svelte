@@ -12,6 +12,7 @@
 	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
 	import { get_project_documents } from '$lib/ts/project';
 	import { keybindings, keybindingMap, type CommandFunctions, type KeyboardInput } from '$lib/ts/keybindings';
+	import { sanitizeText } from '$lib/ts/agent';
 	import {
 		check_grammar,
 		summarize_text,
@@ -20,7 +21,7 @@
 		shrink_text,
 		rewrite_text_as,
 		fact_check_text,
-		check_spelling
+		check_spelling,
 	} from '$lib/ts/ai';
 
 	import logo from '$lib/assets/logo.png';
@@ -4226,7 +4227,7 @@
 		decrementAiCredits();
 	}
 
-	function handleSuggestionReceived(event: CustomEvent<SuggestedDocumentChange[]>) {
+	async function handleSuggestionReceived(event: CustomEvent<SuggestedDocumentChange[]>) {
 		if (isReviewingSuggestion) {
 			showToast('Already reviewing a suggestion. Please accept or reject the current one first.', 'warning');
 			return;
@@ -4247,8 +4248,19 @@
 
 		console.log("Processing suggestion for current document (Structured Diff):", pendingSuggestion);
 
-		if (!pendingSuggestion.old_content || !pendingSuggestion.new_content) {
-			showToast('Suggestion data is incomplete.', 'error');
+		// Validate suggestion data before proceeding
+		// old_content can be an empty string (for new documents), so we primarily check new_content.
+		if (pendingSuggestion.new_content === null || 
+			typeof pendingSuggestion.new_content === 'undefined' || 
+			pendingSuggestion.new_content === '') { // Check if new_content is null, undefined, or an empty string.
+			showToast('Suggestion data is incomplete (new content is missing or empty).', 'error');
+			pendingSuggestion = null;
+			return;
+		}
+
+		// If old_content is null or undefined (shouldn't happen if backend is consistent, but good to safeguard)
+		if (pendingSuggestion.old_content === null || typeof pendingSuggestion.old_content === 'undefined') {
+			showToast('Suggestion data is incomplete (old content is missing).', 'error');
 			pendingSuggestion = null;
 			return;
 		}
@@ -4261,10 +4273,41 @@
 
 		const attributeToRemoveRegex = / data-original-line=".*?"/g;
 		const cleanedOldContent = pendingSuggestion.old_content.replace(attributeToRemoveRegex, '');
-		const cleanedNewContent = pendingSuggestion.new_content.replace(attributeToRemoveRegex, '');
+		
+		let textToClean = pendingSuggestion.new_content.replace(attributeToRemoveRegex, ''); // Start with AI's new content
+		let previousCleanedText = "";
+		const MAX_SANITIZE_ITERATIONS = 5;
+		let iterations = 0;
 
-		// --- Use diffWords ---
-		const diffResult = Diff.diffWords(cleanedOldContent, cleanedNewContent);
+		showToast('Sanitizing AI suggestion...', 'warning'); // Let user know
+
+		while (textToClean !== previousCleanedText && iterations < MAX_SANITIZE_ITERATIONS) {
+		    previousCleanedText = textToClean;
+		    console.log(`[Sanitize Loop] Iteration ${iterations + 1} for doc ${pendingSuggestion.document_id}`);
+		    try {
+		        textToClean = await sanitizeText(previousCleanedText);
+		    } catch (e) {
+		        console.error("[Sanitize Loop] Error during sanitizeText call:", e);
+		        showToast('Error during sanitization. Using content as is.', 'error');
+		        break; 
+		    }
+		    iterations++;
+		    if (textToClean === previousCleanedText) {
+		        console.log("[Sanitize Loop] Text stabilized.");
+		        break;
+		    }
+		}
+		if (iterations >= MAX_SANITIZE_ITERATIONS && textToClean !== previousCleanedText) {
+		    console.warn("[Sanitize Loop] Max iterations reached. Using last cleaned version.");
+		    showToast('Sanitization max iterations reached.', 'warning');
+		} else if (iterations > 0 && textToClean === previousCleanedText) {
+		     showToast('AI suggestion sanitized!', 'success');
+		}
+
+		const finalSanitizedNewContent = textToClean; // This is the fully sanitized new content
+
+		// --- Use finalSanitizedNewContent for diffing ---
+		const diffResult = Diff.diffWords(cleanedOldContent, finalSanitizedNewContent);
 
 		// --- Group the results ---
 		const groupedDiffResult = groupDiffParts(diffResult); // Call the new helper
@@ -4733,14 +4776,7 @@
 									{/if}
 								{/each}
 							</div>
-							<div class="suggestion-controls">
-								<button class="btn btn-sm btn-success me-2" on:click={acceptSuggestion}>
-									<i class="bi bi-check-lg"></i> Accept
-								</button>
-								<button class="btn btn-sm btn-danger" on:click={rejectSuggestion}>
-									<i class="bi bi-x-lg"></i> Reject
-								</button>
-							</div>
+							<!-- suggestion-controls block removed from here -->
 						</div>
 					{:else}
 						<div
@@ -4993,6 +5029,22 @@
 				on:suggestionReceived={handleSuggestionReceived}
 				on:showtoast={handleShowToast} 
 			/>
+		</div>
+	{/if}
+
+	{#if isReviewingSuggestion}
+		<div class="suggestion-actions-bar">
+			<div class="suggestion-controls" style="display: flex; justify-content: center; padding: 0.5rem;">
+				<button class="btn btn-sm btn-success me-2" on:click={acceptSuggestion} title="Accept all changes and apply to document">
+					<i class="bi bi-check-lg"></i> Accept All
+				</button>
+				<button class="btn btn-sm btn-danger me-2" on:click={rejectSuggestion} title="Reject all changes and keep original">
+					<i class="bi bi-x-lg"></i> Reject All
+				</button>
+				<button class="btn btn-sm btn-secondary" on:click={exitReviewMode} title="Close review mode without applying remaining changes">
+					<i class="bi bi-eye-slash"></i> Close Review
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>

@@ -31,7 +31,9 @@ use crate::models::ai::{
     WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, 
     CreateSessionPayload, SendMessagePayload, MessageRole, SelectedTextContext,
     RewritePayload, WritingAssistantSessionWithSnippet, SessionWithMessageContent,
-    ApplySuggestionPayload, SuggestedDocumentChange, LlmDocChange
+    ApplySuggestionPayload, SuggestedDocumentChange, LlmDocChange,
+    DecisionAgentPayload, DecisionAgentResponse,
+    SanitizeTextPayload, SanitizeTextResponse
 };
 // Commented out until implemented
 // use crate::cag::retrieval::semantic_search;
@@ -90,7 +92,7 @@ pub async fn api_get_all_writing_sessions(
     .fetch_all(&pool)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching sessions with messages: {}", e);
+        eprintln!("Database error fetching sessions with messages: {:?}", e);
         Error::DatabaseError
     })?;
 
@@ -355,7 +357,7 @@ pub async fn api_send_writing_message(
         .fetch_optional(&pool)
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching project_id for fallback: {}", e);
+            eprintln!("Database error fetching project_id for fallback: {:?}", e);
             Error::DatabaseError
         })?;
 
@@ -383,7 +385,7 @@ pub async fn api_send_writing_message(
             .fetch_all(&pool)
             .await
             .map_err(|e| {
-                eprintln!("Database error fetching project documents for fallback: {}", e);
+                eprintln!("Database error fetching project documents for fallback: {:?}", e);
                 Error::DatabaseError
             })?;
 
@@ -806,9 +808,10 @@ pub async fn api_apply_suggestion(
     // 5. Construct the prompt
     let final_prompt = prompt::construct_apply_suggestion_prompt(
         &prompt_docs,
-        &payload.suggestion_content
+        &payload.suggestion_content,
+        payload.current_document_id
     ).map_err(|e| {
-        eprintln!("Error serializing documents for prompt: {}", e);
+        eprintln!("Error serializing documents for prompt: {:?}", e);
         Error::FailedApplyChanges
     })?; // Handle potential serialization error
 
@@ -829,7 +832,7 @@ pub async fn api_apply_suggestion(
     // 7. Parse LLM response (JSON array of LlmDocChange)
     let llm_changes: Vec<LlmDocChange> = serde_json::from_str(trimmed_response)
         .map_err(|e| {
-            eprintln!("Error parsing LLM response JSON: {}\nTrimmed Response: {}", e, trimmed_response);
+            eprintln!("Error parsing LLM response JSON: {:?}\nTrimmed Response: {}", e, trimmed_response);
             Error::FailedApplyChanges
         })?;
     println!("->> {:<12} - Parsed {} changes from LLM response.", "HANDLER", llm_changes.len());
@@ -859,6 +862,78 @@ pub async fn api_apply_suggestion(
     Ok(Json(suggested_changes))
 }
 
+/// POST handler for deciding if a diff should be proactively shown.
+/// Accessible via: POST /api/ai/writing-assistant/decide-proactive-diff
+/// This endpoint does NOT decrement AI credits as it's a meta-operation.
+pub async fn api_decide_proactive_diff(
+    cookies: Cookies,
+    Json(payload): Json<DecisionAgentPayload>,
+) -> Result<Json<DecisionAgentResponse>> {
+    println!("->> {:<12} - api_decide_proactive_diff", "HANDLER");
+    // Authenticate user via cookies
+    let _user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Construct the prompt for the decision AI
+    // Pass the document_content_snippet to the prompt construction function
+    let decision_prompt = prompt::construct_proactive_diff_decision_prompt(
+        &payload.ai_response_content,
+        &payload.context, // This is ProactiveDiffContextPayload
+        payload.document_content_snippet.as_deref(), // Pass as Option<&str>
+    );
+
+    println!("->> {:<12} - Decision Prompt: ...", "HANDLER"); // Avoid logging potentially large prompt for now
+
+    // Query the LLM for a decision
+    let llm = QueryModel::new().map_err(|e| {
+        eprintln!("Error creating QueryModel for decision: {:?}", e);
+        Error::FailedApplyChanges
+    })?;
+    let llm_decision_str = llm.query_model(&decision_prompt).await?;
+    println!("->> {:<12} - LLM Decision Received: '{}'", "HANDLER", llm_decision_str);
+
+    // Package and return the LLM's raw decision string
+    let response = DecisionAgentResponse {
+        decision: llm_decision_str.trim().to_string(), // Trim whitespace just in case
+    };
+
+    Ok(Json(response))
+}
+
+/// POST handler for sanitizing text by removing HTML and Markdown.
+/// Accessible via: POST /api/ai/writing-assistant/sanitize-text
+/// This endpoint does NOT decrement AI credits as it's a utility operation.
+pub async fn api_sanitize_text(
+    cookies: Cookies,
+    Json(payload): Json<SanitizeTextPayload>,
+) -> Result<Json<SanitizeTextResponse>> {
+    println!("->> {:<12} - api_sanitize_text", "HANDLER");
+
+    // Authenticate user - even if not billing, good for consistency and future use
+    let _user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Construct the prompt for the sanitization AI
+    let sanitize_prompt = prompt::construct_sanitize_text_prompt(&payload.text_to_sanitize);
+    println!("->> {:<12} - Sanitize Prompt: ... (Brief)", "HANDLER"); // Avoid logging large text
+
+    // Query the LLM for sanitization
+    let llm = QueryModel::new().map_err(|e| {
+        eprintln!("Error creating QueryModel for sanitization: {:?}", e);
+        Error::LlmQueryError // Use LlmQueryError for LLM initialization issues too
+    })?;
+    let sanitized_text_str = llm.query_model(&sanitize_prompt).await.map_err(|e| {
+        eprintln!("Error during LLM query for sanitization: {:?}", e);
+        Error::LlmQueryError // Use LlmQueryError for query failures
+    })?;
+    println!("->> {:<12} - LLM Sanitized Text Received ({} chars): ...", "HANDLER", sanitized_text_str.len());
+
+    // Package and return the sanitized text
+    let response = SanitizeTextResponse {
+        sanitized_text: sanitized_text_str.trim().to_string(), // Trim whitespace
+    };
+
+    Ok(Json(response))
+}
+
 /// Generate routes for the writing assistant controller
 pub fn writing_assistant_routes() -> Router {
     Router::new()
@@ -876,4 +951,6 @@ pub fn writing_assistant_routes() -> Router {
         .route("/shrink", post(api_shrink))
         .route("/rewrite", post(api_rewrite))
         .route("/factcheck", post(api_fact_check))
+        .route("/decide-proactive-diff", post(api_decide_proactive_diff))
+        .route("/sanitize-text", post(api_sanitize_text))
 }

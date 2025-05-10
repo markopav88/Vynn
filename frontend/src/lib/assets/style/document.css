@@ -8,7 +8,6 @@
 	overflow-y: auto; /* Allow vertical scrolling */
 	overflow-x: hidden; /* Prevent horizontal scrolling */
 	padding-top: 70px;
-	padding-bottom: 50px; /* Keep space for status bar */
 	margin-top: 0;
 	scrollbar-width: none; /* Firefox */
 	-ms-overflow-style: none; /* IE and Edge */
@@ -96,21 +95,25 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .editor-container {
 	flex: 1;
 	display: flex;
-	justify-content: center;
+	justify-content: flex-start;
 	align-items: flex-start;
-	padding: 2rem 2rem 0 2rem;
+	padding: 1rem 2rem 0 2rem;
 	position: relative;
 	z-index: 1;
-	min-height: 75vh;
 	overflow: visible; /* Allow content to expand */
-	padding-top: 20px !important;
-	margin-top: 20px !important; /* Reset the editor container margin since document switcher is now in the flow */
+	transition: height 0.2s ease;
+	overflow: visible;
+	opacity: 0.9 !important; /* Higher initial opacity */
+	transform: translateY(5px); /* Match animation start state */
 	transition: height 0.2s ease;
 	min-height: calc(30 * 24px + 48px); /* MIN_LINES * LINE_HEIGHT + padding */
-	height: auto !important;
-	position: relative;
 	overflow: visible;
-	margin-bottom: 60px; /* Add space at the bottom to prevent jumping */
+	width: 100%;
+	max-width: 1200px;
+	margin: 0px auto;
+	flex-direction: column;
+	background: transparent;
+	opacity: 0;
 }
 
 .editor-container:has(.editor-wrapper.left-exit),
@@ -304,15 +307,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	display: flex;
 	gap: 0.75rem;
 	justify-content: center;
-	margin: 0 auto 15px auto !important;
-	margin-top: 25px !important; /* Increased top margin */
-	padding: 10px 0 !important;
 	position: relative !important;
-	width: 100%;
-	max-width: 1400px;
+	width: 90% !important;
+	max-width: 1400px !important;
 	z-index: 100 !important;
 	background-color: transparent !important;
 	border-bottom: none !important;
+	margin: 40px auto 20px auto !important;
+	border: none !important;
+	opacity: 0.9 !important; /* Higher initial opacity */
+	transform: translateY(5px); /* Match animation start state */
 }
 
 .doc-button {
@@ -344,12 +348,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	border: 2px solid #10b981;
 	color: #ffffff;
 	transform: scale(1.05);
-}
-
-/* Reset the editor container margin since document switcher is now in the flow */
-.editor-container {
-	margin-top: 20px !important;
-	padding-top: 15px !important;
 }
 
 @keyframes slideOutLeft {
@@ -423,11 +421,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 		opacity: 1;
 		transform: translateY(0);
 	}
-}
-
-/* Hide the editor container until it's ready */
-.editor-container {
-	opacity: 0;
 }
 
 /* Add a separate fade-in animation for the document switcher */
@@ -541,19 +534,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	background-color: rgba(var(--color-background-rgb), 0.95);
 	backdrop-filter: blur(5px);
 	border-bottom: none;
-}
-
-.editor-container {
-	flex: 1;
-	width: 100%;
-	max-width: 1200px;
-	margin: 0 auto;
-	padding: 20px;
-	padding-bottom: calc(4rem + 60px); /* Increased bottom padding significantly */
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	background: transparent;
 }
 
 .editor-wrapper {
@@ -920,15 +900,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	tab-size: 4;
 }
 
-/* Add this for editor container to allow growing/shrinking */
-.editor-container {
-	transition: height 0.2s ease;
-	min-height: calc(30 * 24px + 48px); /* MIN_LINES * LINE_HEIGHT + padding */
-	height: auto !important;
-	position: relative;
-	overflow: visible;
-	margin-bottom: 60px; /* Add space at the bottom to prevent jumping */
-}
 
 /* Update the editor wrapper to grow with content */
 .editor-wrapper {
@@ -1151,8 +1122,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	position: relative;
 }
 
-/* === Styles moved from +page.svelte === */
-
 .editor-page {
 	padding-top: 0 !important;
 	overflow-x: hidden;
@@ -1169,32 +1138,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	background: transparent !important;
 }
 
-.document-switcher {
-	position: relative !important;
-	width: 90% !important;
-	max-width: 1400px !important;
-	margin: 0 auto 15px auto !important;
-	margin-top: 30px !important;
-	margin-bottom: -5px !important;
-	z-index: 100 !important;
-	background-color: transparent !important;
-	border: none !important;
-	display: flex !important;
-	opacity: 0.9 !important; /* Higher initial opacity */
-	transform: translateY(5px); /* Match animation start state */
-}
-
 .navbar,
 .navbar-container {
 	position: relative !important;
 	z-index: 1000 !important;
 	width: 100% !important;
-	transform: translateY(5px); /* Match animation start state */
-}
-
-.editor-container {
-	margin-top: 10px !important;
-	opacity: 0.9 !important; /* Higher initial opacity */
 	transform: translateY(5px); /* Match animation start state */
 }
 
@@ -1487,16 +1435,98 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	border-top: none; /* Removed border */
 	border-radius: 0; /* Removed border-radius */
 	text-align: right;
-	/* Removed margin-top */
 	z-index: 10; /* Keep z-index */
 }
 
 .suggestion-controls .btn {
-	font-size: 0.85rem;
+	margin-left: 0.5rem;
+	margin-right: 0.5rem;
+	min-width: 120px; /* Ensure buttons have a decent width */
+	padding: 0.375rem 0.75rem; /* Standard sm button padding */
+	opacity: 0.75; /* Make them semi-transparent */
+	transition: opacity 0.2s ease-in-out; /* Smooth transition for hover */
+}
+
+.suggestion-controls .btn:hover {
+	opacity: 1; /* Full opacity on hover */
 }
 
 /* Dim the main editor when reviewing */
 .editor-contenteditable[contenteditable="false"] {
 	cursor: not-allowed;
 	background-color: rgba(40, 40, 40, 0.3); /* Slightly darker */
+}
+
+.suggestion-actions-bar {
+	display: flex;
+	gap: 0.75rem;
+	justify-content: center;
+	margin: 0 auto 15px auto !important;
+	padding: 10px 0 !important;
+	position: relative !important;
+	bottom: 90px !important;
+	left: 0;
+	right: 0;
+	width: 100%;
+	max-width: 450px;
+	z-index: 1000 !important;
+	border-bottom: none !important;
+}
+
+/* Custom styling for the suggestion buttons to match document picker */
+.suggestion-controls button {
+	padding: 0.25rem 0.75rem;
+	height: 30px;
+	min-width: 95px; /* Increased from 40px to accommodate text */
+	font-family: 'JetBrains Mono', monospace;
+	font-size: 14px;
+	font-weight: bold;
+	border-radius: 8px;
+	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+	transition: all 0.2s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: rgba(16, 185, 129, 0.15) !important;
+	border: 2px solid rgba(16, 185, 129, 0.6) !important;
+	color: #ffffff !important;
+	white-space: nowrap !important; /* Prevent text wrapping */
+	flex-direction: row !important; /* Ensure items are laid out horizontally */
+}
+
+.suggestion-controls button i {
+	margin-right: 5px; /* Add space between icon and text */
+}
+
+.suggestion-controls button:hover {
+	background-color: rgba(16, 185, 129, 0.3) !important;
+	transform: scale(1.05) translateY(-2px);
+	box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+}
+
+.suggestion-controls button.btn-success {
+	background-color: rgba(16, 185, 129, 0.3) !important;
+	border: 2px solid rgba(16, 185, 129, 0.8) !important;
+}
+
+.suggestion-controls button.btn-danger {
+	background-color: rgba(220, 53, 69, 0.2) !important;
+	border: 2px solid rgba(220, 53, 69, 0.6) !important;
+}
+
+.suggestion-controls button.btn-secondary {
+	background-color: rgba(173, 181, 189, 0.2) !important;
+	border: 2px solid rgba(173, 181, 189, 0.6) !important;
+}
+
+.suggestion-controls button.btn-success:hover {
+	background-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+.suggestion-controls button.btn-danger:hover {
+	background-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+.suggestion-controls button.btn-secondary:hover {
+	background-color: rgba(173, 181, 189, 0.3) !important;
 }
