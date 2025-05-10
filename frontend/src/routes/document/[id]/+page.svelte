@@ -680,23 +680,48 @@
 			aiFunction(textToSend, ...aiArgs)
 				.then(async result => {
 					await tick();
-					let aiResponse = '';
 					if (result) {
 						if (result.response?.includes("__VYNN_NO_CHANGE__")) {
-							aiResponse = `No suggestions found for ${cmd}.`;
+							const noChangeMessage = `No suggestions found for ${cmd}.`;
+							if (chatAssistantComponent) {
+								chatAssistantComponent.sendProgrammaticMessage(noChangeMessage, 'assistant');
+							} else {
+								showToast(noChangeMessage, 'warning'); 
+							}
+						} else if (result.response) {
+							// Send AI's response to chat history
+							if (chatAssistantComponent) {
+								chatAssistantComponent.sendProgrammaticMessage(result.response, 'assistant');
+							} else {
+								console.error("Chat assistant component not available for AI response from colon command.");
+								// Optionally, show a toast as fallback if chat isn't open/available
+								// showToast("AI response generated, but chat not updated.", "info");
+							}
+
+							const suggestion: SuggestedDocumentChange = {
+								document_id: parseInt(documentId),
+								old_content: textToSend,
+								new_content: result.response,
+								// agent_id: `colon-command:${cmd}` // Optional: for tracking source
+							};
+							// Directly call handleSuggestionReceived with the suggestion wrapped in an array
+							handleSuggestionReceived(new CustomEvent('colonCommandSuggestion', { detail: [suggestion] }));
 						} else {
-							aiResponse = result.response;
+							const emptyResponseMessage = `The ${cmd} command returned an empty response.`;
+							if (chatAssistantComponent) {
+								chatAssistantComponent.sendProgrammaticMessage(emptyResponseMessage, 'assistant');
+							} else {
+								showToast(emptyResponseMessage, 'warning');
+							}
 						}
 					} else {
-						aiResponse = `The ${cmd} command failed. Please try again.`;
+						const failureMessage = `The ${cmd} command failed. Please try again.`;
+						if (chatAssistantComponent) {
+							chatAssistantComponent.sendProgrammaticMessage(failureMessage, 'assistant');
+						} else {
+							showToast(failureMessage, 'error');
+						}
 					}
-					 if (chatAssistantComponent) {
-						// This part usually works because the AI call takes time
-						chatAssistantComponent.sendProgrammaticMessage(aiResponse, 'assistant');
-					 } else {
-						console.error("Chat assistant component not ready to receive AI response.");
-						showToast('AI command finished, but chat could not be updated.', 'warning');
-					 }
 				})
 				.catch(async error => {
 					await tick(); // Wait again
@@ -2379,14 +2404,16 @@
 			event.preventDefault();
 			
 			if (commandPrefix === ':') {
-				// Handle colon command, but always exit mode afterwards
-				await handleColonCommand(commandInput);
-				exitCommandMode(); // Exit regardless of command success/failure
+				// Handle colon command, and only exit if it was valid and processed
+				const commandProcessedSuccessfully = await handleColonCommand(commandInput);
+				if (commandProcessedSuccessfully) {
+					exitCommandMode(); 
+				}
 			} else if (commandPrefix === '/' || commandPrefix === '?') {
 				// Set the search direction based on the command
 				const direction = commandPrefix === '/' ? 'forward' : 'backward';
 				performSearch(commandInput, direction);
-				exitCommandMode();
+				exitCommandMode(); // Search always exits command mode
 			}
 		} else if (event.key === 'Escape') {
 			exitCommandMode();
@@ -4236,7 +4263,7 @@
 
 		const changes = event.detail;
 		if (!changes || changes.length === 0) {
-			showToast('Received empty suggestion.', 'warning');
+			showToast('No changes to be made.', 'warning');
 			return;
 		}
 
@@ -4321,7 +4348,6 @@
 			});
 		});
 
-		// Setting isReviewingSuggestion and disabling editor AFTER diff processing
 		isReviewingSuggestion = true;
 		if (editorElement) {
 			editorElement.contentEditable = 'false';

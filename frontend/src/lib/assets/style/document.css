@@ -1204,7 +1204,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 /* Add styles for shifting elements when chat is open by adjusting page padding */
 .editor-page.chat-open {
-	padding-right: 360px; /* Add padding equal to chat width + small gap */
+	padding-right: 360px;
 }
 
 .commands-header {
