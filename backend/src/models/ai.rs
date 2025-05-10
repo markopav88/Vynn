@@ -25,9 +25,19 @@ pub struct WritingAssistantSession {
 pub struct WritingAssistantMessage {
     pub id: i32,
     pub session_id: i32,
-    pub role: MessageRole,  // Changed to use the enum
+    pub role: MessageRole,
     pub content: String,
     pub created_at: NaiveDateTime,
+}
+
+pub struct SessionWithMessageContent {
+    pub id: i32,
+    pub user_id: i32,
+    pub document_id: Option<i32>,
+    pub title: String,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: chrono::NaiveDateTime,
+    pub last_message_content: Option<String>,
 }
 
 /// Payload for creating a new chat session
@@ -41,6 +51,19 @@ pub struct CreateSessionPayload {
 #[derive(Debug, Deserialize)]
 pub struct SendMessagePayload {
     pub content: String,
+}
+
+/// Payload for sending a new message
+#[derive(Debug, Deserialize)]
+pub struct SelectedTextContext {
+    pub content: String,
+}
+
+/// Payload for sending a new message
+#[derive(Debug, Deserialize)]
+pub struct RewritePayload {
+    pub content: String,
+    pub style: String,
 }
 
 /// Complete session with messages for API responses
@@ -95,4 +118,45 @@ impl ChatHistory {
             content,
         });
     }
+}
+
+/// Struct for API response when getting all sessions, including a snippet of the last message.
+#[derive(Debug, Serialize, sqlx::FromRow)] // Add necessary derives
+pub struct WritingAssistantSessionWithSnippet {
+    pub id: i32,
+    pub user_id: i32,
+    pub document_id: Option<i32>,
+    pub title: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+    pub last_message_snippet: Option<String>,
+}
+
+/// Payload for the apply suggestion request
+#[derive(Debug, Deserialize)]
+pub struct ApplySuggestionPayload {
+    pub suggestion_content: String,
+}
+
+/// Represents the proposed changes for a single document (for backend response)
+#[derive(Debug, Serialize)]
+pub struct SuggestedDocumentChange {
+    pub document_id: i32,
+    pub old_content: String,
+    pub new_content: String,
+}
+
+/// Temporary struct to parse LLM response containing only changed documents
+#[derive(Debug, Deserialize)]
+pub struct LlmDocChange {
+    pub document_id: i32,
+    pub new_content: String,
+}
+
+// Define a simple struct for context documents passed to the prompt
+#[derive(Serialize)]
+pub struct ContextDocument {
+    pub id: i32,
+    pub name: String,
+    pub content: String,
 }

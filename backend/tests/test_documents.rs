@@ -1,16 +1,3 @@
-/*
- / HOW TO USE BACKEND TESTS
- / ENSURE WATCH IS INSTALLED '$ cargo install cargo-watch --locked'
- / In Terminal 1: 'cargo watch -q -c -w src/ -x run'
- / In Terminal 2: 'cargo watch -q -c -w tests/ -x "test -q test_testname -- --nocapture"'
- / Now you can see LIVE Updates of API calls
-*/
-
-/*
- / Document API Tests
- / Run with: cargo test -q test_documents -- --nocapture
-*/
-
 #![allow(unused)]
 
 use std::result;
@@ -321,5 +308,68 @@ async fn test_remove_permissions(hc: &Client) -> Result<()> {
         ));
     }
 
+    Ok(())
+}
+
+// --- Add Skeletons for Missing Tests ---
+
+async fn test_toggle_star_document(hc: &Client) -> Result<()> {
+    println!("TEST - Toggle Star Document");
+    // TODO: Implement test logic (e.g., star doc 1, check status, unstar, check status)
+    let doc_id = 1; // Assuming doc 1 exists and user has permission
+    // Star it
+    let star_res = hc.do_put(&format!("/api/document/{}/star", doc_id), json!({})).await?;
+    star_res.print().await?;
+    if !star_res.status().is_success() { return Err(anyhow!("Failed to star")); }
+    // Unstar it
+    let unstar_res = hc.do_put(&format!("/api/document/{}/star", doc_id), json!({})).await?;
+    unstar_res.print().await?;
+    if !unstar_res.status().is_success() { return Err(anyhow!("Failed to unstar")); }
+    Ok(())
+}
+
+async fn test_trash_document(hc: &Client) -> Result<()> {
+    println!("TEST - Trash Document");
+    // TODO: Implement test logic (e.g., create a doc, trash it, verify)
+    let doc_id = 4; // Assuming we need a new doc or use an existing one carefully
+    // Trash it (Needs owner permission)
+    let trash_res = hc.do_put(&format!("/api/document/{}/trash", doc_id), json!({})).await?;
+    trash_res.print().await?;
+    if !trash_res.status().is_success() { return Err(anyhow!("Failed to trash")); }
+    Ok(())
+}
+
+async fn test_restore_document(hc: &Client) -> Result<()> {
+    println!("TEST - Restore Document");
+    // TODO: Implement test logic (e.g., restore the doc trashed above, verify)
+    let doc_id = 4; // Assuming doc 4 was trashed above
+    // Restore it (Needs owner permission)
+    let restore_res = hc.do_put(&format!("/api/document/{}/restore", doc_id), json!({})).await?;
+    restore_res.print().await?;
+    if !restore_res.status().is_success() { return Err(anyhow!("Failed to restore")); }
+    Ok(())
+}
+
+async fn test_get_starred_documents(hc: &Client) -> Result<()> {
+    println!("TEST - Get Starred Documents");
+    let res = hc.do_get("/api/document/starred").await?;
+    res.print().await?;
+    if !res.status().is_success() { return Err(anyhow!("Failed to get starred docs")); }
+    Ok(())
+}
+
+async fn test_get_trashed_documents(hc: &Client) -> Result<()> {
+    println!("TEST - Get Trashed Documents");
+    let res = hc.do_get("/api/document/trash").await?;
+    res.print().await?;
+    if !res.status().is_success() { return Err(anyhow!("Failed to get trashed docs")); }
+    Ok(())
+}
+
+async fn test_get_shared_documents(hc: &Client) -> Result<()> {
+    println!("TEST - Get Shared Documents");
+    let res = hc.do_get("/api/document/shared").await?;
+    res.print().await?;
+    if !res.status().is_success() { return Err(anyhow!("Failed to get shared docs")); }
     Ok(())
 }

@@ -105,7 +105,7 @@ pub async fn api_add_update_keybinding(
     )
     .fetch_one(&pool)
     .await
-    .map_err(|_| Error::AddUpdateKeybindingError)?;
+    .map_err(|_| Error::AddUpdateKeybindingError { command_id })?;
 
     Ok(Json(keybinding))
 }
@@ -133,7 +133,7 @@ pub async fn api_delete_keybinding(
     )
     .execute(&pool)
     .await
-    .map_err(|_| Error::DeleteKeybindingError)?;
+    .map_err(|_| Error::DeleteKeybindingError { command_id })?;
 
     // Return the default command associated with the deleted row
     let command = sqlx::query_as!(

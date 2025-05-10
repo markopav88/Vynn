@@ -6,9 +6,10 @@ edition = "2021"
 [dependencies]
 axum = { version = "0.6", features = ["macros", "multipart"] }
 tokio = { version = "1.0", features = ["full"] }
-sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-rustls", "macros", "time", "chrono"] }
+sqlx = { version = "0.7", features = [ "runtime-tokio-rustls", "postgres", "chrono", "uuid" ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_with = "2"
 tower-http = { version = "0.4", features = ["cors", "fs"] }
 tower-cookies = { version = "0.9", features = ["private"] }
 dotenvy = "0.15"
@@ -22,11 +23,13 @@ argon2 = "0.5.0"
 futures-util = "0.3"
 multipart = "0.18.0"
 rust-bert = "0.20.0"
-pgvector = { version = "0.3.0", features = ["sqlx"] }
+pgvector = { version = "0.3.4", features = ["sqlx"] }
 lazy_static = "1.4.0"
 langchain-rust = "4.6.0"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 regex = "1"
+strum_macros = "0.27.1"
+uuid = {version = "1", features = ["v4", "fast-rng"]}
 
 [dev-dependencies]
 anyhow = "1"

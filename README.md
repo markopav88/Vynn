@@ -30,7 +30,7 @@ Neovim for Writers is an innovative text editor designed for writers who value e
 
 ### Frontend
 - SvelteKit
-- Tailwind CSS
+- Bootstrap
 - Typescript
 
 ### Backend

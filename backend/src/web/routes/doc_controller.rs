@@ -75,7 +75,7 @@ pub async fn api_get_document(
 
     match result {
         Ok(document) => Ok(Json(document)),
-        Err(_) => Err(Error::UserNotFoundError),
+        Err(_) => Err(Error::DocumentNotFoundError { document_id }),
     }
     } else {
         Err(Error::PermissionError)
@@ -106,7 +106,7 @@ pub async fn api_get_all_documents(
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| Error::DocumentNotFoundError)?;
+    .map_err(|_| Error::DatabaseError)?;
 
     Ok(Json(result))
 }
@@ -177,7 +177,7 @@ pub async fn api_create_document(
                 Ok(document) => Ok(Json(document)),
                 Err(e) => {
                     println!("Error fetching user: {:?}", e);
-                    Err(Error::DocumentNotFoundError)
+                    Err(Error::DocumentNotFoundError { document_id: record.id })
                 }
             }
         }
@@ -240,8 +240,7 @@ pub async fn api_update_document(
 
     // Check if the main update failed
     if update_result.is_err() || update_result.unwrap().rows_affected() == 0 {
-        // Note: Using unwrap() as we checked is_err(). Consider proper error handling.
-        return Err(Error::DocumentUpdateError);
+        return Err(Error::DocumentUpdateError { document_id });
     }
 
     let should_update_embedding = match old_embedding_time {
@@ -328,7 +327,7 @@ async fn api_delete_document(
 
     // return error if the query did nothing
     if result.as_ref().unwrap().rows_affected() == 0 {
-        return Err(Error::DocumentDeletionError);
+        return Err(Error::DocumentDeletionError { document_id });
     }
 
     // otherwise now we can sucessfully delete the delete the document from the database
@@ -343,7 +342,7 @@ async fn api_delete_document(
 
     // return error if the query did nothing
     if result.as_ref().unwrap().rows_affected() == 0 {
-        return Err(Error::DocumentDeletionError);
+        return Err(Error::DocumentDeletionError { document_id });
     }
 
     // otherwise its success
@@ -481,7 +480,7 @@ pub async fn api_get_permissions(
 
     match result {
         Ok(users) => Ok(Json(users)),
-        Err(_) => Err(Error::DocumentNotFoundError),
+        Err(_) => Err(Error::DocumentNotFoundError { document_id }),
     }
 }
 
@@ -604,6 +603,8 @@ pub async fn api_remove_permissions(
 
 /// PUT handler for starring a document.
 /// Accessible via: PUT /api/document/:id/star
+/// Test: TODO: test_documents.rs/test_toggle_star_document()
+/// Frontend: document.ts/toggle_star_document()
 pub async fn api_toggle_star_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -632,7 +633,7 @@ pub async fn api_toggle_star_document(
     )
     .fetch_one(&pool)
     .await
-    .map_err(|_| Error::DocumentNotFoundError)?;
+    .map_err(|_| Error::DocumentNotFoundError { document_id })?;
 
     // Toggle the star status
     let new_status = !document.is_starred.unwrap_or(false);
@@ -662,6 +663,8 @@ pub async fn api_toggle_star_document(
 
 /// PUT handler for moving a document to trash.
 /// Accessible via: PUT /api/document/:id/trash
+/// Test: TODO: test_documents.rs/test_trash_document()
+/// Frontend: document.ts/trash_document()
 pub async fn api_trash_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -702,6 +705,8 @@ pub async fn api_trash_document(
 
 /// PUT handler for restoring a document from trash.
 /// Accessible via: PUT /api/document/:id/restore
+/// Test: TODO: test_documents.rs/test_restore_document()
+/// Frontend: document.ts/restore_document()
 pub async fn api_restore_document(
     cookies: Cookies,
     Path(document_id): Path<i32>,
@@ -742,6 +747,8 @@ pub async fn api_restore_document(
 
 /// GET handler for retrieving all starred documents for a user.
 /// Accessible via: GET /api/document/starred
+/// Test: TODO: test_documents.rs/test_get_starred_documents()
+/// Frontend: document.ts/get_starred_documents()
 pub async fn api_get_starred_documents(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -771,6 +778,8 @@ pub async fn api_get_starred_documents(
 
 /// GET handler for retrieving all trashed documents for a user.
 /// Accessible via: GET /api/document/trash
+/// Test: TODO: test_documents.rs/test_get_trashed_documents()
+/// Frontend: document.ts/get_trashed_documents()
 pub async fn api_get_trashed_documents(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -800,6 +809,8 @@ pub async fn api_get_trashed_documents(
 
 /// GET handler for retrieving all shared documents for a user (where user is not owner but has viewer/editor permissions).
 /// Accessible via: GET /api/document/shared
+/// Test: TODO: test_documents.rs/test_get_shared_documents()
+/// Frontend: document.ts/get_shared_documents()
 pub async fn api_get_shared_documents(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -825,7 +836,7 @@ pub async fn api_get_shared_documents(
 
     match result {
         Ok(documents) => Ok(Json(documents)),
-        Err(_) => Err(Error::DocumentNotFoundError),
+        Err(_) => Err(Error::DatabaseError),
     }
 }
 

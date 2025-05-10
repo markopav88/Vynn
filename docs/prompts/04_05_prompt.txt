@@ -1,0 +1,7 @@
+"""
+on apply changes but is pressed we need to do some things. We need to pass to the ai the current status of each document in the project. 
+the ai will then get passed the response we want to "apply" the ai wil use this information to determine simply what 
+changes will be made to what existing documents to fullfill "applying" the changes. the llm willl simply return the states of each
+document after "applying" changes and then we will go through and generate a diff and let the user accept the chances or not. 
+for now lets just work on passing the information to the llm to decide what changes to make and well work on the diff later
+"""

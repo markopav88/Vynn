@@ -1,11 +1,3 @@
-/*
- / HOW TO USE BACKEND TESTS
- / ENSURE WATCH IS INSTALLED '$ cargo install cargo-watch --locked'
- / In Terminal 1: 'cargo watch -q -c -w src/ -x run'
- / In Terminal 2: 'cargo watch -q -c -w tests/ -x "test -q test_testname -- --nocapture"'
- / Now you can see LIVE Updates of API calls
-*/
-
 #![allow(unused)]
 
 use anyhow::Result;
