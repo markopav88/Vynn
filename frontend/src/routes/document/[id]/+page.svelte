@@ -4249,38 +4249,29 @@
 
 		console.log("Processing suggestion for current document (Structured Diff):", pendingSuggestion);
 
-		// Validate suggestion data before proceeding
-		// old_content can be an empty string (for new documents), so we primarily check new_content.
 		if (pendingSuggestion.new_content === null || 
 			typeof pendingSuggestion.new_content === 'undefined' || 
-			pendingSuggestion.new_content === '') { // Check if new_content is null, undefined, or an empty string.
+			pendingSuggestion.new_content === '') { 
 			showToast('Suggestion data is incomplete (new content is missing or empty).', 'error');
 			pendingSuggestion = null;
 			return;
 		}
 
-		// If old_content is null or undefined (shouldn't happen if backend is consistent, but good to safeguard)
 		if (pendingSuggestion.old_content === null || typeof pendingSuggestion.old_content === 'undefined') {
 			showToast('Suggestion data is incomplete (old content is missing).', 'error');
 			pendingSuggestion = null;
 			return;
 		}
 
-		isReviewingSuggestion = true;
-		if (editorElement) {
-			editorElement.contentEditable = 'false';
-				editorElement.style.opacity = '0.6';
-		}
-
 		const attributeToRemoveRegex = / data-original-line=".*?"/g;
 		const cleanedOldContent = pendingSuggestion.old_content.replace(attributeToRemoveRegex, '');
 		
-		let textToClean = pendingSuggestion.new_content.replace(attributeToRemoveRegex, ''); // Start with AI's new content
+		let textToClean = pendingSuggestion.new_content.replace(attributeToRemoveRegex, '');
 		let previousCleanedText = "";
 		const MAX_SANITIZE_ITERATIONS = 5;
 		let iterations = 0;
 
-		showToast('Sanitizing AI suggestion...', 'warning'); // Let user know
+		showToast('Sanitizing AI suggestion...', 'warning');
 
 		while (textToClean !== previousCleanedText && iterations < MAX_SANITIZE_ITERATIONS) {
 		    previousCleanedText = textToClean;
@@ -4305,17 +4296,14 @@
 		     showToast('AI suggestion sanitized!', 'success');
 		}
 
-		const finalSanitizedNewContent = textToClean; // This is the fully sanitized new content
+		const finalSanitizedNewContent = textToClean;
 
-		// --- Use finalSanitizedNewContent for diffing ---
 		const diffResult = Diff.diffWords(cleanedOldContent, finalSanitizedNewContent);
 
-		// --- Group the results ---
-		const groupedDiffResult = groupDiffParts(diffResult); // Call the new helper
+		const groupedDiffResult = groupDiffParts(diffResult);
 
-		// Process *grouped* diff into structured array
-		processedDiffParts = []; // Reset the array
-		groupedDiffResult.forEach((part, index) => { // Iterate over GROUPED results
+		processedDiffParts = []; 
+		groupedDiffResult.forEach((part, index) => {
 			let type: 'added' | 'removed' | 'common';
 			if (part.added) {
 				type = 'added';
@@ -4327,13 +4315,20 @@
 
 			processedDiffParts.push({
 				id: `diff-part-${index}`,
-				value: part.value, // Value is now a potentially larger chunk
+				value: part.value, 
 				type: type,
 				state: 'pending'
 			});
 		});
 
-		console.log("Processed grouped diff parts:", processedDiffParts.slice(0, 5)); // Log first few grouped parts
+		// Setting isReviewingSuggestion and disabling editor AFTER diff processing
+		isReviewingSuggestion = true;
+		if (editorElement) {
+			editorElement.contentEditable = 'false';
+				editorElement.style.opacity = '0.6';
+		}
+
+		console.log("Processed grouped diff parts:", processedDiffParts.slice(0, 5));
 		activePartControls = null;
 		console.log(`[handleSuggestionReceived] editorElement exists: ${!!editorElement}`);
 		console.log("[handleSuggestionReceived] pendingSuggestion set:", pendingSuggestion);
@@ -5020,7 +5015,6 @@
 									{/if}
 								{/each}
 							</div>
-							<!-- suggestion-controls block removed from here -->
 						</div>
 					{:else}
 						<div
@@ -5074,7 +5068,6 @@
 		</div>
 
 		<div class="cursor-position">
-			<!-- AI Credit Indicator -->
 			<div class="credit-indicator-container">
 				<span class="credit-indicator" title="AI Credits Remaining">
 					<i class="bi bi-coin"></i>
@@ -5085,7 +5078,6 @@
 					{/if}
 				</span>
 				{#if showInsufficientCreditsPopup}
-					<!-- Use a button for accessibility and apply separate transitions -->
 					<button 
 						type="button" 
 						class="insufficient-credits-popup" 
