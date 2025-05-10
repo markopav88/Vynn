@@ -1756,6 +1756,7 @@
 	
 	// Improved handleInput function to work in coordination with handleKeyDown
 	function handleInput(event: Event) {
+		normalizeFirstLineDiv();
 		// In NORMAL mode, prevent any changes to content
 		if (editorMode === 'NORMAL') {
 			// Restore the original content to prevent changes
@@ -4624,6 +4625,19 @@
 
 		console.log(`Grouped diff from ${diffResult.length} parts down to ${grouped.length} parts.`);
 		return grouped;
+	}
+
+	// Ensures the first line is always a <div> (fixes contenteditable quirks)
+	function normalizeFirstLineDiv() {
+		if (!editorElement) return;
+		const firstChild = editorElement.firstChild;
+		if (firstChild && firstChild.nodeType === Node.TEXT_NODE && firstChild.textContent?.trim()) {
+			// Wrap the text node in a div
+			const div = document.createElement('div');
+			div.textContent = firstChild.textContent;
+			editorElement.insertBefore(div, firstChild);
+			editorElement.removeChild(firstChild);
+		}
 	}
 </script>
 

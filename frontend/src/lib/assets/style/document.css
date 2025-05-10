@@ -313,7 +313,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	z-index: 100 !important;
 	background-color: transparent !important;
 	border-bottom: none !important;
-	margin: 40px auto 20px auto !important;
+	margin: 45px auto 20px auto !important;
 	border: none !important;
 	opacity: 0.9 !important; /* Higher initial opacity */
 	transform: translateY(5px); /* Match animation start state */
@@ -749,7 +749,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 /* Updated styles for the commands overlay */
 .commands-overlay {
 	position: fixed;
-	top: 200px;
+	top: 155px;
 	right: 20px;
 	width: 300px;
 	background-color: rgba(18, 18, 18, 0.9);
@@ -765,7 +765,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	transform: translateX(20px);
 	pointer-events: none;
 	transition: all 0.3s ease;
-	max-height: 68vh;
+	max-height: 71vh;
 	overflow-y: auto;
 	scrollbar-width: none; /* Firefox */
 	-ms-overflow-style: none; /* IE and Edge */
