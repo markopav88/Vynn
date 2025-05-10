@@ -1150,21 +1150,17 @@
 		if (!selection || !selection.rangeCount) return;
 
 		const range = selection.getRangeAt(0);
-		const currentDiv = range.startContainer.parentElement;
 
-		// If no text is selected, delete the character at cursor
+		// If no text is selected, delete the character at cursor (this part is fine)
 		if (range.collapsed) {
 			const textNode = range.startContainer;
 			if (textNode.nodeType === Node.TEXT_NODE) {
 				const offset = range.startOffset;
 				const text = textNode.textContent || '';
 
-				// Only proceed if there's a character to delete
 				if (offset < text.length) {
 					const newText = text.slice(0, offset) + text.slice(offset + 1);
 					textNode.textContent = newText;
-
-					// Maintain cursor position
 					range.setStart(textNode, offset);
 					range.setEnd(textNode, offset);
 					selection.removeAllRanges();
@@ -1172,6 +1168,11 @@
 				}
 			}
 		} else {
+			// Before deleting selected text, ensure the selection is within the editor
+			if (!editorElement.contains(range.startContainer) || !editorElement.contains(range.endContainer)) {
+				showToast("Selection extends outside the editable area. Deletion aborted.", "warning");
+				return; // Abort deletion
+			}
 			// Delete selected text
 			range.deleteContents();
 		}
