@@ -2,9 +2,9 @@
 	import { onMount, onDestroy, afterUpdate, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 	import { fade, fly } from 'svelte/transition';
 	import { jsPDF } from 'jspdf';
-	import { browser } from '$app/environment';
 	import Toast from '$lib/components/Toast.svelte';
 	import * as Diff from 'diff';
 
@@ -126,7 +126,6 @@
 	let isReviewingSuggestion = false;
 	let processedDiffParts: DiffPart[] = [];
 	let activePartControls: string | null = null;
-	let hideControlsTimeoutId: ReturnType<typeof setTimeout> | null = null;
 	let pendingSuggestion: SuggestedDocumentChange | null = null;
 
 	// Function to prevent default browser behavior for certain key combinations
@@ -4352,32 +4351,71 @@
 		isReviewingSuggestion = true;
 		if (editorElement) {
 			editorElement.contentEditable = 'false';
-				editorElement.style.opacity = '0.6';
 		}
 
 		console.log("Processed grouped diff parts:", processedDiffParts.slice(0, 5));
 		activePartControls = null;
+		
+		// Set up the outside click handler
+		if (outsideClickCleanup) {
+			outsideClickCleanup(); // Clean up any existing handler first
+		}
+		outsideClickCleanup = setupOutsideClickHandler();
+		
 		console.log(`[handleSuggestionReceived] editorElement exists: ${!!editorElement}`);
 		console.log("[handleSuggestionReceived] pendingSuggestion set:", pendingSuggestion);
 	}
 
 	// Functions to show/hide individual part controls
 	function showPartControls(partId: string) {
-		clearTimeout(hideControlsTimeoutId ?? undefined); // Clear any pending hide
-		hideControlsTimeoutId = null;
+		// If clicking on the same part that's already active, close it
+		if (activePartControls === partId) {
+			activePartControls = null;
+			return;
+		}
+		
+		// Otherwise, activate the new part
 		activePartControls = partId;
 	}
-	function hidePartControls() {
-		clearTimeout(hideControlsTimeoutId ?? undefined); // Clear previous timeout if any
-		hideControlsTimeoutId = setTimeout(() => {
-			activePartControls = null;
-			hideControlsTimeoutId = null;
-		}, 300); 
-	}
+	
+	// Cancel hide is no longer needed since we're not using hover timeouts
 	function cancelHideControls() {
-		clearTimeout(hideControlsTimeoutId ?? undefined);
-		hideControlsTimeoutId = null;
+		// This function remains to prevent bubbling of events
+		// when interacting with the controls themselves
 	}
+	
+	// Add a click handler to the document to close controls when clicking elsewhere
+	function setupOutsideClickHandler() {
+		function handleOutsideClick(event: MouseEvent) {
+			// Skip if no controls are showing
+			if (activePartControls === null) return;
+			
+			// Check if the click was inside a diff part or its controls
+			const target = event.target as HTMLElement;
+			const isDiffPart = target.closest('.diff-part');
+			const isPartControls = target.closest('.part-controls');
+			
+			// If clicked outside both diff parts and controls, hide the controls
+			if (!isDiffPart && !isPartControls) {
+				activePartControls = null;
+			}
+		}
+		
+		// Add the document click listener when we enter review mode
+		if (browser) {
+			document.addEventListener('click', handleOutsideClick);
+			
+			// Return a cleanup function
+			return () => {
+				document.removeEventListener('click', handleOutsideClick);
+			};
+		}
+		
+		return () => {}; // Dummy cleanup if not in browser
+	}
+	
+	// Set up outside click handler when entering review mode
+	let outsideClickCleanup: (() => void) | null = null;
 
 	// Functions to handle individual part accept/reject
 	function acceptPart(partId: string) {
@@ -4550,10 +4588,23 @@
 	}
 	function exitReviewMode() {
 		console.log("--- exitReviewMode function triggered ---");
-		isReviewingSuggestion = false; // This triggers the DOM update
+
+		// Clear suggestion state
+		isReviewingSuggestion = false;
+		processedDiffParts = [];
 		pendingSuggestion = null;
-		processedDiffParts = []; 
 		activePartControls = null; // Reset active controls
+		
+		// Clean up outside click handler
+		if (outsideClickCleanup) {
+			outsideClickCleanup();
+			outsideClickCleanup = null;
+		}
+
+		// Reset editorElement only if it exists
+		if (editorElement) {
+			editorElement.contentEditable = 'true';
+		}
 	}
 
 	// Helper to trigger manual save if needed (e.g., after accept)
@@ -5008,8 +5059,13 @@
 											class:pending={part.state === 'pending'}
 											class:accepted={part.state === 'accepted'}
 											class:rejected={part.state === 'rejected'}
-											on:mouseenter={() => showPartControls(part.id)}
-											on:mouseleave={hidePartControls} 
+											on:click={() => showPartControls(part.id)}
+											on:keydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													showPartControls(part.id);
+												}
+											}}
 											style="position: relative;"
 											role="button" 
 											tabindex="0"
@@ -5019,7 +5075,6 @@
 												<div 
 													class="part-controls"
 													on:mouseenter={cancelHideControls} 
-													on:mouseleave={hidePartControls}
 													role="group" 
 												>
 													<button 
@@ -5058,6 +5113,22 @@
 						></div>
 					{/if}
 				</div>
+				
+				{#if isReviewingSuggestion}
+					<div class="suggestion-actions-bar">
+						<div class="suggestion-controls">
+							<button class="btn btn-sm btn-success me-2" on:click={acceptSuggestion} title="Accept all changes and apply to document">
+								<i class="bi bi-check-lg"></i> Accept All
+							</button>
+							<button class="btn btn-sm btn-danger me-2" on:click={rejectSuggestion} title="Reject all changes and keep original">
+								<i class="bi bi-x-lg"></i> Reject All
+							</button>
+							<button class="btn btn-sm btn-secondary" on:click={exitReviewMode} title="Close review mode without applying remaining changes">
+								<i class="bi bi-eye-slash"></i> Close Review
+							</button>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -5292,22 +5363,6 @@
 				on:suggestionReceived={handleSuggestionReceived}
 				on:showtoast={handleShowToast} 
 			/>
-		</div>
-	{/if}
-
-	{#if isReviewingSuggestion}
-		<div class="suggestion-actions-bar">
-			<div class="suggestion-controls" style="display: flex; justify-content: center; padding: 0.5rem;">
-				<button class="btn btn-sm btn-success me-2" on:click={acceptSuggestion} title="Accept all changes and apply to document">
-					<i class="bi bi-check-lg"></i> Accept All
-				</button>
-				<button class="btn btn-sm btn-danger me-2" on:click={rejectSuggestion} title="Reject all changes and keep original">
-					<i class="bi bi-x-lg"></i> Reject All
-				</button>
-				<button class="btn btn-sm btn-secondary" on:click={exitReviewMode} title="Close review mode without applying remaining changes">
-					<i class="bi bi-eye-slash"></i> Close Review
-				</button>
-			</div>
 		</div>
 	{/if}
 </div>
