@@ -439,17 +439,43 @@
     .offcanvas-end {
         width: 450px
     }
-    .offcanvas.offcanvas-end.show { /* Increased specificity */
-        /* Make background semi-transparent and add blur */
-        background-color: rgba(10, 23, 33, 0.60) !important; /* Added !important */
-        backdrop-filter: blur(8px); /* Increased blur */
+    .offcanvas.offcanvas-end.show {
+        background-color: rgba(10, 23, 33, 0.60) !important;
+        backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        border-radius: 8px; /* Round all corners */
-        top: 165px; /* Maintain position below navbar */
-        height: 770px;
+        border-radius: 8px;
+        top: 165px;
+        /* Responsive height: subtract navbar + status bar (adjusted to 220px) */
+        height: calc(100vh - 220px);
+        max-height: calc(100vh - 220px);
+        min-height: 300px;
         transition: transform 0.4s ease-out;
-        margin-right: 50px; /* Add right margin */
+        margin-right: 50px;
         z-index: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .offcanvas-body.d-flex.flex-column.p-0 {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+        padding: 0;
+    }
+    .chat-body {
+        background-color: transparent;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding-bottom: 110px; /* Increased to ensure input is always visible above footer/status bar */
+        min-height: 0;
+    }
+    /* Make the input group sticky at the bottom of the chat */
+    .input-group.p-3.border-top {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        border-radius: 0 0 8px 8px;
     }
     .offcanvas-header,
     /* Remove session list container styles */
@@ -457,9 +483,6 @@
         border-color: rgba(22, 163, 74, 0.4); /* Adjusted green border */
     }
 
-    .chat-body {
-        background-color: transparent; /* Make chat body background transparent */
-    }
     .message-assistant .message-content {
         background-color: rgba(73, 80, 87, 0.9); /* Darker gray for assistant - made slightly transparent */
         color: white;
