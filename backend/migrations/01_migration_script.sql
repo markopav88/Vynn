@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS user_profile_images;
 DROP TABLE IF EXISTS writing_assistant_sessions;
 DROP TABLE IF EXISTS writing_assistant_messages;
+DROP TYPE IF EXISTS message_role_enum;
 
 CREATE EXTENSION IF NOT EXISTS vector; -- Use PGVECTOR
 

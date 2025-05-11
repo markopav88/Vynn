@@ -445,10 +445,11 @@
         backdrop-filter: blur(8px); /* Increased blur */
         -webkit-backdrop-filter: blur(8px);
         border-radius: 8px; /* Round all corners */
-        top: 155px; /* Maintain position below navbar */
+        top: 165px; /* Maintain position below navbar */
         height: 770px;
         transition: transform 0.4s ease-out;
         margin-right: 50px; /* Add right margin */
+        z-index: 0;
     }
     .offcanvas-header,
     /* Remove session list container styles */

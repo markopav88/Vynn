@@ -34,7 +34,8 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     // Read environment variables
-    let frontend_url = env::var("FRONTEND_URL").expect("FRONTEND_URL must be set");
+    let api_base_url = env::var("API_BASE_URL").expect("API_BASE_URL must be set");
+    let front_end_url = env::var("FRONTEND_URL").expect("FRONTEND_URL must be set");
     let bind_address = env::var("BIND_ADDRESS").expect("BIND_ADDRESS must be set");
 
     /*
@@ -52,7 +53,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We allow all origins, methods, and headers currently, but this should be changed later for security.
     */
     let cors = CorsLayer::new()
-        .allow_origin(frontend_url.parse::<HeaderValue>().expect("Invalid FRONTEND_URL format"))
+        .allow_origin(front_end_url.parse::<HeaderValue>().expect("Invalid api_base_url format"))
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([
             http::header::CONTENT_TYPE,
@@ -97,7 +98,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We will bind to port 3001 for now
     */
     let addr = SocketAddr::from_str(&bind_address).expect("Invalid BIND_ADDRESS format");
-    println!("Server starting on http://{}", frontend_url); // Log the configured bind address
+    println!("Server starting on {}", api_base_url); // Log the configured bind address
 
     /*
     / Serve the router ie Start the server
