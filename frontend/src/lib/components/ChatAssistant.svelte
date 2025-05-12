@@ -3,6 +3,8 @@
     import { get_all_writing_sessions, create_writing_session, get_writing_session, send_writing_message, delete_writing_session, apply_ai_suggestion } from '$lib/ts/ai';
     import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload, SuggestedDocumentChange } from '$lib/ts/ai';
     import { shouldAgentShowDiffProactively } from '$lib/ts/agent';
+    import { get_all_preferences, check_background_image } from '$lib/ts/account'; // Adjust imports as necessary
+
     export let documentId: number | null = null;
     export let isOpen = false;
 
@@ -20,6 +22,18 @@
     export let messageInput: HTMLInputElement | null;
     let chatBody: HTMLDivElement;
     let isApplyingSuggestion = false;
+
+    // Preferences variables
+    let preferences: any[] = [];
+    let primaryColorPref = '#0A1721';
+    let secondaryColorPref = '#10b981';
+    let primaryAccentColorPref = '#10b981';
+    let secondaryAccentColorPref = '#808080';
+    let primaryTextColorPref = '#10b981';
+    let secondaryTextColorPref = '#FFFFFF';
+    let backgroundOpacity = 0.7; // Default opacity
+    let currentBackgroundImage: string | null = null;
+    let isCustomBackground = false;
 
     // Reactive variable for current session title
     $: currentSessionTitle = (() => {
@@ -255,10 +269,53 @@
         }
     }
 
+    // New loadPreferences function
+    async function loadPreferences() {
+        try {
+            const prefs = await get_all_preferences();
+            
+            if (prefs) {
+                preferences = prefs;
+                // Set local variables for specific preferences
+                preferences.forEach(pref => {
+                    if (pref.preference_name === 'primary_color') {
+                        primaryColorPref = pref.preference_value;
+                    } else if (pref.preference_name === 'editor_background_opacity') {
+                        backgroundOpacity = parseFloat(pref.preference_value); // Convert to float
+                    } else if (pref.preference_name === 'secondary_color') {
+                        secondaryColorPref = pref.preference_value;
+                    } else if (pref.preference_name === 'primary_accent_color') {
+                        primaryAccentColorPref = pref.preference_value;
+                    } else if (pref.preference_name === 'secondary_accent_color') {
+                        secondaryAccentColorPref = pref.preference_value;
+                    } else if (pref.preference_name === 'primary_text_color') {
+                        primaryTextColorPref = pref.preference_value;
+                    } else if (pref.preference_name === 'secondary_text_color') {
+                        secondaryTextColorPref = pref.preference_value;
+                    }
+                });
+
+                // Check if background image exists
+                const { imageUrl, isCustom } = await check_background_image();
+                if (imageUrl) {
+                    currentBackgroundImage = imageUrl;
+                }
+                isCustomBackground = isCustom;
+            } else {
+                console.error('Failed to load preferences');
+                dispatch('showtoast', { message: 'Failed to load preferences', type: 'error' });
+            }
+        } catch (error) {
+            console.error('Error loading preferences:', error);
+            dispatch('showtoast', { message: 'An error occurred while loading preferences', type: 'error' });
+        }
+    }
+
     // Mount logic
-    onMount(() => {
+    onMount(async () => {
         if (isOpen) {
-            loadAllSessions();
+            await loadAllSessions();
+            await loadPreferences(); // Call loadPreferences here
         }
         // Optional: Add focus to input when chat opens?
         if (isOpen && messageInput) messageInput.focus();
@@ -305,7 +362,7 @@
 {#if isOpen}
 <!-- Use 'showing' class for transitions if desired -->
 <div class="offcanvas offcanvas-end show text-bg-dark" tabindex="-1" id="chatAssistantOffcanvas" aria-labelledby="chatAssistantLabel">
-    <div class="offcanvas-header border-bottom border-secondary">
+    <div class="offcanvas-header border-bottom border-secondary" style="border-bottom-color: var(--primary-color)">
         <!-- Replace static title with Dropdown for sessions -->
         <div class="dropdown flex-grow-1 me-2">
             <button class="btn btn-dark dropdown-toggle w-100 text-start" type="button" id="sessionDropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
@@ -314,7 +371,7 @@
             <ul class="dropdown-menu dropdown-menu-dark w-100" aria-labelledby="sessionDropdownMenuButton">
                 {#if isLoadingSessions}
                     <li><span class="dropdown-item-text">Loading...</span></li>
-                {:else if errorLoadingSessions}
+                {:else if errorLoadingSessions}d
                      <li><span class="dropdown-item-text text-danger">Error loading</span></li>
                 {:else}
                     {#each sessions as session (session.id)}
@@ -376,6 +433,7 @@
                                 <button 
                                     class="btn btn-sm copy-button" 
                                     title="Copy to clipboard"
+                                    style="color: var(--primary-color)"
                                     aria-label="Copy assistant message to clipboard"
                                     on:click={(e) => copyToClipboard(message.content, e.currentTarget)}
                                 >
@@ -385,6 +443,7 @@
                                 <button 
                                     class="btn btn-sm apply-ai-button" 
                                     title="Apply suggestion"
+                                    style="color: var(--primary-color)"
                                     aria-label="Apply AI suggestion to document"
                                     on:click={() => applyAIResponse(message.content)}
                                     disabled={isApplyingSuggestion}
@@ -417,16 +476,17 @@
                     bind:this={messageInput}
                     type="text"
                     class="form-control bg-transparent text-white border-secondary"
+                    
                     placeholder="Ask the AI..."
                     bind:value={newMessageContent}
                     on:keydown={(e) => { if (e.key === 'Enter') sendMessage(); }}
                     disabled={isLoadingMessages}
                 />
-                 <button class="btn btn-success" on:click={sendMessage} disabled={isLoadingMessages || !newMessageContent.trim()}>
+                 <button class="btn" style="background-color: var(--primary-color)" on:click={sendMessage} disabled={isLoadingMessages || !newMessageContent.trim()}>
                     {#if isLoadingMessages}
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                     {:else}
-                        <i class="bi bi-send"></i>
+                        <i class="bi bi-send" style="color: var(--secondary-color)"></i>
                     {/if}
                 </button>
             </div>
@@ -436,6 +496,17 @@
 {/if}
 
 <style>
+    :root {
+        --primary-color: #0A1721;
+        --secondary-color: #10b981;
+        --primary-accent-color: #10b981;
+        --secondary-accent-color: #808080;
+        --primary-text-color: #10b981;
+        --secondary-text-color: #FFFFFF;
+        --primary-color-rgba: rgba(10, 23, 33, 0.5);
+        --editor-background-opacity: 0.7;
+    }
+
     .offcanvas-end {
         width: 450px
     }
@@ -480,12 +551,12 @@
     .offcanvas-header,
     /* Remove session list container styles */
     .input-group { /* Apply border to input area */
-        border-color: rgba(22, 163, 74, 0.4); /* Adjusted green border */
+        border-color: var(--primary-color);
     }
 
     .message-assistant .message-content {
-        background-color: rgba(73, 80, 87, 0.9); /* Darker gray for assistant - made slightly transparent */
-        color: white;
+        background-color: var(--secondary-color); /* Darker gray for assistant - made slightly transparent */
+        color: var(--secondary-text-color);
         border-radius: 15px 15px 15px 5px; /* Chat bubble style */
         margin-left:1px
     }
@@ -498,7 +569,7 @@
     
     /* Adjust active dropdown item style if needed */
     .dropdown-item.active {
-        background-color: #0a58ca !important; /* Ensure active color overrides */
+        background-color: #595f68 !important; /* Ensure active color overrides */
         border-color: #0a58ca !important;
     }
 
@@ -545,8 +616,8 @@
     }
 
     .message-user .message-content {
-        background-color: #198754; /* Bootstrap success green */
-        color: white;
+        background-color: var(--primary-color); /* Bootstrap success green */
+        color: var(--primary-text-color);
         border-radius: 15px 15px 5px 15px; /* Chat bubble style */
     }
 
@@ -605,7 +676,7 @@
     
     /* Style the active row (li) */
     .dropdown-menu li.active-row {
-        background-color: var(--bs-success) !important; 
+        background-color: var(--primary-color) !important; 
     }
 
     /* Style the active button within the active row */
@@ -616,7 +687,7 @@
 
     /* Style the delete button within the active row for visibility */
     .dropdown-menu li.active-row .delete-session-btn {
-        color: rgba(255, 255, 255, 0.7);
+        color: var(--secondary-accent-color);
         opacity: 0.7;
     }
     .dropdown-menu li.active-row .delete-session-btn:hover {

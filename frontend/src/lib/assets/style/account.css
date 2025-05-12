@@ -150,4 +150,16 @@
     0% { background-color: rgba(16, 185, 129, 0.3); }
     50% { background-color: rgba(16, 185, 129, 0.2); }
     100% { background-color: transparent; }
-} 
+}
+
+.preferences-container {
+    overflow-y: auto;
+    height: 100%; /* Or set a specific height */
+  }
+  
+  
+  /* Remove any transformations on scroll */
+  .color-picker, .color-preview {
+    position: static;
+    transform: none !important;
+  }
