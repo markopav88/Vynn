@@ -5276,7 +5276,7 @@
 	<!-- Commands cheat sheet overlay -->
 	<div class="commands-overlay" class:show-commands={showCommands}>
 		<div class="commands-header">
-				<h5>Command Reference</h5>
+				<h5 style="color: var(--secondary-text-color)">Command Reference</h5>
 				<div class="header-buttons">
 					<button 
 						class="header-action-btn"
@@ -5284,13 +5284,14 @@
 						title="Edit Keybindings"
 						aria-label="Edit keybindings"
 					>
-						<i class="bi bi-pencil-square"></i>
+						<i class="bi bi-pencil-square" style="color: var(--secondary-accent-color)"></i>
 					</button>
 					<button 
 						class="header-action-btn" 
 						on:click={() => (showCommands = false)} 
 						aria-label="Close commands reference"
 						title="Close"
+						style="color: var(--secondary-accent-color)"
 					>
 						&times;
 					</button>
@@ -5298,97 +5299,96 @@
 		</div>
 		<div class="commands-body">
 			<div class="commands-section">
-				<h6>Mode Switching</h6>
+				<h6 style="color: var(--secondary-text-color)">Mode Switching</h6>
 				<ul>
-					<li><span class="key">{insertModeKey}</span> Enter Insert mode</li>
-					<li><span class="key">Esc</span> Return to Normal mode</li>
-					<li><span class="key">:</span> Enter Command mode</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{insertModeKey}</span> Enter Insert mode</li>
+					<li style="color: var(--primary-text-color)"><span class="key">Esc</span> Return to Normal mode</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:</span> Enter Command mode</li>
 				</ul>
 			</div>
 			
 			<div class="commands-section">
-				<h6>Navigation</h6>
+				<h6 style="color: var(--secondary-text-color)">Navigation</h6>
 				<ul>
-					<li><span class="key">{moveLeftKey}</span> Move left</li>
-					<li><span class="key">{moveDownKey}</span> Move down</li>
-					<li><span class="key">{moveUpKey}</span> Move up</li>
-					<li><span class="key">{moveRightKey}</span> Move right</li>
-					<li><span class="key">{startOfLineKey}</span> Start of line</li>
-					<li><span class="key">{endOfLineKey}</span> End of line</li>
-					<li><span class="key">{startOfDocKey}</span> Start of document</li>
-					<li><span class="key">{endOfDocKey}</span> End of document</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{moveLeftKey}</span> Move left</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{moveDownKey}</span> Move down</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{moveUpKey}</span> Move up</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{moveRightKey}</span> Move right</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{startOfLineKey}</span> Start of line</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{endOfLineKey}</span> End of line</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{startOfDocKey}</span> Start of document</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{endOfDocKey}</span> End of document</li>
 				</ul>
 			</div>
 			
 			<div class="commands-section">
-				<h6>Editing</h6>
+				<h6 style="color: var(--secondary-text-color)">Editing</h6>
 				<ul>
-					<li><span class="key">{deleteSelectedKey}</span> Delete selected</li>
-					<li><span class="key">{deleteLineKey}</span> Delete current line</li>
-					<li><span class="key">{yankKey}</span> Copy (Yank)</li>
-					<li><span class="key">{pasteKey}</span> Paste</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{deleteSelectedKey}</span> Delete selected</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{deleteLineKey}</span> Delete current line</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{yankKey}</span> Copy (Yank)</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{pasteKey}</span> Paste</li>
 				</ul>
 			</div>
 
 			<div class="commands-section">
-				<h6>Styling</h6>
+				<h6 style="color: var(--secondary-text-color)">Styling</h6>
 				<ul>
-					<li><span class="key">{boldKey}</span> Toggle Bold</li>
-					<li><span class="key">{italicKey}</span> Toggle Italic</li>
-					<li><span class="key">{underlineKey}</span> Toggle Underline</li>
-					<li><span class="key">{colorPickerKey}</span> Open Color Picker</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{boldKey}</span> Toggle Bold</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{italicKey}</span> Toggle Italic</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{underlineKey}</span> Toggle Underline</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{colorPickerKey}</span> Open Color Picker</li>
 				</ul>
 			</div>
 			
 			<div class="commands-section">
-				<h6>Search</h6>
+				<h6 style="color: var(--secondary-text-color)">Search</h6>
 				<ul>
-					<li><span class="key">/</span> Search forward</li>
-					<li><span class="key">?</span> Search backward</li>
-					<li><span class="key">{nextMatchKey}</span> Next match</li>
-					<li><span class="key">{prevMatchKey}</span> Previous match</li>
+					<li style="color: var(--primary-text-color)"><span class="key">/</span> Search forward</li>
+					<li style="color: var(--primary-text-color)"><span class="key">?</span> Search backward</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{nextMatchKey}</span> Next match</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{prevMatchKey}</span> Previous match</li>
 				</ul>
 			</div>
 
 			<div class="commands-section">
-				<h6>Colon Commands</h6>
+				<h6 style="color: var(--secondary-text-color)">Colon Commands</h6>
 				<ul>
-					<li><span class="key">:q</span> Quit document</li>
-					<li><span class="key">:w</span> Save document</li>
-					<li><span class="key">:wq</span> Save and quit</li>
-					<li><span class="key">:export</span> Export to PDF</li>
-					<li><span class="key">:grammar</span> Check grammar</li>
-					<li><span class="key">:spellcheck</span> Check spelling</li>
-					<li><span class="key">:summarize</span> Summarize text</li>
-					<li><span class="key">:rephrase</span> Rephrase text</li>
-					<li><span class="key">:expand</span> Expand text</li>
-					<li><span class="key">:shrink</span> Shrink text</li>
-					<li><span class="key">:rewriteas [style]</span> Rewrite text</li>
-					<li><span class="key">:factcheck</span> Fact-check text</li>
-					<li><span class="key">:%s/old/new/gi</span> Replace all</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:q</span> Quit document</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:w</span> Save document</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:wq</span> Save and quit</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:export</span> Export to PDF</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:grammar</span> Check grammar</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:spellcheck</span> Check spelling</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:summarize</span> Summarize text</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:rephrase</span> Rephrase text</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:expand</span> Expand text</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:shrink</span> Shrink text</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:rewriteas [style]</span> Rewrite text</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:factcheck</span> Fact-check text</li>
+					<li style="color: var(--primary-text-color)"><span class="key">:%s/old/new/gi</span> Replace all</li>
 				</ul>
 			</div>
 
 			<div class="commands-section">
-				<h6>Document Switching</h6>
+				<h6 style="color: var(--secondary-text-color)">Document Switching</h6>
 				<ul>
-					<li><span class="key">{switchDoc1Key}</span> Switch to Document 1</li>
-					<li><span class="key">{switchDoc2Key}</span> Switch to Document 2</li>
-					<li><span class="key">{switchDoc3Key}</span> Switch to Document 3</li>
-					<li><span class="key">{switchDoc4Key}</span> Switch to Document 4</li>
-					<li><span class="key">{switchDoc5Key}</span> Switch to Document 5</li>
-					<li><span class="key">{switchDoc6Key}</span> Switch to Document 6</li>
-					<li><span class="key">{switchDoc7Key}</span> Switch to Document 7</li>
-					<li><span class="key">{switchDoc8Key}</span> Switch to Document 8</li>
-					<li><span class="key">{switchDoc9Key}</span> Switch to Document 9</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc1Key}</span> Switch to Document 1</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc2Key}</span> Switch to Document 2</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc3Key}</span> Switch to Document 3</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc4Key}</span> Switch to Document 4</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc5Key}</span> Switch to Document 5</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc6Key}</span> Switch to Document 6</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc7Key}</span> Switch to Document 7</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc8Key}</span> Switch to Document 8</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{switchDoc9Key}</span> Switch to Document 9</li>
 				</ul>
 			</div>
 
 			<div class="commands-section">
-				<h6>Editor</h6>
+				<h6 style="color: var(--secondary-text-color)">Editor</h6>
 				<ul>
-					<li><span class="key">{toggleSheetKey}</span> Toggle Command Sheet</li>
-					
+					<li style="color: var(--primary-text-color)"><span class="key">{toggleSheetKey}</span> Toggle Command Sheet</li>
 				</ul>
 			</div>
 		</div>
