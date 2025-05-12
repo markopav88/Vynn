@@ -1,4 +1,4 @@
-use crate::models::ai::{ChatHistory, MessageRole, ContextDocument};
+use crate::models::ai::{ChatHistory, MessageRole, ContextDocument, ProactiveDiffContextPayload};
 use crate::rag::retrieval::RetrievedChunk;
 
 const MAX_HISTORY_TOKENS: usize = 1000; // Example token limit for history
@@ -199,22 +199,40 @@ pub fn construct_fact_check_prompt(text: &str) -> String {
 pub fn construct_apply_suggestion_prompt(
     project_documents: &[(i32, String, String)], // List of (id, name, content)
     suggestion_to_apply: &str,
-) -> Result<String, serde_json::Error> { // Return Result for serialization errors
+    active_document_id: Option<i32>, // New parameter
+) -> Result<String, serde_json::Error> { 
     let mut prompt = String::new();
 
     // --- System Instructions ---
-    prompt.push_str(
-        "You are an AI assistant tasked with applying a given suggestion to a set of documents within a project. \
-        Analyze the provided 'Project Documents' and the 'Suggestion to Apply'. \
-        Determine which documents need modification based on the suggestion. \
-        For ONLY the documents that need changes, generate their complete new content. \
-        Your response MUST be a JSON array containing objects, where each object represents a changed document and has the following structure: \
-        { \"document_id\": <integer>, \"new_content\": \"<full_new_document_content_as_string>\" }. \
-        Do NOT include documents that remain unchanged in the JSON array. \
-        Ensure the 'new_content' is the complete text of the document after applying the suggestion. \
-        If the suggestion cannot be applied or no documents need changes, return an empty JSON array []. \
-        Output ONLY the JSON array, with no other text before or after it. Do not return any markdown text!\n\n"
+    let mut system_instruction = String::from("You are an AI assistant tasked with applying a given suggestion to a set of documents within a project. ");
+
+    if let Some(active_id) = active_document_id {
+        system_instruction.push_str(&format!(
+            "The user is currently focused on Document ID: {}. Prioritize applying the suggestion to this document. ", active_id
+        ));
+        
+        // Check if the active document is empty
+        if let Some((_, _, active_doc_content)) = project_documents.iter().find(|(id, _, _)| *id == active_id) {
+            if active_doc_content.trim().is_empty() {
+                system_instruction.push_str(
+                    "This active document is currently empty. If the 'Suggestion to Apply' is suitable as new content for an empty document (e.g., a complete story, article, or section), then the 'new_content' for this active document should be the 'Suggestion to Apply' itself. "
+                );
+            } else {
+                system_instruction.push_str(
+                    "This active document has existing content. Determine how the 'Suggestion to Apply' modifies this existing content. "
+                );
+            }
+        }
+    } else {
+        system_instruction.push_str(
+            "No specific document is marked as active. Analyze the provided 'Project Documents' and the 'Suggestion to Apply'. "
+        );
+    }
+
+    system_instruction.push_str(
+        "Determine which documents need modification based on the suggestion. For ONLY the documents that need changes, generate their complete new content. Your response MUST be a JSON array containing objects, where each object represents a changed document and has the following structure: { \"document_id\": <integer>, \"new_content\": \"<full_new_document_content_as_string>\" }. Do NOT include documents that remain unchanged in the JSON array. Ensure the 'new_content' is the complete text of the document after applying the suggestion. If the suggestion cannot be applied or no documents need changes, return an empty JSON array []. Output ONLY the JSON array, with no other text before or after it. Do not return any markdown text!\n\n"
     );
+    prompt.push_str(&system_instruction);
 
     // --- Add Project Documents ---
     prompt.push_str("Project Documents:\n");
@@ -240,4 +258,67 @@ pub fn construct_apply_suggestion_prompt(
     println!("->> {:<12} - Apply Suggestion Prompt constructed ({} chars)", "PROMPT", prompt.len()); // Use char count for large prompts
 
     Ok(prompt)
+}
+
+pub fn construct_proactive_diff_decision_prompt(
+    ai_response_content: &str,
+    context: &ProactiveDiffContextPayload,
+    document_content_snippet: Option<&str>, 
+) -> String {
+    // System instruction for the LLM
+    // You are a decision-making AI. Based on the AI's response content, the user's context, and an optional snippet of the current document, decide if it is appropriate to proactively show a diff to the user. 
+
+    // Restore user_intent_description logic
+    let user_intent_description = match context.r#type.as_str() {
+        "chat" => format!("User asked: '{}' in chat.", context.user_prompt.as_deref().unwrap_or("N/A")),
+        "command" => format!("User invoked command: '{}' with prompt: '{}'.", 
+                                context.command_name.as_deref().unwrap_or("N/A"), 
+                                context.user_prompt.as_deref().unwrap_or("N/A")),
+        _ => "User performed an unspecified action.".to_string(),
+    };
+
+    // Create document_context_description
+    let document_context_description = if let Some(snippet) = document_content_snippet {
+        if snippet.trim().is_empty() {
+            "The current document is empty.".to_string()
+        } else {
+            format!("The current document contains: \"...{}...\".", snippet.chars().take(100).collect::<String>())
+        }
+    } else {
+        "No specific document content snippet provided (assume it might be empty or irrelevant to this decision).".to_string()
+    };
+    
+    // Construct the prompt with clear instructions for the LLM
+    let mut prompt_segments: Vec<String> = Vec::new();
+
+    prompt_segments.push("You are an AI assistant that helps decide if a user interface should proactively show a diff view. Your sole output MUST be 'True' or 'False'.".to_string());
+    prompt_segments.push(format!("User's action: {}", user_intent_description));
+    prompt_segments.push(format!("Current document state: {}", document_context_description));
+    prompt_segments.push(format!("AI's response to user: \"{}\".", ai_response_content.chars().take(500).collect::<String>())); // Limit length of AI response in prompt
+    prompt_segments.push("Decision criteria:".to_string());
+    prompt_segments.push("- If the AI's response is a direct answer, question, or general statement that doesn't imply changes to a document, output: False".to_string());
+    prompt_segments.push("- If the AI's response explicitly suggests or implies content to be added, removed, or modified in a document (e.g., writing a story, suggesting a paragraph, providing code), output: True".to_string());
+    prompt_segments.push("- If the current document is empty and the AI's response is substantial content, output: True".to_string());
+    prompt_segments.push("- If unsure, lean towards False.".to_string());
+    prompt_segments.push("Based on the above, should a diff be proactively shown to the user? Output True or False.".to_string());
+
+    // Join segments to form the final prompt string
+    prompt_segments.join("\n\n")
+}
+
+/// Constructs a prompt for sanitizing text by removing HTML and Markdown.
+pub fn construct_sanitize_text_prompt(text_with_markdown_html: &str) -> String {
+    format!(
+        "You are a text sanitization AI. Your task is to remove ALL HTML tags (e.g., <p>, <div>, <span>, <img>) and ALL Markdown syntax (e.g., **, _, #, ##, ```, [link](url), ![image](url), lists like * or - or 1.) from the provided text. \
+        Preserve the original textual content and its meaning as much as possible. \
+        If the input text consists *only* of HTML/Markdown and would result in an empty string after sanitization, return an empty string. \
+        Do NOT add any explanations, apologies, or introductory/concluding phrases. \
+        Return ONLY the sanitized plain text.\
+\n\
+        Text to Sanitize:\
+        ```text\
+        {}\n        ```\n\n\
+        Sanitized Text:",
+        text_with_markdown_html
+    )
 }

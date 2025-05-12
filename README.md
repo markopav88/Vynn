@@ -40,7 +40,14 @@ Neovim for Writers is an innovative text editor designed for writers who value e
 
 ## Getting Started
 
-[Installation and setup instructions to be added]
+1. Clone
+2. Create .env File
+3. install docker and docker-compose
+4. ensure docker daemon is running
+5. psql -h localhost -p 5431 -U <db_user> -d <db_name>
+6. run migration \i <migration_path>
+7 npm install frontend
+8. cargo build backend w db up
 
 ## Contributing
 

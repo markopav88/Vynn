@@ -2,6 +2,7 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import { get_all_writing_sessions, create_writing_session, get_writing_session, send_writing_message, delete_writing_session, apply_ai_suggestion } from '$lib/ts/ai';
     import type { WritingAssistantSession, WritingAssistantMessage, SessionWithMessages, CreateSessionPayload, SendMessagePayload, SuggestedDocumentChange } from '$lib/ts/ai';
+    import { shouldAgentShowDiffProactively } from '$lib/ts/agent';
     export let documentId: number | null = null;
     export let isOpen = false;
 
@@ -155,7 +156,7 @@
         if (!trimmedContent || !currentSessionId || isLoadingMessages) return;
 
         const userMessage: WritingAssistantMessage = {
-            id: Date.now() + Math.random(), // Temporary unique ID for UI
+            id: Date.now() + Math.random(),
             session_id: currentSessionId,
             role: 'User',
             content: trimmedContent,
@@ -163,38 +164,63 @@
         };
 
         messages = [...messages, userMessage];
-        newMessageContent = ''; // Clear input immediately
+        newMessageContent = '';
+        dispatch('sendMessage');
         isLoadingMessages = true;
         errorLoadingMessages = null;
-
-        dispatch('sendMessage'); 
-        
-        // Focus input again after sending
-        messageInput?.focus(); 
-        scrollToBottom(); // Scroll down to show user message
+        messageInput?.focus();
+        scrollToBottom();
 
         try {
             const payload: SendMessagePayload = { content: userMessage.content };
-            const assistantResponse = await send_writing_message(currentSessionId, payload);
-            if (assistantResponse) {
-                // Construct the full message object using only role and content from response
-                const fullResponse: WritingAssistantMessage = {
-                    id: Date.now(), // Generate a temporary ID for the UI
+            const assistantResponseData = await send_writing_message(currentSessionId, payload);
+
+            if (assistantResponseData && assistantResponseData.content) {
+                const assistantMessage: WritingAssistantMessage = {
+                    id: Date.now(), // Temporary ID
                     session_id: currentSessionId,
-                    role: 'assistant', // We know the response is from the assistant
-                    content: assistantResponse.content || '', // Use content from response
-                    created_at: new Date().toISOString() // Use current time
+                    role: 'assistant',
+                    content: assistantResponseData.content,
+                    created_at: new Date().toISOString()
                 };
-                messages = [...messages, fullResponse];
+                messages = [...messages, assistantMessage];
+                scrollToBottom();
+
+                // Agentic decision for proactive diff
+                const showDiffProactively = await shouldAgentShowDiffProactively(
+                    assistantMessage.content,
+                    { type: 'chat', userPrompt: userMessage.content },
+                    "" // Pass empty string for documentContentSnippet
+                );
+
+                if (showDiffProactively) {
+                    console.log('[ChatAssistant] Agent decided to proactively show diff.');
+                    isApplyingSuggestion = true;
+                    dispatch('showtoast', { message: 'AI suggested changes, preparing diff...', type: 'success' });
+                    try {
+                        const result = await apply_ai_suggestion(currentSessionId!, assistantMessage.content, documentId);
+                        if (result && Array.isArray(result)) {
+                            dispatch('suggestionReceived', result as SuggestedDocumentChange[]);
+                        } else {
+                            console.warn("[ChatAssistant] Proactive AI Apply Suggestion returned invalid data.");
+                            dispatch('showtoast', { message: 'Suggestion data for diff invalid.', type: 'warning' });
+                        }
+                    } catch (error) {
+                        console.error("[ChatAssistant] Error during proactive AI apply suggestion:", error);
+                        dispatch('showtoast', { message: 'Failed to prepare proactive diff', type: 'error' });
+                    } finally {
+                        isApplyingSuggestion = false;
+                    }
+                }
             } else {
-                errorLoadingMessages = "Failed to get AI response (null returned)";
+                errorLoadingMessages = "Failed to get AI response (null returned or empty content)";
             }
         } catch (err) {
             console.error("Error sending message:", err);
             errorLoadingMessages = err instanceof Error ? err.message : "Failed to get AI response";
         } finally {
             isLoadingMessages = false;
-            scrollToBottom(); // Scroll down to show assistant message or error
+            scrollToBottom();
         }
     }
 
@@ -206,25 +232,23 @@
             return;
         }
         
-        console.log(`[applyAIResponse] Attempting to apply. Session ID: ${currentSessionId}`);
+        console.log(`[applyAIResponse] MANUAL APPLY: Attempting to apply. Session ID: ${currentSessionId}`);
         isApplyingSuggestion = true;
         dispatch('showtoast', { message: 'Applying changes...', type: 'success' });
 
-        console.log("Suggestion Content:", suggestionContent);
-
         try {
-            const result = await apply_ai_suggestion(currentSessionId, suggestionContent);
-            console.log("AI Apply Suggestion Result:", result);
+            const result = await apply_ai_suggestion(currentSessionId, suggestionContent, documentId);
+            console.log("AI Apply Suggestion Result (Manual):", result);
 
             if (result && Array.isArray(result)) {
                 dispatch('suggestionReceived', result as SuggestedDocumentChange[]);
             } else {
-                 console.warn("AI Apply Suggestion returned invalid data.");
+                 console.warn("AI Apply Suggestion (Manual) returned invalid data.");
                  dispatch('showtoast', { message: 'Suggestion data invalid.', type: 'warning' });
             }
 
         } catch (error) {
-            console.error("Error applying AI suggestion:", error);
+            console.error("Error applying AI suggestion (Manual):", error);
             dispatch('showtoast', { message: 'Failed to apply changes', type: 'error' });
         } finally {
             isApplyingSuggestion = false;
@@ -415,16 +439,43 @@
     .offcanvas-end {
         width: 450px
     }
-    .offcanvas.offcanvas-end.show { /* Increased specificity */
-        /* Make background semi-transparent and add blur */
-        background-color: rgba(10, 23, 33, 0.60) !important; /* Added !important */
-        backdrop-filter: blur(8px); /* Increased blur */
+    .offcanvas.offcanvas-end.show {
+        background-color: rgba(10, 23, 33, 0.60) !important;
+        backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        border-radius: 8px; /* Round all corners */
-        top: 155px; /* Maintain position below navbar */
-        height: 770px;
+        border-radius: 8px;
+        top: 165px;
+        /* Responsive height: subtract navbar + status bar (adjusted to 220px) */
+        height: calc(100vh - 220px);
+        max-height: calc(100vh - 220px);
+        min-height: 300px;
         transition: transform 0.4s ease-out;
-        margin-right: 50px; /* Add right margin */
+        margin-right: 50px;
+        z-index: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .offcanvas-body.d-flex.flex-column.p-0 {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+        padding: 0;
+    }
+    .chat-body {
+        background-color: transparent;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding-bottom: 110px; /* Increased to ensure input is always visible above footer/status bar */
+        min-height: 0;
+    }
+    /* Make the input group sticky at the bottom of the chat */
+    .input-group.p-3.border-top {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        border-radius: 0 0 8px 8px;
     }
     .offcanvas-header,
     /* Remove session list container styles */
@@ -432,9 +483,6 @@
         border-color: rgba(22, 163, 74, 0.4); /* Adjusted green border */
     }
 
-    .chat-body {
-        background-color: transparent; /* Make chat body background transparent */
-    }
     .message-assistant .message-content {
         background-color: rgba(73, 80, 87, 0.9); /* Darker gray for assistant - made slightly transparent */
         color: white;
