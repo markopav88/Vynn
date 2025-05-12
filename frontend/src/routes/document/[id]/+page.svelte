@@ -23,7 +23,7 @@
 		fact_check_text,
 		check_spelling,
 	} from '$lib/ts/ai';
-	import { check_background_image, get_all_preferences } from '$lib/ts/account';
+	import { check_background_image, get_all_preferences, hexToRgba } from '$lib/ts/account';
 
 	import logo from '$lib/assets/logo.png';
 	import profileDefault from '$lib/assets/profile-image.png';
@@ -130,12 +130,14 @@
 
 	// Variables for preferences
 	let backgroundImage: string | null = null;
-	let editorPrimaryColor: string = '#000000'; // Default value
-	let editorSecondaryColor: string = '#808080'; // Default value
-	let editorPrimaryAccent: string = '#FF5733'; // Default value
-	let editorSecondaryAccent: string = '#33FF57'; // Default value
+	let editorPrimaryColor: string = '#0A1721'; // Default value
+	let editorSecondaryColor: string = '#10b981'; // Default value
+	let editorPrimaryAccent: string = '#10b981'; // Default value
+	let editorSecondaryAccent: string = '#808080'; // Default value
 	let editorPrimaryTextColor: string = '#10b981' // Default value
 	let editorSecondaryTextColor: string = '#FFFFFF'; // Default value
+	let primaryColorRgba: string = ''; // Default value
+	let backgroundOpacity: number = 0.2;
 	let isLoadingPreferences: boolean = false;
 
 	// Declare the preferences variable
@@ -4974,6 +4976,14 @@
 					} else if (pref.preference_name === 'secondary_text_color') {
 						editorSecondaryTextColor = pref.preference_value;
 						document.documentElement.style.setProperty('--secondary-text-color', editorSecondaryTextColor);
+					} else if (pref.preference_name === 'editor_background_opacity') {
+						backgroundOpacity = parseFloat(pref.preference_value); // Convert to float
+						console.warn(backgroundOpacity);
+
+						// Convert primary color to RGBA and store it in a new variable
+						primaryColorRgba = hexToRgba(editorPrimaryColor, backgroundOpacity);
+						console.warn(primaryColorRgba);
+						document.documentElement.style.setProperty('--primary-color-rgba', primaryColorRgba);
 					}
 				});
 
@@ -5249,7 +5259,7 @@
 				aria-label="Toggle AI chat assistant"
 				style="margin-right: -.5px;"
 			>
-				<i class="bi bi-robot"></i>
+				<i class="bi bi-robot" style="color: var(--secondary-text-color)"></i>
 			</button>
 			<button
 				class="commands-toggle"
@@ -5257,9 +5267,9 @@
 				title="Toggle Commands Reference"
 				aria-label="Toggle commands reference"
 			>
-				<i class="bi bi-info-circle"></i>
+				<i class="bi bi-info-circle" style="color: var(--secondary-text-color)"></i>
 			</button>
-			<span>Line: {cursorLine}, Col: {cursorColumn}</span>
+			<span style="color: var(--secondary-text-color)">Line: {cursorLine}, Col: {cursorColumn}</span>
 		</div>
 	</div>
 

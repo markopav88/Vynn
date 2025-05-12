@@ -14,7 +14,8 @@
 		reset_all_preferences,
 		check_background_image,
 		upload_background_image,
-		reset_background_image
+		reset_background_image,
+		hexToRgba
 	} from '$lib/ts/account';
 	import { keybindings, type KeyboardInput } from '$lib/ts/keybindings';
 	import Navbar from '$lib/components/Navbar.svelte';
@@ -52,12 +53,14 @@
 	// Preferences data
 	let isLoadingPreferences = false;
 	let preferences: any[] = [];
-	let primaryColorPref = '#0A1721F2';
+	let primaryColorPref = '#0A1721';
 	let secondaryColorPref = '#10b981';
 	let primaryAccentColorPref = '#10b981';
 	let secondaryAccentColorPref = '#808080';
 	let primaryTextColorPref = '#10b981';
 	let secondaryTextColorPref = '#FFFFFF';
+	let backgroundOpacity = 0.7; // Opacity level
+	let primaryColorRgba = ''; // Variable to store RGBA value
 	let backgroundImageFile: File | null = null;
 	let backgroundImagePreview: string | null = null;
 	let currentBackgroundImage: string | null = null;
@@ -790,6 +793,9 @@
 				preferences.forEach(pref => {
 					if (pref.preference_name === 'primary_color') {
 						primaryColorPref = pref.preference_value;
+						primaryColorRgba = hexToRgba(primaryColorPref, backgroundOpacity);
+					} else if (pref.preference_name === 'editor_background_opacity') {
+						backgroundOpacity = parseFloat(pref.preference_value); // Convert to float
 					} else if (pref.preference_name === 'secondary_color') {
 						secondaryColorPref = pref.preference_value;
 					} else if (pref.preference_name === 'primary_accent_color') {
@@ -807,7 +813,6 @@
 				const { imageUrl, isCustom } = await check_background_image();
 				if (imageUrl) {
 					currentBackgroundImage = imageUrl;
-					console.log('Current background image set to:', currentBackgroundImage); // Debug log
 				}
 				isCustomBackground = isCustom;
 			} else {
@@ -821,6 +826,7 @@
 			isLoadingPreferences = false;
 		}
 	}
+
 	// Function to update a preference
 	async function handleUpdatePreference(preferenceId: number, value: string) {
 		const success = await update_preference(preferenceId, value);
@@ -1473,7 +1479,7 @@
 								</div>
 							{:else}
 								<!-- Messages now handled by Toast component -->
-								
+							<div class="preferences-container">
 								<form on:submit|preventDefault={handleSubmit}>
 									
 									<!-- Primary Color -->
@@ -1510,39 +1516,39 @@
 										</div>
 									</div>
 								
-										<!-- Primary Accent Color -->
-										<div class="mb-3">
-											<label for="primaryAccentColor" class="form-label">Primary Accent Color</label>
-											<div class="d-flex gap-3 align-items-center">
-												<input 
-													type="color" 
-													class="form-control bg-dark text-white border-secondary color-picker" 
-													id="primaryAccentColor" 
-													bind:value={primaryAccentColorPref}
-													on:change={handlePrimaryAccentColorChange}
-													style="width: 60px; height: 40px; padding: 2px;"
-												/>
-												<div class="color-preview rounded" style="background-color: {primaryAccentColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
-												<div class="ms-2 text-white-50">{primaryAccentColorPref}</div>
-											</div>
+									<!-- Primary Accent Color -->
+									<div class="mb-3">
+										<label for="primaryAccentColor" class="form-label">Primary Accent Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="primaryAccentColor" 
+												bind:value={primaryAccentColorPref}
+												on:change={handlePrimaryAccentColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {primaryAccentColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{primaryAccentColorPref}</div>
 										</div>
+									</div>
 										
-										<!-- Secondary Accent Color -->
-										<div class="mb-3">
-											<label for="secondaryAccentColor" class="form-label">Secondary Accent Color</label>
-											<div class="d-flex gap-3 align-items-center">
-												<input 
-													type="color" 
-													class="form-control bg-dark text-white border-secondary color-picker" 
-													id="secondaryAccentColor" 
-													bind:value={secondaryAccentColorPref}
-													on:change={handleSecondaryAccentColorChange}
-													style="width: 60px; height: 40px; padding: 2px;"
-												/>
-												<div class="color-preview rounded" style="background-color: {secondaryAccentColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
-												<div class="ms-2 text-white-50">{secondaryAccentColorPref}</div>
-											</div>
+									<!-- Secondary Accent Color -->
+									<div class="mb-3">
+										<label for="secondaryAccentColor" class="form-label">Secondary Accent Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="secondaryAccentColor" 
+												bind:value={secondaryAccentColorPref}
+												on:change={handleSecondaryAccentColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {secondaryAccentColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{secondaryAccentColorPref}</div>
 										</div>
+									</div>
 								
 									<!-- Primary Text Color -->
 									<div class="mb-3">
@@ -1576,6 +1582,31 @@
 											<div class="color-preview rounded" style="background-color: {secondaryTextColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
 											<div class="ms-2 text-white-50">{secondaryTextColorPref}</div>
 										</div>
+									</div>
+								
+									<!-- Editor Background Opacity -->
+									<div class="mb-3">
+										<label for="editorBackgroundOpacity" class="form-label">Editor Background Opacity</label>
+										<input 
+											type="number" 
+											class="form-control bg-dark text-white border-secondary" 
+											id="editorBackgroundOpacity" 
+											bind:value={backgroundOpacity} 
+											min="0" 
+											max="1" 
+											step="0.01" 
+											on:change={async (e) => {
+												const target = e.target as HTMLInputElement;
+												if (target) {
+													backgroundOpacity = parseFloat(target.value);
+													// Update the preference in the database
+													const opacityPref = preferences.find(p => p.preference_name === 'editor_background_opacity');
+													if (opacityPref) {
+														await handleUpdatePreference(opacityPref.preference_id, backgroundOpacity.toString());
+													}
+												}
+											}}
+										/>
 									</div>
 								
 									<!-- Reset All Colors Button -->
@@ -1684,6 +1715,7 @@
 										{/if}
 									</button>
 								</form>
+							</div>
 							{/if}
 						</div>
 					</div>
@@ -1711,3 +1743,22 @@
 		</div>
 	</div>
 </div>
+
+<!-- Add this style to your CSS -->
+<style>
+	.preferences-container {
+	  overflow-y: auto;
+	  height: 100%; /* Or set a specific height */
+	}
+	
+	.form-group {
+	  position: static; /* Ensure no positioning is applied */
+	  margin-bottom: 1rem;
+	}
+	
+	/* Remove any transformations on scroll */
+	.color-picker, .color-preview {
+	  position: static;
+	  transform: none !important;
+	}
+  </style>

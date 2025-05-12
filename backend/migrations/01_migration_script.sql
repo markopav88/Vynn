@@ -309,12 +309,13 @@ SELECT setval('writing_assistant_messages_id_seq', 1, false);
 -- Insert default color preferences
 INSERT INTO default_preferences(preference_id, preference_name, preference_value, preference_description)
 VALUES 
-(1, 'primary_color', '#0A1721F2', 'Default primary color for text and UI elements'),
+(1, 'primary_color', '#0A1721', 'Default primary color for text and UI elements'),
 (2, 'secondary_color', '#10b981', 'Default secondary color for UI elements'),
 (3, 'primary_accent_color', '#10b981', 'Default primary accent color for UI elements'),
 (4, 'secondary_accent_color', '#808080', 'Default secondary accent color for UI elements'),
 (5, 'primary_text_color', '#10b981', 'Default primary text color for UI elements'),
-(6, 'secondary_text_color', '#FFFFFF', 'Default secondary text color for UI elements')
+(6, 'secondary_text_color', '#FFFFFF', 'Default secondary text color for UI elements'),
+(7, 'editor_background_opacity', '0.2', 'Default opacity for the editor background')
 ON CONFLICT (preference_id) DO UPDATE SET
     preference_name = EXCLUDED.preference_name,
     preference_value = EXCLUDED.preference_value,
