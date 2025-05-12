@@ -52,12 +52,12 @@
 	// Preferences data
 	let isLoadingPreferences = false;
 	let preferences: any[] = [];
-	let primaryColorPref = '#000000';
-	let secondaryColorPref = '#808080';
-	let accentColorPref = '#3498DB';
-	let textColorPref = '#000000'; // Default value
-	let primaryAccentColorPref = '#FF5733';
-	let secondaryAccentColorPref = '#33FF57';
+	let primaryColorPref = '#0A1721F2';
+	let secondaryColorPref = '#10b981';
+	let primaryAccentColorPref = '#10b981';
+	let secondaryAccentColorPref = '#808080';
+	let primaryTextColorPref = '#10b981';
+	let secondaryTextColorPref = '#FFFFFF';
 	let backgroundImageFile: File | null = null;
 	let backgroundImagePreview: string | null = null;
 	let currentBackgroundImage: string | null = null;
@@ -778,30 +778,7 @@
 			}
 		}, 300);
 	}
-	
-	// Get the action name for a custom keybinding
-	function getActionForCommand(commandId: number): string {
-		const metadata = customKeybindingsMetadata.get(commandId);
-		if (metadata) {
-			const action = availableActions.find(a => a.id === metadata.actionId);
-			return action ? action.name : 'Unknown Action';
-		}
-		return 'Unknown Action';
-	}
-	
-	// Get the action ID for a custom keybinding
-	function getActionIdForCommand(commandId: number): string {
-		const metadata = customKeybindingsMetadata.get(commandId);
-		return metadata ? metadata.actionId : 'unknown';
-	}
-	
-	// Handle changing a custom keybinding's action
-	function updateCustomKeybindingAction(commandId: number, actionId: string) {
-		customKeybindingsMetadata.set(commandId, { actionId });
-		showToast('Keybinding action updated successfully', 'success');
-	}
-	
-	// Function to load user preferences
+
 	async function loadPreferences() {
 		try {
 			isLoadingPreferences = true;
@@ -819,8 +796,10 @@
 						primaryAccentColorPref = pref.preference_value;
 					} else if (pref.preference_name === 'secondary_accent_color') {
 						secondaryAccentColorPref = pref.preference_value;
-					} else if (pref.preference_name === 'text_color') {
-						textColorPref = pref.preference_value;
+					} else if (pref.preference_name === 'primary_text_color') {
+						primaryTextColorPref = pref.preference_value;
+					} else if (pref.preference_name === 'secondary_text_color') {
+						secondaryTextColorPref = pref.preference_value;
 					}
 				});
 
@@ -842,7 +821,6 @@
 			isLoadingPreferences = false;
 		}
 	}
-	
 	// Function to update a preference
 	async function handleUpdatePreference(preferenceId: number, value: string) {
 		const success = await update_preference(preferenceId, value);
@@ -855,19 +833,6 @@
 		}
 	}
 	
-	// Function to reset a preference to default
-	async function handleResetPreference(preferenceId: number) {
-		const success = await reset_preference(preferenceId);
-		if (success) {
-			showToast('Preference reset to default', 'success');
-			// Reload preferences to get updated values
-			await loadPreferences();
-			return true;
-		} else {
-			showToast('Failed to reset preference', 'error');
-			return false;
-		}
-	}
 	
 	// Function to handle primary color change
 	async function handlePrimaryColorChange(e: Event) {
@@ -1006,15 +971,25 @@
 		}
 	}
 
-	// Function to handle text color change
-	async function handleTextColorChange(e: Event) {
+	async function handlePrimaryTextColorChange(e: Event) {
 		const input = e.target as HTMLInputElement;
-		textColorPref = input.value;
+		primaryTextColorPref = input.value;
 
-		// Find the preference ID for text color
-		const textColorPrefEntry = preferences.find(p => p.preference_name === 'text_color');
-		if (textColorPrefEntry) {
-			await handleUpdatePreference(textColorPrefEntry.preference_id, textColorPref);
+		// Find the preference ID for primary text color
+		const primaryTextColorPrefEntry = preferences.find(p => p.preference_name === 'primary_text_color');
+		if (primaryTextColorPrefEntry) {
+			await handleUpdatePreference(primaryTextColorPrefEntry.preference_id, primaryTextColorPref);
+		}
+	}
+
+	async function handleSecondaryTextColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		secondaryTextColorPref = input.value;
+
+		// Find the preference ID for secondary text color
+		const secondaryTextColorPrefEntry = preferences.find(p => p.preference_name === 'secondary_text_color');
+		if (secondaryTextColorPrefEntry) {
+			await handleUpdatePreference(secondaryTextColorPrefEntry.preference_id, secondaryTextColorPref);
 		}
 	}
 </script>
@@ -1568,21 +1543,38 @@
 												<div class="ms-2 text-white-50">{secondaryAccentColorPref}</div>
 											</div>
 										</div>
-									
-									<!-- Text Color -->
+								
+									<!-- Primary Text Color -->
 									<div class="mb-3">
-										<label for="textColor" class="form-label">Text Color</label>
+										<label for="primaryTextColor" class="form-label">Primary Text Color</label>
 										<div class="d-flex gap-3 align-items-center">
 											<input 
 												type="color" 
 												class="form-control bg-dark text-white border-secondary color-picker" 
-												id="textColor" 
-												bind:value={textColorPref}
-												on:change={handleTextColorChange}
+												id="primaryTextColor" 
+												bind:value={primaryTextColorPref}
+												on:change={handlePrimaryTextColorChange}
 												style="width: 60px; height: 40px; padding: 2px;"
 											/>
-											<div class="color-preview rounded" style="background-color: {textColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
-											<div class="ms-2 text-white-50">{textColorPref}</div>
+											<div class="color-preview rounded" style="background-color: {primaryTextColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{primaryTextColorPref}</div>
+										</div>
+									</div>
+									
+									<!-- Secondary Text Color -->
+									<div class="mb-3">
+										<label for="secondaryTextColor" class="form-label">Secondary Text Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="secondaryTextColor" 
+												bind:value={secondaryTextColorPref}
+												on:change={handleSecondaryTextColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {secondaryTextColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{secondaryTextColorPref}</div>
 										</div>
 									</div>
 								

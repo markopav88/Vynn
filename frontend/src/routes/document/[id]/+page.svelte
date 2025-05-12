@@ -134,7 +134,8 @@
 	let editorSecondaryColor: string = '#808080'; // Default value
 	let editorPrimaryAccent: string = '#FF5733'; // Default value
 	let editorSecondaryAccent: string = '#33FF57'; // Default value
-	let editorTextColor: string = '#FFFFFF'; // Default value
+	let editorPrimaryTextColor: string = '#10b981' // Default value
+	let editorSecondaryTextColor: string = '#FFFFFF'; // Default value
 	let isLoadingPreferences: boolean = false;
 
 	// Declare the preferences variable
@@ -4967,9 +4968,12 @@
 					} else if (pref.preference_name === 'secondary_accent_color') {
 						editorSecondaryAccent = pref.preference_value;
 						document.documentElement.style.setProperty('--secondary-accent-color', editorSecondaryAccent);
-					} else if (pref.preference_name === 'text_color') {
-						editorTextColor = pref.preference_value;
-						document.documentElement.style.setProperty('--text-color', editorTextColor);
+					} else if (pref.preference_name === 'primary_text_color') {
+						editorPrimaryTextColor = pref.preference_value;
+						document.documentElement.style.setProperty('--primary-text-color', editorPrimaryTextColor);
+					} else if (pref.preference_name === 'secondary_text_color') {
+						editorSecondaryTextColor = pref.preference_value;
+						document.documentElement.style.setProperty('--secondary-text-color', editorSecondaryTextColor);
 					}
 				});
 
