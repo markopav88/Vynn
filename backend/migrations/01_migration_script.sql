@@ -4,6 +4,9 @@
 
 DROP TABLE IF EXISTS user_keybindings CASCADE;
 DROP TABLE IF EXISTS commands CASCADE;
+DROP TABLE IF EXISTS user_preferences CASCADE;
+DROP TABLE IF EXISTS default_preferences CASCADE;
+DROP TABLE IF EXISTS user_backgrounds CASCADE;
 
 DROP TABLE IF EXISTS document_permissions CASCADE;
 DROP TABLE IF EXISTS document_projects CASCADE;
@@ -11,10 +14,10 @@ DROP TABLE IF EXISTS documents CASCADE;
 DROP TABLE IF EXISTS project_permissions CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS user_profile_images;
-DROP TABLE IF EXISTS writing_assistant_sessions;
-DROP TABLE IF EXISTS writing_assistant_messages;
-DROP TYPE IF EXISTS message_role_enum;
+DROP TABLE IF EXISTS user_profile_images CASCADE;
+DROP TABLE IF EXISTS writing_assistant_messages CASCADE;
+DROP TABLE IF EXISTS writing_assistant_sessions CASCADE;
+DROP TYPE IF EXISTS message_role_enum CASCADE;
 
 CREATE EXTENSION IF NOT EXISTS vector; -- Use PGVECTOR
 
@@ -105,6 +108,27 @@ CREATE TABLE user_keybindings (
 
 -- Create table for user profile images
 CREATE TABLE user_profile_images (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    image_data BYTEA NOT NULL,
+    content_type VARCHAR(255) NOT NULL DEFAULT 'image/jpeg'
+);
+
+-- Create tables for user preferences
+CREATE TABLE default_preferences (
+    preference_id SERIAL PRIMARY KEY,
+    preference_name VARCHAR(100) NOT NULL UNIQUE,
+    preference_value VARCHAR(100) NOT NULL,
+    preference_description VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE user_preferences (
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    preference_id INT REFERENCES default_preferences(preference_id) ON DELETE CASCADE,
+    preference_value VARCHAR(100) NOT NULL,
+    PRIMARY KEY (user_id, preference_id)
+);
+
+CREATE TABLE user_backgrounds (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     image_data BYTEA NOT NULL,
     content_type VARCHAR(255) NOT NULL DEFAULT 'image/jpeg'
@@ -243,7 +267,7 @@ VALUES
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
-SELECT setval('commands_id_seq', (SELECT MAX(command_id) FROM commands));
+SELECT setval('commands_command_id_seq', (SELECT MAX(command_id) FROM commands));
 
 -- Update sequence after adding new documents
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
@@ -281,3 +305,22 @@ CREATE INDEX IF NOT EXISTS idx_writing_sessions_document_id ON writing_assistant
 -- Set initial sequence values for writing assistant tables
 SELECT setval('writing_assistant_sessions_id_seq', 1, false);
 SELECT setval('writing_assistant_messages_id_seq', 1, false);
+
+-- Insert default color preferences
+INSERT INTO default_preferences(preference_id, preference_name, preference_value, preference_description)
+VALUES 
+(1, 'background_color', '#FFFFFF', 'Default background color for the editor'),
+(2, 'primary_color', '#000000', 'Default primary color for text and UI elements'),
+(3, 'secondary_color', '#808080', 'Default secondary color for UI elements'),
+(4, 'accent_color', '#3498DB', 'Default accent color for highlights and interactive elements')
+ON CONFLICT (preference_id) DO UPDATE SET
+    preference_name = EXCLUDED.preference_name,
+    preference_value = EXCLUDED.preference_value,
+    preference_description = EXCLUDED.preference_description;
+
+-- Set sequence values to match the highest IDs after adding preferences
+SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
+SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
+SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
+SELECT setval('commands_command_id_seq', (SELECT MAX(command_id) FROM commands));
+SELECT setval('default_preferences_preference_id_seq', (SELECT MAX(preference_id) FROM default_preferences));

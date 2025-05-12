@@ -53,6 +53,9 @@ pub enum Error {
     LlmQueryError,
     InsufficientAiCredits,
     FailedApplyChanges,
+    
+    // Preference Errors
+    PreferenceNotFoundError { preference_id: i32 },
 }
 
 #[derive(Debug, Clone, strum_macros::AsRefStr)]
@@ -124,6 +127,9 @@ impl Error {
             Self::DatabaseConnectionError | 
             Self::MigrationExecutionError | 
             Self::MigrationKeyError => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),
+
+            // Preference Errors
+            Self::PreferenceNotFoundError { .. } => (StatusCode::NOT_FOUND, ClientError::RESOURCE_NOT_FOUND),
 
             // Fallback for any other unmapped error
             _ => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),

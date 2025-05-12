@@ -75,6 +75,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let project_api_routes = web::routes::proj_controller::project_routes();
     let key_api_routes = web::routes::key_controller::key_routes();
     let writing_assistant_routes = web::routes::ai_controller::writing_assistant_routes();
+    let pref_api_routes = web::routes::pref_controller::pref_routes();
 
     let cookie_layer = CookieManagerLayer::new();
 
@@ -85,6 +86,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .nest("/api/project", project_api_routes)
         .nest("/api/command", key_api_routes)
         .nest("/api/writing-assistant", writing_assistant_routes)
+        .nest("/api/preference", pref_api_routes)
         .layer(Extension(pool.clone())) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::from_fn(mw_log_requests))
         .layer(cookie_layer)
