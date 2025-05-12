@@ -782,7 +782,7 @@
 		}, 300);
 	}
 
-	async function loadPreferences() {
+	export async function loadPreferences() {
 		try {
 			isLoadingPreferences = true;
 			const prefs = await get_all_preferences();
@@ -1743,22 +1743,3 @@
 		</div>
 	</div>
 </div>
-
-<!-- Add this style to your CSS -->
-<style>
-	.preferences-container {
-	  overflow-y: auto;
-	  height: 100%; /* Or set a specific height */
-	}
-	
-	.form-group {
-	  position: static; /* Ensure no positioning is applied */
-	  margin-bottom: 1rem;
-	}
-	
-	/* Remove any transformations on scroll */
-	.color-picker, .color-preview {
-	  position: static;
-	  transform: none !important;
-	}
-  </style>
