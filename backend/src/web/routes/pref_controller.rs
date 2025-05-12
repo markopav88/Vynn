@@ -13,19 +13,20 @@
 / api_upload_background_image POST    /background        - Upload a background image for the current user
 / api_get_background_image    GET     /background        - Get the current user's background image
 / api_delete_background_image DELETE  /background        - Delete the current user's background image
+/ api_get_default_background_image GET /default-background - Get the default background image
 /
 */
 
 use axum::{
     extract::{Extension, Json, Path, Multipart},
     routing::{delete, get, put, post},
+    http::{header, HeaderMap, HeaderValue},
     Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower_cookies::Cookies;
-
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
@@ -43,10 +44,9 @@ pub struct UpdatePreferencePayload {
 }
 
 // Function to get the default background image data
-fn get_default_background_image() -> Vec<u8> {
-    // Assuming the default image is stored as bytes in the project
-    let default_image = include_bytes!("../../../../frontend/src/lib/assets/editor-background.jpg").to_vec();
-    default_image
+fn get_default_background_image() -> (Vec<u8>, &'static str) {
+    let image = include_bytes!("../../../../frontend/src/lib/assets/editor-background.jpg").to_vec();
+    (image, "image/jpeg") // or image/png if it's PNG
 }
 
 /// GET handler for retrieving all preferences for the current user.
@@ -314,29 +314,36 @@ pub async fn api_upload_background_image(
 pub async fn api_get_background_image(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>
-) -> Result<Json<Vec<u8>>> {
+) -> Result<impl axum::response::IntoResponse> {
     println!("->> {:<12} - get_background_image", "HANDLER");
 
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Retrieve the background image data from the database
     let background_data = sqlx::query!(
         "SELECT image_data, content_type FROM user_backgrounds WHERE user_id = $1",
         user_id
     )
     .fetch_optional(&pool)
     .await
-    .map_err(|_| Error::DatabaseError)?;
+    .map_err(|e| {
+        println!("->> {:<12} - database error: {:?}", "ERROR", e);
+        Error::DatabaseError
+    })?;
 
-    if let Some(data) = background_data {
-        let file_bytes = data.image_data;
+    match background_data {
+        Some(data) => {
+            let content_type = HeaderValue::from_str(&data.content_type)
+                .map_err(|_| Error::BackgroudImageError)?;
+            
+            let mut headers = HeaderMap::new();
+            headers.insert(header::CONTENT_TYPE, content_type);
 
-        // Return the image data as JSON
-        Ok(Json(file_bytes))
-    } else {
-        // Use the function to get the default background image
-        let default_image = get_default_background_image();
-        Ok(Json(default_image))
+            Ok((headers, data.image_data))
+        }
+        None => {
+            // Return an empty response with 204 No Content status
+            Ok((HeaderMap::new(), Vec::new()))
+        }
     }
 }
 
@@ -370,6 +377,22 @@ pub async fn api_delete_background_image(
     })))
 }
 
+/// GET handler for retrieving the default background image
+/// Accessible via: GET /api/preference/default-background
+pub async fn api_get_default_background_image() -> Result<impl axum::response::IntoResponse> {
+    println!("->> {:<12} - get_default_background_image", "HANDLER");
+
+    let (default_image, default_content_type) = get_default_background_image();
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static(default_content_type),
+    );
+
+    Ok((headers, default_image))
+}
+
 pub fn pref_routes() -> Router {
     Router::new()
         .route("/", get(api_get_all_preferences))
@@ -377,6 +400,7 @@ pub fn pref_routes() -> Router {
         .route("/background", get(api_get_background_image))
         .route("/background", post(api_upload_background_image))
         .route("/background", delete(api_delete_background_image))
+        .route("/default-background", get(api_get_default_background_image))
         .route("/:id", get(api_get_preference))
         .route("/:id", put(api_update_preference))
         .route("/:id", delete(api_reset_preference))

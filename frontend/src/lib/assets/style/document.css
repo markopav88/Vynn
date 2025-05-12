@@ -1,3 +1,11 @@
+:root {
+	--primary-color: #000000; /* Default value */
+	--secondary-color: #808080; /* Default value */
+	--primary-accent-color: #FF5733; /* Default value */
+	--secondary-accent-color: #33FF57; /* Default value */
+	--text-color: #FFFF; /* Default value */
+}
+
 .editor-page {
 	min-height: 100vh;
 	width: 100%;
@@ -44,7 +52,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	display: flex;
 	align-items: center;
 	padding: 0.5rem 1rem;
-	background-color: rgba(10, 23, 33, 0.95);
+	background-color: var(--primary-color);
 	backdrop-filter: blur(5px);
 	-webkit-backdrop-filter: blur(5px);
 	height: 60px;
@@ -54,7 +62,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	right: 0;
 	width: 100%;
 	z-index: 2000;
-	border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+	border-bottom: 1px solid var(--primary-accent-color);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -76,7 +84,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	margin-left: 10px;
 	font-size: 24px;
 	font-weight: bold;
-	color: #e5e5e5;
+	color: var(--text-color);
 	font-family: 'JetBrains Mono', monospace;
 }
 

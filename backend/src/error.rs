@@ -56,6 +56,7 @@ pub enum Error {
     
     // Preference Errors
     PreferenceNotFoundError { preference_id: i32 },
+    BackgroudImageError
 }
 
 #[derive(Debug, Clone, strum_macros::AsRefStr)]

@@ -23,9 +23,9 @@
 		fact_check_text,
 		check_spelling,
 	} from '$lib/ts/ai';
+	import { check_background_image, get_all_preferences } from '$lib/ts/account';
 
 	import logo from '$lib/assets/logo.png';
-	import backgroundImage from '$lib/assets/editor-background.jpg';
 	import profileDefault from '$lib/assets/profile-image.png';
 
 	import '$lib/assets/style/document.css';
@@ -127,6 +127,18 @@
 	let processedDiffParts: DiffPart[] = [];
 	let activePartControls: string | null = null;
 	let pendingSuggestion: SuggestedDocumentChange | null = null;
+
+	// Variables for preferences
+	let backgroundImage: string | null = null;
+	let editorPrimaryColor: string = '#000000'; // Default value
+	let editorSecondaryColor: string = '#808080'; // Default value
+	let editorPrimaryAccent: string = '#FF5733'; // Default value
+	let editorSecondaryAccent: string = '#33FF57'; // Default value
+	let editorTextColor: string = '#FFFFFF'; // Default value
+	let isLoadingPreferences: boolean = false;
+
+	// Declare the preferences variable
+	let preferences: any[] = []; // Initialize as an empty array
 
 	// Function to prevent default browser behavior for certain key combinations
 	function preventBrowserDefaults(event: KeyboardEvent) {
@@ -1351,6 +1363,9 @@
 
 	// Update the onMount function for proper initialization
 	onMount(async () => {
+		// Call loadPreferences on component mount
+		loadPreferences();
+
 		// Check if we're in a browser environment first
 		if (!browser) return;
 
@@ -1517,22 +1532,6 @@
 		// Set document ready immediately for content
 		documentReady = true;
 		
-		// Use a simple timeout to delay the navbar appearance
-		setTimeout(() => {
-			console.log('Setting navbarReady to true');
-			navbarReady = true;
-			console.log('navbarReady is now:', navbarReady);
-			
-			// Log the navbar container opacity after a short delay
-			setTimeout(() => {
-				const navbarContainer = document.querySelector('.navbar-container');
-				if (navbarContainer) {
-					console.log('Navbar container style:', navbarContainer.getAttribute('style'));
-					console.log('Navbar container opacity:', window.getComputedStyle(navbarContainer).opacity);
-				}
-			}, 100);
-		}, 300);
-
 		console.debug('Component mounted, initializing keybindings');
 		
 		// Initialize keybindings
@@ -4940,6 +4939,55 @@
 			div.textContent = firstChild.textContent;
 			editorElement.insertBefore(div, firstChild);
 			editorElement.removeChild(firstChild);
+		}
+	}
+
+	// Function to load user preferences
+	async function loadPreferences() {
+		try {
+			isLoadingPreferences = true;
+			const prefs = await get_all_preferences();
+			
+			if (prefs) {
+				preferences = prefs;
+				// Log all loaded preferences
+				console.log('Loaded preferences:', preferences); // Debug log
+
+				// Set local variables for specific preferences
+				preferences.forEach(pref => {
+					if (pref.preference_name === 'primary_color') {
+						editorPrimaryColor = pref.preference_value;
+						document.documentElement.style.setProperty('--primary-color', editorPrimaryColor);
+					} else if (pref.preference_name === 'secondary_color') {
+						editorSecondaryColor = pref.preference_value;
+						document.documentElement.style.setProperty('--secondary-color', editorSecondaryColor);
+					} else if (pref.preference_name === 'primary_accent_color') {
+						editorPrimaryAccent = pref.preference_value;
+						document.documentElement.style.setProperty('--primary-accent-color', editorPrimaryAccent);
+					} else if (pref.preference_name === 'secondary_accent_color') {
+						editorSecondaryAccent = pref.preference_value;
+						document.documentElement.style.setProperty('--secondary-accent-color', editorSecondaryAccent);
+					} else if (pref.preference_name === 'text_color') {
+						editorTextColor = pref.preference_value;
+						document.documentElement.style.setProperty('--text-color', editorTextColor);
+					}
+				});
+
+				// Check if background image exists
+				const { imageUrl } = await check_background_image();
+				if (imageUrl) {
+					backgroundImage = imageUrl; // Set background image
+					console.log('Current background image set to:', backgroundImage); // Debug log
+				}
+			} else {
+				console.error('Failed to load preferences');
+				showToast('Failed to load preferences', 'error');
+			}
+		} catch (error) {
+			console.error('Error loading preferences:', error);
+			showToast('An error occurred while loading preferences', 'error');
+		} finally {
+			isLoadingPreferences = false;
 		}
 	}
 </script>

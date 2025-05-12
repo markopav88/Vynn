@@ -231,23 +231,62 @@ export async function reset_all_preferences(): Promise<boolean> {
  * Function to check if background image exists
  * Calls: GET /api/preference/background
  */
-export async function check_background_image(): Promise<string | null> {
+export async function check_background_image(): Promise<{ imageUrl: string | null, isCustom: boolean }> {
     try {
         const timestamp = new Date().getTime();
         const apiUrl = `${API_BASE_URL}/api/preference/background?t=${timestamp}`;
+        console.log(`Checking background image at: ${apiUrl}`); // Debug log
 
         const response = await fetch(apiUrl, {
-            method: 'HEAD',
+            method: 'GET',
             credentials: 'include'
         });
 
         if (response.ok) {
-            return apiUrl;
+            const blob = await response.blob(); // Get the image as a blob
+            
+            // Check if the blob size is greater than 0
+            if (blob.size === 0) {
+                console.log('Received an empty image blob. Fetching default image.'); // Debug log
+                
+                // Fetch the default background image
+                const defaultImageResponse = await fetch(`${API_BASE_URL}/api/preference/default-background`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+
+                if (defaultImageResponse.ok) {
+                    const defaultBlob = await defaultImageResponse.blob();
+                    const defaultImageUrl = URL.createObjectURL(defaultBlob);
+                    return { imageUrl: defaultImageUrl, isCustom: false }; // Return the default image URL
+                } else {
+                    console.log('Failed to fetch default background image.'); // Debug log
+                    return { imageUrl: null, isCustom: false }; // Return null if default image fetch fails
+                }
+            }
+
+            const imageUrl = URL.createObjectURL(blob); // Create a URL for the blob
+            console.log('Background image found, returning URL.'); // Debug log
+            return { imageUrl, isCustom: true }; // Return the blob URL and indicate it's custom
+        } else {
+            console.log('No background image found, fetching default image.'); // Debug log
+            // Fetch the default background image
+            const defaultImageResponse = await fetch(`${API_BASE_URL}/api/preference/default-background`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (defaultImageResponse.ok) {
+                const defaultBlob = await defaultImageResponse.blob();
+                const defaultImageUrl = URL.createObjectURL(defaultBlob);
+                return { imageUrl: defaultImageUrl, isCustom: false }; // Return the default image URL
+            }
+
+            return { imageUrl: null, isCustom: false }; // Return null if default image fetch fails
         }
-        return null;
     } catch (error) {
         console.error('Error checking background image:', error);
-        return null;
+        return { imageUrl: null, isCustom: false }; // Return null and indicate it's not custom
     }
 }
 
