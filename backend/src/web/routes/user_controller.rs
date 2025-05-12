@@ -437,7 +437,7 @@ pub async fn api_upload_profile_image(
         let name = field.name().unwrap_or("").to_string();
         println!("->> {:<12} - processing field: {}", "DEBUG", name);
         
-        if name == "image" {
+        if name == "profile_image" {
             // Get content type
             content_type = field.content_type()
                 .unwrap_or("image/jpeg")
