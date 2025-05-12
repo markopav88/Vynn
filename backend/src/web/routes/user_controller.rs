@@ -22,6 +22,7 @@ use axum::{
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower_cookies::cookie::time::Duration;
+use tower_cookies::cookie::SameSite;
 use tower_cookies::{Cookie, Cookies};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -326,6 +327,11 @@ pub async fn api_login(
                     .path("/")
                     .secure(on_production)
                     .http_only(true)
+                    .same_site(if on_production { 
+                        SameSite::None  // For cross-origin in production 
+                    } else { 
+                        SameSite::Lax   // For local development
+                    })
                     .max_age(Duration::days(3))
                     .finish();
 
@@ -364,6 +370,11 @@ pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
         .path("/")
         .secure(on_production)
         .http_only(true)
+        .same_site(if on_production { 
+            SameSite::None  // For cross-origin in production 
+        } else { 
+            SameSite::Lax   // For local development
+        })
         .max_age(Duration::days(0)) // Expire immediately
         .finish();
 
