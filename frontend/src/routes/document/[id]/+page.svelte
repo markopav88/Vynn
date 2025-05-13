@@ -66,7 +66,7 @@
 	// Constants for editor configuration
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
 	const MIN_LINES = 30; // minimum lines to display
-	const MAX_COLUMN_WIDTH = 97; // maximum characters per line
+	const MAX_COLUMN_WIDTH = 110; // maximum characters per line
 	let documentReady = false; // to track when the document is ready to display
 	let projectDocumentsLoaded = false; // to track when project documents are loaded
 
@@ -5036,7 +5036,7 @@
 					src={userProfileImage} 
 					alt="Profile" 
 					class="rounded-circle profile-img"
-					style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px; object-fit: cover;"
+					style="width: 40px; height: 40px; margin-right: 10px; object-fit: cover;"
 					on:error={() => (userProfileImage = profileDefault)}
 				/>
 			</button>
