@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { logout, get_current_user, get_profile_image_url } from '$lib/ts/user';
+	import { goto } from '$app/navigation';
+	import { logout, get_current_user, get_profile_image_url, check_auth } from '$lib/ts/user';
 	import logo from '$lib/assets/logo.png';
 	import profileDefault from '$lib/assets/profile-image.png';
 
@@ -54,21 +55,43 @@
 	function goToAccount() {
 		window.location.href = '/account';
 	}
+
+	// Function to handle logo click
+	async function handleLogoClick() {
+		const isAuthenticated = await check_auth();
+		if (isAuthenticated) {
+			goto('/drive'); // Redirect to /drive if authenticated
+		} else {
+			goto('/'); // Redirect to home if not authenticated
+		}
+	}
+
+	// Function to handle My Drive click
+	async function handleDriveClick() {
+		const isAuthenticated = await check_auth();
+		if (isAuthenticated) {
+			goto('/drive'); // Redirect to /drive if authenticated
+		} else {
+			goto('/login'); // Redirect to /login if not authenticated
+		}
+	}
 </script>
 
 <nav class="navbar navbar-expand navbar-dark bg-black">
 	<div class="container-fluid">
 		<!-- Logo and Brand Name -->
-		<a class="navbar-brand d-flex align-items-center" href="/">
+		<button class="navbar-brand d-flex align-items-center" type="button" tabindex="0" on:click={handleLogoClick} style="border: none; background: none; padding: 0;">
 			<img src={logo} alt="Vynn Logo" class="me-2" height="60" width="60" />
 			<span class="text-white fw-semibold">Vynn</span>
-		</a>
+		</button>
 
 		<!-- Navigation Links - Always Centered -->
 		<div class="navbar-collapse justify-content-center flex-grow-1 mr-5">
 			<ul class="navbar-nav mx-auto text-center">
 				<li class="nav-item mx-3">
-					<a class="nav-link" href="/drive">My Drive</a>
+					<a class="nav-link" href="/drive" on:click|preventDefault={handleDriveClick}>
+						My Drive
+					</a>
 				</li>
 				<li class="nav-item mx-3">
 					<a class="nav-link" href="/document">Editor</a>
