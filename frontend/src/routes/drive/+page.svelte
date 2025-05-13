@@ -23,7 +23,7 @@
 		delete_project,
 		get_shared_projects
 	} from '$lib/ts/drive';
-	import { add_document_to_project, get_project_documents } from '$lib/ts/project';
+	import { add_document_to_project, get_project_documents, remove_document_from_project } from '$lib/ts/project';
 	import type { Project } from '$lib/ts/drive';
 
 	import Navbar from '$lib/components/Navbar.svelte';
@@ -768,6 +768,39 @@
 			}
 		}
 	}
+
+	// Add this new function for removing documents from projects
+	async function handleRemoveFromProject(event: Event, document: Document) {
+		event.stopPropagation(); // Prevent document click
+		
+		if (!currentProject) return;
+		
+		const confirmed = confirm(`Are you sure you want to remove "${document.name}" from project "${currentProject.name}"?`);
+		if (!confirmed) return;
+		
+		try {
+			const success = await remove_document_from_project(parseInt(currentProject.id), document.id);
+			
+			if (success) {
+				// Update our project documents map
+				const currentDocs = projectDocumentsMap.get(currentProject.id) || [];
+				projectDocumentsMap.set(
+					currentProject.id,
+					currentDocs.filter(id => id !== document.id)
+				);
+				
+				// Remove from displayed documents in the current view
+				displayedDocuments = displayedDocuments.filter(d => d.id !== document.id);
+				
+				showToast(`Document "${document.name}" removed from project "${currentProject.name}"`, 'success');
+			} else {
+				showToast('Failed to remove document from project', 'error');
+			}
+		} catch (error) {
+			console.error('Error removing document from project:', error);
+			showToast('An error occurred while removing the document from the project', 'error');
+		}
+	}
 </script>
 
 {#each toasts as toast, i}
@@ -1150,6 +1183,16 @@
 													>
 														<i class="bi bi-share"></i>
 													</button>
+													{#if currentProject}
+													<button
+														class="action-icon remove-icon"
+														on:click={(e) => handleRemoveFromProject(e, document)}
+														title="Remove from project"
+														aria-label={`Remove document ${document.name} from project`}
+													>
+														<i class="bi bi-box-arrow-up-right"></i>
+													</button>
+													{/if}
 													<button
 														class="action-icon delete-icon"
 														on:click={(e) => handleTrashDocument(e, document)}
