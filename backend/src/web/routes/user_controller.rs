@@ -322,7 +322,7 @@ pub async fn api_login(
                 println!("Password verified for user: {}", record.email);
 
                 // Create token and set cookie as before
-                let domain = option_env!("DOMAIN").unwrap_or("localhost");
+                let _domain = option_env!("DOMAIN").unwrap_or("localhost");
                 let app_env = option_env!("APP_ENV").unwrap_or("development");
                 let on_production = app_env == "production";
 
@@ -349,7 +349,6 @@ pub async fn api_login(
 
                 // Add the cookie
                 cookies.add(cookie);
-                println!("Cookie set for user: {} with domain: {}", record.email, domain);
 
                 // Return success
                 return Ok(Json(json!({
@@ -379,13 +378,13 @@ pub async fn api_login(
 pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     println!("->> {:<12} - logout", "HANDLER");
     // Get environment variables with fallbacks for development
-    let domain = option_env!("DOMAIN").unwrap_or("localhost");
+    let _domain = option_env!("DOMAIN").unwrap_or("localhost");
     let app_env = option_env!("APP_ENV").unwrap_or("development");
     let on_production = app_env == "production";
 
     // Build a cookie with the same properties as the login cookie
     let cookie = Cookie::build("auth-token", "")
-        .domain(domain.to_string())
+        //.domain(domain.to_string())
         .path("/")
         .secure(on_production)
         .http_only(true)
