@@ -328,6 +328,8 @@ pub async fn api_login(
 
                 // Create a token value (in a real app, this would be a JWT or similar)
                 let token_value = format!("user-{}.exp.sign", record.id);
+                let token_for_cookie = token_value.clone();
+
                 println!("Generated token value: {}", token_value);
 
                 // Build the cookie with enhanced security
@@ -352,9 +354,11 @@ pub async fn api_login(
                 return Ok(Json(json!({
                     "result": {
                         "success": true,
-                        "user_id": record.id
+                        "user_id": record.id,
+                        "token": token_for_cookie
                     }
                 })));
+
             } else {
                 println!("Password verification failed for user: {}", record.email);
                 return Err(Error::LoginFailError);
