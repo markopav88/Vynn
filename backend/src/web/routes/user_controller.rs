@@ -291,6 +291,7 @@ pub async fn api_login(
     Json(payload): Json<LoginPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
+    println!("Received login request for email: {}", payload.email);
 
     // Get user from database
     let result = sqlx::query!(
@@ -304,15 +305,22 @@ pub async fn api_login(
 
     match result {
         Ok(record) => {
+            println!("User found: {:?}", record); // Log the user record
+
             // Verify password
             let parsed_hash = PasswordHash::new(&record.password)
-                .map_err(|_| Error::LoginFailError)?;
+                .map_err(|_| {
+                    println!("Failed to parse password hash for user: {}", record.email);
+                    Error::LoginFailError
+                })?;
             
             let password_verified = Argon2::default()
                 .verify_password(payload.password.as_bytes(), &parsed_hash)
                 .is_ok();
 
             if password_verified {
+                println!("Password verified for user: {}", record.email);
+
                 // Create token and set cookie as before
                 let domain = option_env!("DOMAIN").unwrap_or("localhost");
                 let app_env = option_env!("APP_ENV").unwrap_or("development");
@@ -320,6 +328,7 @@ pub async fn api_login(
 
                 // Create a token value (in a real app, this would be a JWT or similar)
                 let token_value = format!("user-{}.exp.sign", record.id);
+                println!("Generated token value: {}", token_value);
 
                 // Build the cookie with enhanced security
                 let cookie = Cookie::build("auth-token", token_value)
@@ -337,6 +346,7 @@ pub async fn api_login(
 
                 // Add the cookie
                 cookies.add(cookie);
+                println!("Cookie set for user: {} with domain: {}", record.email, domain);
 
                 // Return success
                 return Ok(Json(json!({
@@ -346,10 +356,14 @@ pub async fn api_login(
                     }
                 })));
             } else {
+                println!("Password verification failed for user: {}", record.email);
                 return Err(Error::LoginFailError);
             }
         }
-        Err(_) => return Err(Error::LoginFailError),
+        Err(_) => {
+            println!("No user found with email: {}", payload.email);
+            return Err(Error::LoginFailError);
+        },
     }
 }
 
