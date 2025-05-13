@@ -5036,7 +5036,7 @@
 					src={userProfileImage} 
 					alt="Profile" 
 					class="rounded-circle profile-img"
-					style="width: 40px; height: 40px; border: 2px solid var(--color-primary); margin-right: 10px; object-fit: cover;"
+					style="width: 40px; height: 40px; margin-right: 10px; object-fit: cover;"
 					on:error={() => (userProfileImage = profileDefault)}
 				/>
 			</button>

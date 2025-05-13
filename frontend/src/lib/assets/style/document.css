@@ -884,7 +884,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 .editor-wrapper {
     position: relative;
-    width: 90%;
+    width: 100%;
     max-width: 1400px;
     min-height: calc(30 * 1.5rem + 3rem);
     background-color: var(--primary-color-rgba);
