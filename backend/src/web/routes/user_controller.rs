@@ -331,10 +331,11 @@ pub async fn api_login(
                 let token_for_cookie = token_value.clone();
 
                 println!("Generated token value: {}", token_value);
+                println!("Production is: {}", on_production);
 
                 // Build the cookie with enhanced security
                 let cookie = Cookie::build("auth-token", token_value)
-                    .domain(domain.to_string())
+                    //.domain(domain.to_string())
                     .path("/")
                     .secure(on_production)
                     .http_only(true)
