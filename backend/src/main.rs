@@ -54,14 +54,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     */
     let cors = CorsLayer::new()
         .allow_origin(front_end_url.parse::<HeaderValue>().expect("Invalid api_base_url format"))
+        .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([
             http::header::CONTENT_TYPE,
             http::header::ACCEPT,
             http::header::AUTHORIZATION,
             http::header::HeaderName::from_static("x-requested-with"),
-        ])
-        .allow_credentials(true);
+        ]);
 
     /*
     / Initialize our router
