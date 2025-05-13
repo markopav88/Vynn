@@ -334,7 +334,7 @@ pub async fn api_login(
                 let cookie = Cookie::build("auth-token", token_value)
                     .domain(domain.to_string())
                     .path("/")
-                    .secure(on_production)
+                    .secure(!on_production)
                     .http_only(true)
                     .same_site(if on_production { 
                         SameSite::None  // For cross-origin in production 
