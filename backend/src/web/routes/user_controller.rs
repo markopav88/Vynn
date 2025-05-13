@@ -661,6 +661,81 @@ pub async fn api_get_current_user(
     }
 }
 
+/// GET handler for retrieving the user's storage usage data.
+/// Accessible via: GET /api/users/storage
+/// Frontend: user.ts/get_storage_usage()
+pub async fn api_get_storage_usage(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - get_storage_usage", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::UserIdUpdateError)?;
+    
+    // Calculate document storage
+    // We'll count characters in content as a proxy for storage space (1 char = ~1-4 bytes)
+    let document_storage = sqlx::query!(
+        r#"
+        SELECT SUM(LENGTH(COALESCE(content, ''))) as total_size
+        FROM documents d
+        JOIN document_permissions dp ON d.id = dp.document_id
+        WHERE dp.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Count number of documents
+    let document_count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM documents d
+        JOIN document_permissions dp ON d.id = dp.document_id
+        WHERE dp.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Count number of projects
+    let project_count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM projects p
+        JOIN project_permissions pp ON p.id = pp.project_id
+        WHERE pp.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Convert document content size to megabytes (assuming 1 char ≈ 1 byte for simplicity)
+    let size_bytes = document_storage.total_size.unwrap_or(0) as f64;
+    let size_mb = size_bytes / (1024.0 * 1024.0);
+    
+    // Calculate storage usage percentage (assuming 10GB limit)
+    let max_storage_gb = 10.0;
+    let size_gb = size_mb / 1024.0;
+    let usage_percentage = (size_gb / max_storage_gb) * 100.0;
+    
+    Ok(Json(json!({
+        "used_bytes": size_bytes,
+        "used_mb": size_mb,
+        "used_gb": size_gb,
+        "max_storage_gb": max_storage_gb,
+        "usage_percentage": usage_percentage,
+        "document_count": document_count.count,
+        "project_count": project_count.count
+    })))
+}
+
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
@@ -674,4 +749,5 @@ pub fn user_routes() -> Router {
         .route("/:id/profile-image", get(api_get_profile_image))
         .route("/search", get(api_search_users))
         .route("/current", get(api_get_current_user))
+        .route("/storage", get(api_get_storage_usage))
 }

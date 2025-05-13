@@ -30,7 +30,7 @@
 
 	import '$lib/assets/style/drive.css';
 
-	import { get_current_user } from '$lib/ts/user'
+	import { get_current_user, get_storage_usage } from '$lib/ts/user'
 
 	import Toast from '$lib/components/Toast.svelte';
 
@@ -83,6 +83,16 @@
 	let newProjectNameInput: HTMLInputElement;
 	let newDocumentNameInput: HTMLInputElement;
 
+	// Add these variables for storage information
+	let storageInfo = {
+		usedGB: 0,
+		maxGB: 10,
+		percentage: 0,
+		documentCount: 0,
+		projectCount: 0
+	};
+	let isLoadingStorage = true;
+
 	// Add these new functions
 	$: if (showNewProjectModal) {
 		setTimeout(() => newProjectNameInput?.focus(), 0);
@@ -106,6 +116,25 @@
 			} finally {
 				isLoading = false;
 			}
+			
+			// Load storage information
+			try {
+				const storage = await get_storage_usage();
+				if (storage) {
+					storageInfo = {
+						usedGB: parseFloat(storage.used_gb.toFixed(2)),
+						maxGB: storage.max_storage_gb,
+						percentage: Math.min(Math.round(storage.usage_percentage), 100), // Cap at 100%
+						documentCount: storage.document_count,
+						projectCount: storage.project_count
+					};
+				}
+			} catch (error) {
+				console.error('Error loading storage data:', error);
+			} finally {
+				isLoadingStorage = false;
+			}
+			
 			// Fetch all data in parallel
 			const [
 				docsResult,
@@ -861,7 +890,7 @@
 							<li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
 								<button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
 									<span><i class="bi bi-hdd me-2"></i> Storage</span>
-									<span class="text-white-50">25%</span>
+									<span class="text-white-50">{storageInfo.percentage}%</span>
 								</button>
 							</li>
 							<li class="px-2">
@@ -869,13 +898,20 @@
 									<div
 										class="progress-bar bg-green"
 										role="progressbar"
-										style="width: 25%;"
-										aria-valuenow="25"
+										style="width: {storageInfo.percentage}%;"
+										aria-valuenow="{storageInfo.percentage}"
 										aria-valuemin="0"
 										aria-valuemax="100"
 									></div>
 								</div>
-								<small class="text-white-50 ps-1">2.5 GB of 10 GB used</small>
+								<small class="text-white-50 ps-1">
+									{#if isLoadingStorage}
+										<span class="small">Loading storage info...</span>
+									{:else}
+										{storageInfo.usedGB} GB of {storageInfo.maxGB} GB used
+										<br><span class="small">{storageInfo.documentCount} documents, {storageInfo.projectCount} projects</span>
+									{/if}
+								</small>
 							</li>
 						</ul>
 					</div>

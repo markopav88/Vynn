@@ -309,3 +309,36 @@ export async function upload_profile_image(file: File): Promise<boolean> {
 export function get_profile_image_url(userId: number): string {
 	return `${API_BASE_URL}/api/users/${userId}/profile-image?t=${new Date().getTime()}`;
 }
+
+/**
+ * Function to get the user's storage usage
+ * Calls: GET /api/users/storage
+ */
+export async function get_storage_usage(): Promise<{
+	used_bytes: number;
+	used_mb: number;
+	used_gb: number;
+	max_storage_gb: number;
+	usage_percentage: number;
+	document_count: number;
+	project_count: number;
+} | null> {
+	try {
+		const apiUrl = `${API_BASE_URL}/api/users/storage`;
+
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Failed to fetch storage usage:', response.status);
+			return null;
+		}
+
+		const data = await response.json();
+		return data;
+	} catch (error) {
+		console.error('Error fetching storage usage:', error);
+		return null;
+	}
+}
