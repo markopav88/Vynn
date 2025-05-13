@@ -2,12 +2,26 @@
 	import '$lib/assets/style/account.css';
 	import { onMount } from 'svelte';
 	import { get_current_user, update_user, upload_profile_image, get_profile_image_url } from '$lib/ts/user';
-	import { get_all_keybindings, add_update_keybinding, delete_keybinding, Command, UserKeybinding } from '$lib/ts/account';
+	import { 
+		get_all_keybindings, 
+		add_update_keybinding, 
+		delete_keybinding, 
+		Command, 
+		UserKeybinding,
+		get_all_preferences,
+		update_preference,
+		reset_preference,
+		reset_all_preferences,
+		check_background_image,
+		upload_background_image,
+		reset_background_image,
+		hexToRgba
+	} from '$lib/ts/account';
 	import { keybindings, type KeyboardInput } from '$lib/ts/keybindings';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import profileDefault from '$lib/assets/profile-image.png';
 	import Toast from '$lib/components/Toast.svelte';
-	
+
 	let isLoggedIn = true;
 	let isLoading = true;
 	let isSaving = false;
@@ -25,7 +39,7 @@
 	let imagePreview: string | null = null;
 	
 	// Active tab
-	let activeTab = 'profile'; // 'profile' or 'keybindings'
+	let activeTab = 'profile'; // 'profile' or 'keybindings' or 'preferences'
 	
 	// Keybindings data
 	let commands: Command[] = [];
@@ -35,6 +49,22 @@
 	let keybindingsErrorMessage = '';
 	let editingKeybinding: number | null = null;
 	let newKeybindingValue = '';
+	
+	// Preferences data
+	let isLoadingPreferences = false;
+	let preferences: any[] = [];
+	let primaryColorPref = '#0A1721';
+	let secondaryColorPref = '#10b981';
+	let primaryAccentColorPref = '#10b981';
+	let secondaryAccentColorPref = '#808080';
+	let primaryTextColorPref = '#10b981';
+	let secondaryTextColorPref = '#FFFFFF';
+	let backgroundOpacity = 0.7; // Opacity level
+	let primaryColorRgba = ''; // Variable to store RGBA value
+	let backgroundImageFile: File | null = null;
+	let backgroundImagePreview: string | null = null;
+	let currentBackgroundImage: string | null = null;
+	let isCustomBackground = false; // Track if the background is custom
 	
 	// Custom keybinding creation
 	let showCustomKeybindingForm = false;
@@ -228,6 +258,7 @@
 				
 				// Load data
 				await loadKeybindings();
+				await loadPreferences();
 			} else {
 				// Redirect to login if not logged in
 				window.location.href = '/login';
@@ -750,27 +781,222 @@
 			}
 		}, 300);
 	}
-	
-	// Get the action name for a custom keybinding
-	function getActionForCommand(commandId: number): string {
-		const metadata = customKeybindingsMetadata.get(commandId);
-		if (metadata) {
-			const action = availableActions.find(a => a.id === metadata.actionId);
-			return action ? action.name : 'Unknown Action';
+
+	export async function loadPreferences() {
+		try {
+			isLoadingPreferences = true;
+			const prefs = await get_all_preferences();
+			
+			if (prefs) {
+				preferences = prefs;
+				// Set local variables for specific preferences
+				preferences.forEach(pref => {
+					if (pref.preference_name === 'primary_color') {
+						primaryColorPref = pref.preference_value;
+						primaryColorRgba = hexToRgba(primaryColorPref, backgroundOpacity);
+					} else if (pref.preference_name === 'editor_background_opacity') {
+						backgroundOpacity = parseFloat(pref.preference_value); // Convert to float
+					} else if (pref.preference_name === 'secondary_color') {
+						secondaryColorPref = pref.preference_value;
+					} else if (pref.preference_name === 'primary_accent_color') {
+						primaryAccentColorPref = pref.preference_value;
+					} else if (pref.preference_name === 'secondary_accent_color') {
+						secondaryAccentColorPref = pref.preference_value;
+					} else if (pref.preference_name === 'primary_text_color') {
+						primaryTextColorPref = pref.preference_value;
+					} else if (pref.preference_name === 'secondary_text_color') {
+						secondaryTextColorPref = pref.preference_value;
+					}
+				});
+
+				// Check if background image exists
+				const { imageUrl, isCustom } = await check_background_image();
+				if (imageUrl) {
+					currentBackgroundImage = imageUrl;
+				}
+				isCustomBackground = isCustom;
+			} else {
+				console.error('Failed to load preferences');
+				showToast('Failed to load preferences', 'error');
+			}
+		} catch (error) {
+			console.error('Error loading preferences:', error);
+			showToast('An error occurred while loading preferences', 'error');
+		} finally {
+			isLoadingPreferences = false;
 		}
-		return 'Unknown Action';
+	}
+
+	// Function to update a preference
+	async function handleUpdatePreference(preferenceId: number, value: string) {
+		const success = await update_preference(preferenceId, value);
+		if (success) {
+			showToast('Preference updated successfully', 'success');
+			return true;
+		} else {
+			showToast('Failed to update preference', 'error');
+			return false;
+		}
 	}
 	
-	// Get the action ID for a custom keybinding
-	function getActionIdForCommand(commandId: number): string {
-		const metadata = customKeybindingsMetadata.get(commandId);
-		return metadata ? metadata.actionId : 'unknown';
+	
+	// Function to handle primary color change
+	async function handlePrimaryColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		primaryColorPref = input.value;
+		
+		// Find the preference ID for primary color
+		const primaryPref = preferences.find(p => p.preference_name === 'primary_color');
+		if (primaryPref) {
+			await handleUpdatePreference(primaryPref.preference_id, primaryColorPref);
+		}
 	}
 	
-	// Handle changing a custom keybinding's action
-	function updateCustomKeybindingAction(commandId: number, actionId: string) {
-		customKeybindingsMetadata.set(commandId, { actionId });
-		showToast('Keybinding action updated successfully', 'success');
+	// Function to handle secondary color change
+	async function handleSecondaryColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		secondaryColorPref = input.value;
+		
+		// Find the preference ID for secondary color
+		const secondaryPref = preferences.find(p => p.preference_name === 'secondary_color');
+		if (secondaryPref) {
+			await handleUpdatePreference(secondaryPref.preference_id, secondaryColorPref);
+		}
+	}
+
+	// Function to handle primary accent color change
+	async function handlePrimaryAccentColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		primaryAccentColorPref = input.value;
+		
+		// Find the preference ID for primary accent color
+		const primaryAccentPref = preferences.find(p => p.preference_name === 'primary_accent_color');
+		if (primaryAccentPref) {
+			await handleUpdatePreference(primaryAccentPref.preference_id, primaryAccentColorPref);
+		}
+	}
+	
+	// Function to handle secondary accent color change
+	async function handleSecondaryAccentColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		secondaryAccentColorPref = input.value;
+		
+		// Find the preference ID for secondary accent color
+		const secondaryAccentPref = preferences.find(p => p.preference_name === 'secondary_accent_color');
+		if (secondaryAccentPref) {
+			await handleUpdatePreference(secondaryAccentPref.preference_id, secondaryAccentColorPref);
+		}
+	}
+	
+	// Function to reset all preferences
+	async function resetAllPreferences() {
+		const success = await reset_all_preferences();
+		if (success) {
+			showToast('All preferences reset to default', 'success');
+			// Reload preferences to get updated values
+			await loadPreferences();
+			return true;
+		} else {
+			showToast('Failed to reset preferences', 'error');
+			return false;
+		}
+	}
+	
+	// Function to handle background image file selection
+	function handleBackgroundImageSelect(event: Event) {
+		const input = event.target as HTMLInputElement;
+		if (!input.files || input.files.length === 0) {
+			backgroundImageFile = null;
+			backgroundImagePreview = null;
+			return;
+		}
+		
+		backgroundImageFile = input.files[0];
+		
+		// Create a preview
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			if (typeof e.target?.result === 'string') {
+				backgroundImagePreview = e.target.result;
+			}
+		};
+		reader.readAsDataURL(backgroundImageFile);
+	}
+	
+	// Function to upload background image
+	async function uploadBackgroundImage() {
+		if (!backgroundImageFile) {
+			showToast('No image selected', 'error');
+			return false;
+		}
+		
+		const success = await upload_background_image(backgroundImageFile);
+		if (success) {
+			showToast('Background image uploaded successfully', 'success');
+			currentBackgroundImage = backgroundImagePreview;
+			backgroundImageFile = null;
+			backgroundImagePreview = null;
+			
+			// Clear file input
+			const fileInput = document.getElementById('backgroundImageInput') as HTMLInputElement;
+			if (fileInput) {
+				fileInput.value = '';
+			}
+			
+			return true;
+		} else {
+			showToast('Failed to upload background image', 'error');
+			return false;
+		}
+	}
+	
+	// Function to reset background image
+	async function resetBackgroundImage() {
+		const success = await reset_background_image();
+		if (success) {
+			showToast('Background image reset to default', 'success');
+			currentBackgroundImage = null;
+			backgroundImagePreview = null;
+			backgroundImageFile = null;
+			return true;
+		} else {
+			showToast('Failed to reset background image', 'error');
+			return false;
+		}
+	}
+	
+	// Function to handle tab changes
+	function handleTabChange(tab: string) {
+		activeTab = tab;
+		
+		// Load data based on active tab
+		if (tab === 'keybindings' && commands.length === 0) {
+			loadKeybindings();
+		} else if (tab === 'preferences' && preferences.length === 0) {
+			loadPreferences();
+		}
+	}
+
+	async function handlePrimaryTextColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		primaryTextColorPref = input.value;
+
+		// Find the preference ID for primary text color
+		const primaryTextColorPrefEntry = preferences.find(p => p.preference_name === 'primary_text_color');
+		if (primaryTextColorPrefEntry) {
+			await handleUpdatePreference(primaryTextColorPrefEntry.preference_id, primaryTextColorPref);
+		}
+	}
+
+	async function handleSecondaryTextColorChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		secondaryTextColorPref = input.value;
+
+		// Find the preference ID for secondary text color
+		const secondaryTextColorPrefEntry = preferences.find(p => p.preference_name === 'secondary_text_color');
+		if (secondaryTextColorPrefEntry) {
+			await handleUpdatePreference(secondaryTextColorPrefEntry.preference_id, secondaryTextColorPref);
+		}
 	}
 </script>
 
@@ -795,7 +1021,7 @@
 					<li class="nav-item">
 						<button 
 							class="nav-link text-white {activeTab === 'profile' ? 'active bg-dark' : ''}" 
-							on:click={() => activeTab = 'profile'}
+							on:click={() => handleTabChange('profile')}
 						>
 							<i class="bi bi-person me-2"></i> Profile
 						</button>
@@ -803,9 +1029,17 @@
 					<li class="nav-item">
 						<button 
 							class="nav-link text-white {activeTab === 'keybindings' ? 'active bg-dark' : ''}" 
-							on:click={() => activeTab = 'keybindings'}
+							on:click={() => handleTabChange('keybindings')}
 						>
 							<i class="bi bi-keyboard me-2"></i> Keybindings
+						</button>
+					</li>
+					<li class="nav-item">
+						<button 
+							class="nav-link text-white {activeTab === 'preferences' ? 'active bg-dark' : ''}" 
+							on:click={() => handleTabChange('preferences')}
+						>
+							<i class="bi bi-gear me-2"></i> Preferences
 						</button>
 					</li>
 				</ul>
@@ -1224,6 +1458,264 @@
 										</tbody>
 									</table>
 								</div>
+							{/if}
+						</div>
+					</div>
+				{:else if activeTab === 'preferences'}
+					<!-- Preferences Tab Content -->
+					<div class="card bg-dark text-white border-0 shadow">
+						<div class="card-body p-4">
+							<h2 class="card-title text-center mb-4">Customize Preferences</h2>
+							
+							<p class="text-white-50 mb-4">
+								Customize your preferences for the application.
+							</p>
+							
+							{#if isLoadingPreferences}
+								<div class="text-center p-4">
+									<div class="spinner-border text-green" role="status">
+										<span class="visually-hidden">Loading...</span>
+									</div>
+								</div>
+							{:else}
+								<!-- Messages now handled by Toast component -->
+							<div class="preferences-container">
+								<form on:submit|preventDefault={handleSubmit}>
+									
+									<!-- Primary Color -->
+									<div class="mb-3">
+										<label for="primaryColor" class="form-label">Primary Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="primaryColor" 
+												bind:value={primaryColorPref}
+												on:change={handlePrimaryColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {primaryColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{primaryColorPref}</div>
+										</div>
+									</div>
+									
+									<!-- Secondary Color -->
+									<div class="mb-3">
+										<label for="secondaryColor" class="form-label">Secondary Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="secondaryColor" 
+												bind:value={secondaryColorPref}
+												on:change={handleSecondaryColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {secondaryColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{secondaryColorPref}</div>
+										</div>
+									</div>
+								
+									<!-- Primary Accent Color -->
+									<div class="mb-3">
+										<label for="primaryAccentColor" class="form-label">Primary Accent Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="primaryAccentColor" 
+												bind:value={primaryAccentColorPref}
+												on:change={handlePrimaryAccentColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {primaryAccentColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{primaryAccentColorPref}</div>
+										</div>
+									</div>
+										
+									<!-- Secondary Accent Color -->
+									<div class="mb-3">
+										<label for="secondaryAccentColor" class="form-label">Secondary Accent Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="secondaryAccentColor" 
+												bind:value={secondaryAccentColorPref}
+												on:change={handleSecondaryAccentColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {secondaryAccentColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{secondaryAccentColorPref}</div>
+										</div>
+									</div>
+								
+									<!-- Primary Text Color -->
+									<div class="mb-3">
+										<label for="primaryTextColor" class="form-label">Primary Text Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="primaryTextColor" 
+												bind:value={primaryTextColorPref}
+												on:change={handlePrimaryTextColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {primaryTextColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{primaryTextColorPref}</div>
+										</div>
+									</div>
+									
+									<!-- Secondary Text Color -->
+									<div class="mb-3">
+										<label for="secondaryTextColor" class="form-label">Secondary Text Color</label>
+										<div class="d-flex gap-3 align-items-center">
+											<input 
+												type="color" 
+												class="form-control bg-dark text-white border-secondary color-picker" 
+												id="secondaryTextColor" 
+												bind:value={secondaryTextColorPref}
+												on:change={handleSecondaryTextColorChange}
+												style="width: 60px; height: 40px; padding: 2px;"
+											/>
+											<div class="color-preview rounded" style="background-color: {secondaryTextColorPref}; width: 40px; height: 40px; border: 1px solid #343a40;"></div>
+											<div class="ms-2 text-white-50">{secondaryTextColorPref}</div>
+										</div>
+									</div>
+								
+									<!-- Editor Background Opacity -->
+									<div class="mb-3">
+										<label for="editorBackgroundOpacity" class="form-label">Editor Background Opacity</label>
+										<input 
+											type="number" 
+											class="form-control bg-dark text-white border-secondary" 
+											id="editorBackgroundOpacity" 
+											bind:value={backgroundOpacity} 
+											min="0" 
+											max="1" 
+											step="0.01" 
+											on:change={async (e) => {
+												const target = e.target as HTMLInputElement;
+												if (target) {
+													backgroundOpacity = parseFloat(target.value);
+													// Update the preference in the database
+													const opacityPref = preferences.find(p => p.preference_name === 'editor_background_opacity');
+													if (opacityPref) {
+														await handleUpdatePreference(opacityPref.preference_id, backgroundOpacity.toString());
+													}
+												}
+											}}
+										/>
+									</div>
+								
+									<!-- Reset All Colors Button -->
+									<div class="mb-4">
+										<button 
+											type="button" 
+											class="btn btn-outline-danger"
+											on:click={resetAllPreferences}
+										>
+											<i class="bi bi-arrow-counterclockwise me-2"></i>Reset All Colors
+										</button>
+										<small class="d-block mt-2 text-muted">This will reset all color preferences to default values.</small>
+									</div>
+									
+									<!-- Background Image -->
+									<div class="mb-4">
+										<label for="backgroundImageInput" class="form-label">Background Image</label>
+										
+										<div class="bg-black border border-secondary rounded p-3">
+											<!-- Current or preview image -->
+											<div class="mb-3 text-center">
+												{#if backgroundImagePreview}
+													<!-- Preview of newly selected image -->
+													<div class="position-relative">
+														<img 
+															src={backgroundImagePreview} 
+															alt="Background Preview" 
+															class="img-fluid rounded"
+															style="max-height: 150px; object-fit: cover;"
+														/>
+														<span class="badge bg-info position-absolute top-0 end-0 m-2">Preview</span>
+													</div>
+												{:else if currentBackgroundImage}
+													<!-- Current background image -->
+													<div class="position-relative">
+														<img 
+															src={currentBackgroundImage} 
+															alt="Current Background" 
+															class="img-fluid rounded"
+															style="max-height: 150px; object-fit: cover;"
+														/>
+														<span class="badge bg-success position-absolute top-0 end-0 m-2">Current</span>
+													</div>
+												{:else}
+													<!-- No image selected placeholder -->
+													<div class="bg-dark rounded d-flex align-items-center justify-content-center" style="height: 150px;">
+														<p class="text-muted">No background image</p>
+													</div>
+												{/if}
+											</div>
+											
+											<!-- Upload controls -->
+											<div class="d-flex gap-2">
+												<label for="backgroundImageInput" class="btn btn-outline-primary flex-grow-1">
+													<i class="bi bi-upload me-2"></i> Select Image
+												</label>
+												<input 
+													type="file" 
+													id="backgroundImageInput" 
+													accept="image/*" 
+													class="d-none"
+													on:change={handleBackgroundImageSelect}
+												/>
+												
+												{#if backgroundImageFile}
+													<button 
+														type="button" 
+														class="btn btn-success"
+														on:click={uploadBackgroundImage}
+													>
+														<i class="bi bi-check me-2"></i> Upload
+													</button>
+												{/if}
+												
+												{#if isCustomBackground}
+													<button 
+														type="button" 
+														class="btn btn-outline-danger"
+														on:click={resetBackgroundImage}
+													>
+														<i class="bi bi-x me-2"></i> Remove Background
+													</button>
+												{/if}
+											</div>
+											
+											{#if backgroundImageFile}
+												<div class="mt-2 small text-info">
+													<i class="bi bi-info-circle me-2"></i>
+													Click "Upload" to apply this background image
+												</div>
+											{/if}
+										</div>
+									</div>
+									
+									<!-- Submit Button -->
+									<button 
+										type="submit" 
+										class="btn btn-green w-100" 
+										disabled={isSaving}
+									>
+										{#if isSaving}
+											<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+											Saving...
+										{:else}
+											Save Changes
+										{/if}
+									</button>
+								</form>
+							</div>
 							{/if}
 						</div>
 					</div>

@@ -79,10 +79,19 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify(login_payload),
-			credentials: 'include'
+			credentials: 'include' // Important for sending/receiving cookies
 		});
 
 		if (response.ok) {
+			const data = await response.json();
+			const token = data.result?.token;
+
+			if (token) {
+				localStorage.setItem("auth-token", token);
+			} else {
+				console.warn("No token found in response body.");
+			}
+
 			return true;
 		} else {
 			console.error('Login failed with status:', response.status);
@@ -95,6 +104,7 @@ export async function attempt_login(login_payload: Login): Promise<boolean> {
 		return false;
 	}
 }
+
 
 /**
  * Function to logout user

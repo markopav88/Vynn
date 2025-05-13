@@ -331,7 +331,7 @@ export async function get_project_documents(project_id: number): Promise<Documen
  * Calls: POST /api/project/:id/documents/:doc_id
  */
 export async function add_document_to_project(projectId: number, documentId: number): Promise<boolean> {
-	const apiUrl = `${API_BASE_URL}/api/project/${projectId}/document`;
+	const apiUrl = `${API_BASE_URL}/api/project/${projectId}/documents/${documentId}`;
 
 	try {
 		const response = await fetch(apiUrl, {
@@ -362,7 +362,7 @@ export async function add_document_to_project(projectId: number, documentId: num
  * Calls: DELETE /api/project/:id/documents/:doc_id
  */
 export async function remove_document_from_project(projectId: number, documentId: number): Promise<boolean> {
-	const apiUrl = `${API_BASE_URL}/api/project/${projectId}/document/${documentId}`;
+	const apiUrl = `${API_BASE_URL}/api/project/${projectId}/documents/${documentId}`;
 
 	try {
 		const response = await fetch(apiUrl, {

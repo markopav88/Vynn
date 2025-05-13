@@ -30,6 +30,8 @@
 
 	import '$lib/assets/style/drive.css';
 
+	import { get_current_user } from '$lib/ts/user'
+
 	import Toast from '$lib/components/Toast.svelte';
 
 	import ShareModal from '$lib/components/ShareModal.svelte';
@@ -92,6 +94,18 @@
 
 	onMount(async () => {
 		try {
+			try {
+				const user = await get_current_user();
+				if (!user) {
+					// Redirect to login if not logged in
+					window.location.href = '/login';
+				}
+			} catch (error) {
+				console.error('Error loading user data:', error);
+				showToast('Failed to load user data', 'error');
+			} finally {
+				isLoading = false;
+			}
 			// Fetch all data in parallel
 			const [
 				docsResult,

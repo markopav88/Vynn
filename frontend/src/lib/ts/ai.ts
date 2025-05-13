@@ -17,6 +17,8 @@
 / - AiRewritePayload: Payload for the rewrite command, including style.
 / - AiCommandResponse: Expected structure for responses from AI text commands.
 / - SuggestedDocumentChange: Represents the proposed changes for a single document.
+/ - SanitizeTextPayload: Payload for the new sanitize-text endpoint.
+/ - SanitizeTextResponse: Response for the new sanitize-text endpoint.
 / 
 / Functions:
 / - get_all_writing_sessions: Fetches all sessions for the current user.
@@ -33,10 +35,37 @@
 / - fact_check_text: Sends text to the backend for fact-checking.
 / - check_spelling: Sends text to the backend for spell checking.
 / - apply_ai_suggestion: Sends an AI suggestion to the backend to determine necessary document changes.
+/ - getProactiveDiffDecision: Calls the backend to get AI decision on proactive diff.
+/ - sanitizeText: Sends text to the backend for HTML and Markdown sanitization.
 /
 */
+import type { ProactiveDiffContext } from './agent';
 
 const API_BASE_URL = process.env.API_BASE_URL;
+
+// Generic request helper
+async function makeRequest<T>(url: string, method: string, body?: object): Promise<T> {
+    console.log(`[makeRequest] ${method} to ${url} with body:`, body);
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: body ? { 'Content-Type': 'application/json' } : {},
+            body: body ? JSON.stringify(body) : undefined,
+            credentials: 'include'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[makeRequest] API call failed to ${url}:`, response.status, response.statusText, errorText);
+            throw new Error(`API Error ${response.status}: ${response.statusText} - ${errorText}`);
+        }
+        const responseData = await response.json();
+        console.log(`[makeRequest] Response from ${url}:`, responseData);
+        return responseData as T;
+    } catch (error) {
+        console.error(`[makeRequest] Error during fetch to ${url}:`, error);
+        throw error; // Rethrow to be handled by the calling function
+    }
+}
 
 export interface WritingAssistantSession {
     id: number;
@@ -100,6 +129,8 @@ export interface SuggestedDocumentChange {
 interface AiCommandResponse {
 	response: string;
 }
+
+
 
 /**
  * Fetches all writing assistant sessions for the current user.
@@ -462,36 +493,55 @@ export async function check_spelling(content: string): Promise<AiCommandResponse
  * Calls: POST /api/ai/writing-assistant/:sessionId/apply-suggestion
  * Test: TODO
  */
-export async function apply_ai_suggestion(sessionId: number, suggestionContent: string): Promise<SuggestedDocumentChange[]> {
-    const url = `${API_BASE_URL}/api/writing-assistant/${sessionId}/apply-suggestion`;
-    const payload = { suggestion_content: suggestionContent };
-    
-    console.log(`POST ${url} with payload:`, payload);
+export async function apply_ai_suggestion(
+    sessionId: number, 
+    suggestionContent: string,
+    currentDocumentId: number | null
+): Promise<SuggestedDocumentChange[]> {
+    console.log(`[apply_ai_suggestion] Session ID: ${sessionId}, Current Doc ID: ${currentDocumentId}`);
+    const payload = { 
+        suggestion_content: suggestionContent,
+        current_document_id: currentDocumentId 
+    };
+    const result = await makeRequest<SuggestedDocumentChange[]>(
+        `${API_BASE_URL}/api/writing-assistant/${sessionId}/apply-suggestion`, 
+        'POST', 
+        payload
+    );
+    // Ensure the result is always an array, even if the backend sends null/undefined by mistake
+    return result || []; 
+}
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        credentials: 'include'
-    });
+// Define interfaces for ProactiveDiffDecision - these were previously inline
+interface DecisionAgentPayload {
+    aiResponseContent: string;
+    context: ProactiveDiffContext;
+}
+interface DecisionAgentResponse {
+    decision: string;
+}
 
-    if (!response.ok) {
-        // Try to parse error body for more details
-        try {
-            const errorBody = await response.json();
-            console.error('Apply suggestion failed:', errorBody);
-            // Re-throw a more specific error or handle based on errorBody
-            throw new Error(errorBody.error?.message || `HTTP error! status: ${response.status}`);
-        } catch (e) {
-            // Fallback if parsing error body fails
-            console.error('Apply suggestion failed, could not parse error body.');
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+/**
+ * Calls the backend to get AI decision on proactive diff.
+ * Calls: POST /api/ai/writing-assistant/decide-proactive-diff
+ */
+export async function getProactiveDiffDecision(
+    aiResponseContent: string, 
+    context: ProactiveDiffContext
+): Promise<string> {
+    console.log('[getProactiveDiffDecision] Payload:', { aiResponseContent, context });
+    const payload: DecisionAgentPayload = { aiResponseContent, context };
+
+    try {
+        const result = await makeRequest<DecisionAgentResponse>(
+            `${API_BASE_URL}/writing-assistant/decide-proactive-diff`, 
+            'POST', 
+            payload
+        );
+        console.log('[getProactiveDiffDecision] Response:', result);
+        return result.decision;
+    } catch (error) {
+        console.error('[getProactiveDiffDecision] Error getting decision:', error);
+        return 'False'; // Fallback decision
     }
-
-    const result = await response.json();
-    console.log(`Apply suggestion successful. Result:`, result);
-    return result as SuggestedDocumentChange[];
 }

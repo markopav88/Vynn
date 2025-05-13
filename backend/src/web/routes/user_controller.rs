@@ -22,6 +22,7 @@ use axum::{
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower_cookies::cookie::time::Duration;
+use tower_cookies::cookie::SameSite;
 use tower_cookies::{Cookie, Cookies};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -39,7 +40,6 @@ static DEFAULT_PROFILE_IMAGE: OnceLock<(Vec<u8>, String)> = OnceLock::new();
 // Function to get the default profile image data
 fn get_default_profile_image() -> (Vec<u8>, String) {
     DEFAULT_PROFILE_IMAGE.get_or_init(|| {
-        // This is a small default profile image (a simple placeholder SVG)
         // Hardcoded simple SVG data for a user avatar
         let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" width=\"100\" height=\"100\"><circle cx=\"50\" cy=\"35\" r=\"25\" fill=\"#10B981\"/><circle cx=\"50\" cy=\"100\" r=\"40\" fill=\"#10B981\"/></svg>";
         
@@ -291,6 +291,7 @@ pub async fn api_login(
     Json(payload): Json<LoginPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
+    println!("Received login request for email: {}", payload.email);
 
     // Get user from database
     let result = sqlx::query!(
@@ -304,29 +305,45 @@ pub async fn api_login(
 
     match result {
         Ok(record) => {
+            println!("User found: {:?}", record); // Log the user record
+
             // Verify password
             let parsed_hash = PasswordHash::new(&record.password)
-                .map_err(|_| Error::LoginFailError)?;
+                .map_err(|_| {
+                    println!("Failed to parse password hash for user: {}", record.email);
+                    Error::LoginFailError
+                })?;
             
             let password_verified = Argon2::default()
                 .verify_password(payload.password.as_bytes(), &parsed_hash)
                 .is_ok();
 
             if password_verified {
+                println!("Password verified for user: {}", record.email);
+
                 // Create token and set cookie as before
-                let domain = option_env!("DOMAIN").unwrap_or("localhost");
+                let _domain = option_env!("DOMAIN").unwrap_or("localhost");
                 let app_env = option_env!("APP_ENV").unwrap_or("development");
                 let on_production = app_env == "production";
 
                 // Create a token value (in a real app, this would be a JWT or similar)
                 let token_value = format!("user-{}.exp.sign", record.id);
+                let token_for_cookie = token_value.clone();
+
+                println!("Generated token value: {}", token_value);
+                println!("Production is: {}", on_production);
 
                 // Build the cookie with enhanced security
                 let cookie = Cookie::build("auth-token", token_value)
-                    .domain(domain.to_string())
+                    //.domain(domain.to_string())
                     .path("/")
                     .secure(on_production)
                     .http_only(true)
+                    .same_site(if on_production { 
+                        SameSite::None  // For cross-origin in production 
+                    } else { 
+                        SameSite::Lax   // For local development
+                    })
                     .max_age(Duration::days(3))
                     .finish();
 
@@ -337,14 +354,20 @@ pub async fn api_login(
                 return Ok(Json(json!({
                     "result": {
                         "success": true,
-                        "user_id": record.id
+                        "user_id": record.id,
+                        "token": token_for_cookie
                     }
                 })));
+
             } else {
+                println!("Password verification failed for user: {}", record.email);
                 return Err(Error::LoginFailError);
             }
         }
-        Err(_) => return Err(Error::LoginFailError),
+        Err(_) => {
+            println!("No user found with email: {}", payload.email);
+            return Err(Error::LoginFailError);
+        },
     }
 }
 
@@ -355,16 +378,21 @@ pub async fn api_login(
 pub async fn api_logout(cookies: Cookies) -> Result<Json<Value>> {
     println!("->> {:<12} - logout", "HANDLER");
     // Get environment variables with fallbacks for development
-    let domain = option_env!("DOMAIN").unwrap_or("localhost");
+    let _domain = option_env!("DOMAIN").unwrap_or("localhost");
     let app_env = option_env!("APP_ENV").unwrap_or("development");
     let on_production = app_env == "production";
 
     // Build a cookie with the same properties as the login cookie
     let cookie = Cookie::build("auth-token", "")
-        .domain(domain.to_string())
+        //.domain(domain.to_string())
         .path("/")
         .secure(on_production)
         .http_only(true)
+        .same_site(if on_production { 
+            SameSite::None  // For cross-origin in production 
+        } else { 
+            SameSite::Lax   // For local development
+        })
         .max_age(Duration::days(0)) // Expire immediately
         .finish();
 
@@ -438,7 +466,7 @@ pub async fn api_upload_profile_image(
         let name = field.name().unwrap_or("").to_string();
         println!("->> {:<12} - processing field: {}", "DEBUG", name);
         
-        if name == "image" {
+        if name == "profile_image" {
             // Get content type
             content_type = field.content_type()
                 .unwrap_or("image/jpeg")

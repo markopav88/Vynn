@@ -34,7 +34,8 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     // Read environment variables
-    let frontend_url = env::var("FRONTEND_URL").expect("FRONTEND_URL must be set");
+    let api_base_url = env::var("API_BASE_URL").expect("API_BASE_URL must be set");
+    let front_end_url = env::var("FRONTEND_URL").expect("FRONTEND_URL must be set");
     let bind_address = env::var("BIND_ADDRESS").expect("BIND_ADDRESS must be set");
 
     /*
@@ -52,15 +53,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We allow all origins, methods, and headers currently, but this should be changed later for security.
     */
     let cors = CorsLayer::new()
-        .allow_origin(frontend_url.parse::<HeaderValue>().expect("Invalid FRONTEND_URL format"))
+        .allow_origin(front_end_url.parse::<HeaderValue>().expect("Invalid api_base_url format"))
+        .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([
             http::header::CONTENT_TYPE,
             http::header::ACCEPT,
             http::header::AUTHORIZATION,
             http::header::HeaderName::from_static("x-requested-with"),
-        ])
-        .allow_credentials(true);
+        ]);
 
     /*
     / Initialize our router
@@ -74,6 +75,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let project_api_routes = web::routes::proj_controller::project_routes();
     let key_api_routes = web::routes::key_controller::key_routes();
     let writing_assistant_routes = web::routes::ai_controller::writing_assistant_routes();
+    let pref_api_routes = web::routes::pref_controller::pref_routes();
 
     let cookie_layer = CookieManagerLayer::new();
 
@@ -84,6 +86,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .nest("/api/project", project_api_routes)
         .nest("/api/command", key_api_routes)
         .nest("/api/writing-assistant", writing_assistant_routes)
+        .nest("/api/preference", pref_api_routes)
         .layer(Extension(pool.clone())) // Make the pool available to all handlers,Attachs the PgPool as an Axum Extension
         .layer(middleware::from_fn(mw_log_requests))
         .layer(cookie_layer)
@@ -97,7 +100,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     / We will bind to port 3001 for now
     */
     let addr = SocketAddr::from_str(&bind_address).expect("Invalid BIND_ADDRESS format");
-    println!("Server starting on http://{}", frontend_url); // Log the configured bind address
+    println!("Server starting on {}", api_base_url); // Log the configured bind address
 
     /*
     / Serve the router ie Start the server
