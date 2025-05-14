@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to test the 1MB storage limit with high precision reporting
+# Script to test the 500MB storage limit with high precision reporting
 
 # Basic setup
 HOST=http://localhost:3000
@@ -7,7 +7,7 @@ EMAIL=CFdefence@gmail.com
 PASSWORD=MyPassword
 COOKIE_FILE=auth_cookie.txt
 
-echo "Testing 1MB storage limit functionality with precision measurement..."
+echo "Testing 500MB storage limit functionality with precision measurement..."
 
 # Login to get auth cookie
 echo "Logging in..."
@@ -20,7 +20,7 @@ curl -s -X POST $HOST/api/users/login \
 echo "Checking initial storage usage..."
 INITIAL_STORAGE=$(curl -s $HOST/api/users/storage -b $COOKIE_FILE)
 echo "$INITIAL_STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'Initial usage: {data[\"storage_bytes\"] or 0} bytes, {data[\"storage_bytes_formatted\"][\"kb\"]} KB, {data[\"storage_bytes_formatted\"][\"mb\"]} MB')"
-echo "$INITIAL_STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'Storage percentage: {data[\"storage_percentage\"]}%')"
+echo "$INITIAL_STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'Storage percentage: {data[\"storage_percentage\"]}% of 500MB')"
 
 # Test 1: Create a document with just a few characters
 echo -e "\n*** TEST 1: Very Small Text (10 bytes) ***"
@@ -50,7 +50,7 @@ else
   echo "  Raw bytes: $BYTES bytes"
   echo "  As KB: $BYTES_KB KB"
   echo "  As MB: $BYTES_MB MB"
-  echo "  Percentage of 1MB: $PERCENTAGE%"
+  echo "  Percentage of 500MB: $PERCENTAGE%"
   
   # Test 2: Update with a single additional character
   echo -e "\n*** TEST 2: Single Character Addition (1 byte) ***"
@@ -80,14 +80,14 @@ else
     echo "  Raw bytes: $NEW_BYTES bytes (+$DIFF)"
     echo "  As KB: $NEW_BYTES_KB KB"
     echo "  As MB: $NEW_BYTES_MB MB"
-    echo "  Percentage of 1MB: $NEW_PERCENTAGE%"
+    echo "  Percentage of 500MB: $NEW_PERCENTAGE%"
   fi
 fi
 
 # Test 3: Test larger document for comparison
-echo -e "\n*** TEST 3: Larger Document (100KB) ***"
-CONTENT=$(python3 -c "print('B' * 100 * 1024)")
-echo "Creating a document with 100KB of data..."
+echo -e "\n*** TEST 3: Larger Document (5MB) ***"
+CONTENT=$(python3 -c "print('B' * 5 * 1024 * 1024)")
+echo "Creating a document with 5MB of data..."
 RESULT=$(curl -s -X POST $HOST/api/document \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"Larger Storage Test\",\"content\":\"$CONTENT\",\"created_at\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\",\"updated_at\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" \
@@ -100,11 +100,11 @@ else
   
   # Check storage again
   STORAGE=$(curl -s $HOST/api/users/storage -b $COOKIE_FILE)
-  echo "After adding 100KB:"
+  echo "After adding 5MB:"
   echo "$STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'  Raw bytes: {data[\"storage_bytes_formatted\"][\"bytes\"]} bytes')"
   echo "$STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'  As KB: {data[\"storage_bytes_formatted\"][\"kb\"]} KB')"
   echo "$STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'  As MB: {data[\"storage_bytes_formatted\"][\"mb\"]} MB')"
-  echo "$STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'  Percentage of 1MB: {data[\"storage_percentage\"]}%')"
+  echo "$STORAGE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(f'  Percentage of 500MB: {data[\"storage_percentage\"]}%')"
 fi
 
 # Clean up

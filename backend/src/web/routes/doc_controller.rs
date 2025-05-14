@@ -29,6 +29,7 @@ use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPay
 use crate::models::permission::{
     CreatePermissionPayload, DocumentPermission, UpdatePermissionPayload, UserPermissions,
 };
+use crate::models::storage::StorageManager;
 use crate::web::middleware::middleware::check_document_permission;
 use crate::{Error, Result};
 
@@ -146,8 +147,8 @@ pub async fn api_create_document(
     // Calculate the content size in bytes
     let content_length = payload.content.as_ref().map_or(0, |s| s.len() as i64);
     
-    // Check if this would exceed the user's storage limit (1MB)
-    let max_storage_bytes: i64 = 1024 * 1024; // 1MB in bytes
+    // Check if this would exceed the user's storage limit (using dynamic storage management)
+    let max_storage_bytes = StorageManager::get_user_quota();
     
     // Get user's current storage usage
     let current_storage = sqlx::query!(
@@ -165,9 +166,10 @@ pub async fn api_create_document(
     
     if new_total_storage > max_storage_bytes {
         return Err(Error::LimitExceededError { 
-            message: format!("Storage limit of 1MB exceeded. Current usage: {}KB, This document: {}KB", 
-                            current_storage.total_bytes.unwrap_or(0) / 1024,
-                            content_length / 1024)
+            message: format!("Storage limit of {}MB exceeded. Current usage: {}MB, This document: {}MB", 
+                            max_storage_bytes / 1024 / 1024,
+                            current_storage.total_bytes.unwrap_or(0) / 1024 / 1024,
+                            content_length / 1024 / 1024)
         });
     }
 
@@ -278,8 +280,8 @@ pub async fn api_update_document(
 
     // If content is growing, check storage limits
     if size_diff > 0 {
-        // Check if this would exceed the user's storage limit (1MB)
-        let max_storage_bytes: i64 = 1024 * 1024; // 1MB in bytes
+        // Check if this would exceed the user's storage limit (using dynamic storage management)
+        let max_storage_bytes = StorageManager::get_user_quota();
         
         // Get document owner
         let owner = sqlx::query!(
@@ -307,9 +309,10 @@ pub async fn api_update_document(
         
         if new_total_storage > max_storage_bytes {
             return Err(Error::LimitExceededError { 
-                message: format!("Storage limit of 1MB exceeded. Current usage: {}KB, Additional storage needed: {}KB", 
-                                current_storage.total_bytes.unwrap_or(0) / 1024,
-                                size_diff / 1024)
+                message: format!("Storage limit of {}MB exceeded. Current usage: {}MB, Additional storage needed: {}MB", 
+                                max_storage_bytes / 1024 / 1024,
+                                current_storage.total_bytes.unwrap_or(0) / 1024 / 1024,
+                                size_diff / 1024 / 1024)
             });
         }
     }

@@ -31,6 +31,7 @@ use argon2::{
 use std::sync::OnceLock;
 
 use crate::models::user::{CreateUserPayload, LoginUserPayload, UpdateUserPayload, User};
+use crate::models::storage::StorageManager;
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
@@ -800,16 +801,29 @@ pub async fn api_get_user_storage(
     .await
     .map_err(|_| Error::DatabaseError)?;
 
-    // Use hardcoded limits
-    let max_projects = 3;
-    let max_documents = 10;
-    let max_storage_bytes: i64 = 1024 * 1024; // 1MB in bytes
+    // Get dynamic storage limits
+    let max_projects = 3; // Project limit remains fixed
+    let max_documents = 10; // Document limit remains fixed
+    let max_storage_bytes = StorageManager::get_user_quota();
+    
+    // Get overall database statistics
+    let db_size = StorageManager::get_db_size(&pool).await.unwrap_or(0);
+    let db_total = StorageManager::get_total_db_allocated();
+    let db_usage_percentage = StorageManager::get_db_usage_percentage(&pool).await.unwrap_or(0.0);
     
     // Return the storage usage information with detailed byte-level precision
     Ok(Json(json!({
         // Raw byte counts for maximum precision
         "storage_bytes": storage_bytes.total_bytes,
         "max_storage_bytes": max_storage_bytes,
+        
+        // Database overview
+        "database_info": {
+            "total_size_bytes": db_total,
+            "total_size_gb": format!("{:.2}", db_total as f64 / (1024.0 * 1024.0 * 1024.0)),
+            "used_bytes": db_size,
+            "used_percentage": format!("{:.2}", db_usage_percentage)
+        },
         
         // Formatted values for different units
         "storage_bytes_formatted": {
