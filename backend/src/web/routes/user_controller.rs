@@ -803,16 +803,31 @@ pub async fn api_get_user_storage(
     // Use hardcoded limits
     let max_projects = 3;
     let max_documents = 10;
+    let max_storage_bytes: i64 = 1024 * 1024; // 1MB in bytes
     
-    // Return the storage usage information
+    // Return the storage usage information with detailed byte-level precision
     Ok(Json(json!({
+        // Raw byte counts for maximum precision
         "storage_bytes": storage_bytes.total_bytes,
+        "max_storage_bytes": max_storage_bytes,
+        
+        // Formatted values for different units
+        "storage_bytes_formatted": {
+            "bytes": storage_bytes.total_bytes.unwrap_or(0),
+            "kb": format!("{:.6}", storage_bytes.total_bytes.unwrap_or(0) as f64 / 1024.0),
+            "mb": format!("{:.8}", storage_bytes.total_bytes.unwrap_or(0) as f64 / (1024.0 * 1024.0))
+        },
+        
+        // Counts and limits
         "max_projects": max_projects,
         "max_documents": max_documents,
         "project_count": project_count.count,
         "document_count": document_count.count,
-        "projects_percentage": (project_count.count.unwrap_or(0) as f64 / max_projects as f64 * 100.0),
-        "documents_percentage": (document_count.count.unwrap_or(0) as f64 / max_documents as f64 * 100.0)
+        
+        // Percentages with high precision
+        "storage_percentage": format!("{:.10}", (storage_bytes.total_bytes.unwrap_or(0) as f64 / max_storage_bytes as f64 * 100.0)),
+        "projects_percentage": format!("{:.2}", (project_count.count.unwrap_or(0) as f64 / max_projects as f64 * 100.0)),
+        "documents_percentage": format!("{:.2}", (document_count.count.unwrap_or(0) as f64 / max_documents as f64 * 100.0))
     })))
 }
 

@@ -143,8 +143,33 @@ pub async fn api_create_document(
         return Err(Error::LimitExceededError { message: "Document limit reached".to_string() });
     }
 
-    // Calculate the content size in bytes (but don't use it for storage tracking in this version)
-    let _content_length = payload.content.as_ref().map_or(0, |s| s.len() as i64);
+    // Calculate the content size in bytes
+    let content_length = payload.content.as_ref().map_or(0, |s| s.len() as i64);
+    
+    // Check if this would exceed the user's storage limit (1MB)
+    let max_storage_bytes: i64 = 1024 * 1024; // 1MB in bytes
+    
+    // Get user's current storage usage
+    let current_storage = sqlx::query!(
+        r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    let new_total_storage = current_storage.total_bytes.unwrap_or(0) + content_length;
+    
+    if new_total_storage > max_storage_bytes {
+        return Err(Error::LimitExceededError { 
+            message: format!("Storage limit of 1MB exceeded. Current usage: {}KB, This document: {}KB", 
+                            current_storage.total_bytes.unwrap_or(0) / 1024,
+                            content_length / 1024)
+        });
+    }
 
     // First insert the document
     let result = sqlx::query!(
@@ -246,10 +271,48 @@ pub async fn api_update_document(
     let old_embedding_time = old_data.as_ref().and_then(|d| d.embedding_updated_at);
     // --- Embedding Logic End ---
 
-    // Calculate the difference in content size (but don't use it in this version)
+    // Calculate the difference in content size
     let old_content_len = old_content.len() as i64;
     let new_content_len = payload.content.as_ref().map_or(0, |s| s.len() as i64);
-    let _size_diff = new_content_len - old_content_len;
+    let size_diff = new_content_len - old_content_len;
+
+    // If content is growing, check storage limits
+    if size_diff > 0 {
+        // Check if this would exceed the user's storage limit (1MB)
+        let max_storage_bytes: i64 = 1024 * 1024; // 1MB in bytes
+        
+        // Get document owner
+        let owner = sqlx::query!(
+            "SELECT user_id FROM document_permissions 
+             WHERE document_id = $1 AND role = 'owner'",
+            document_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+        
+        // Get owner's current storage usage
+        let current_storage = sqlx::query!(
+            r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
+               FROM documents d
+               JOIN document_permissions dp ON d.id = dp.document_id
+               WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+            owner.user_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+        
+        let new_total_storage = current_storage.total_bytes.unwrap_or(0) + size_diff;
+        
+        if new_total_storage > max_storage_bytes {
+            return Err(Error::LimitExceededError { 
+                message: format!("Storage limit of 1MB exceeded. Current usage: {}KB, Additional storage needed: {}KB", 
+                                current_storage.total_bytes.unwrap_or(0) / 1024,
+                                size_diff / 1024)
+            });
+        }
+    }
 
     // Proceed with the main update
     let update_result = sqlx::query!(
