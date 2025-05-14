@@ -342,3 +342,49 @@ export async function get_storage_usage(): Promise<{
 		return null;
 	}
 }
+
+/**
+ * Function to get the user's detailed storage information with dynamic quotas
+ * Calls: GET /api/users/user-storage
+ */
+export async function get_user_storage(): Promise<{
+	storage_bytes: number;
+	max_storage_bytes: number;
+	database_info: {
+		total_size_bytes: number;
+		total_size_gb: string;
+		used_bytes: number;
+		used_percentage: string;
+	};
+	storage_bytes_formatted: {
+		bytes: number;
+		kb: string;
+		mb: string;
+	};
+	max_projects: number;
+	max_documents: number;
+	project_count: number;
+	document_count: number;
+	storage_percentage: string;
+	projects_percentage: string;
+	documents_percentage: string;
+} | null> {
+	try {
+		const apiUrl = `${API_BASE_URL}/api/users/user-storage`;
+
+		const response = await fetch(apiUrl, {
+			credentials: 'include'
+		});
+
+		if (!response.ok) {
+			console.error('Failed to fetch user storage data:', response.status);
+			return null;
+		}
+
+		const data = await response.json();
+		return data;
+	} catch (error) {
+		console.error('Error fetching user storage data:', error);
+		return null;
+	}
+}

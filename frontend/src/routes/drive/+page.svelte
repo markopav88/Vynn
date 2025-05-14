@@ -30,7 +30,7 @@
 
 	import '$lib/assets/style/drive.css';
 
-	import { get_current_user, get_storage_usage } from '$lib/ts/user'
+	import { get_current_user, get_storage_usage, get_user_storage } from '$lib/ts/user'
 
 	import Toast from '$lib/components/Toast.svelte';
 
@@ -89,7 +89,8 @@
 		maxGB: 10,
 		percentage: 0,
 		documentCount: 0,
-		projectCount: 0
+		projectCount: 0,
+		unit: 'GB'
 	};
 	let isLoadingStorage = true;
 
@@ -117,20 +118,55 @@
 				isLoading = false;
 			}
 			
-			// Load storage information
+			// Load storage information using the dynamic storage API
 			try {
-				const storage = await get_storage_usage();
+				const storage = await get_user_storage();
 				if (storage) {
+					// Convert bytes to MB to display in appropriate units
+					const usedMB = parseFloat((storage.storage_bytes_formatted.mb).replace(/,/g, ''));
+					const maxMB = storage.max_storage_bytes / (1024 * 1024);
+					
+					// Update display in MB instead of GB if less than 1GB
+					let usedDisplay, maxDisplay, unit;
+					if (maxMB < 1000) {
+						// Display in MB
+						usedDisplay = usedMB.toFixed(2);
+						maxDisplay = maxMB.toFixed(0);
+						unit = 'MB';
+					} else {
+						// Display in GB
+						usedDisplay = (usedMB / 1024).toFixed(2);
+						maxDisplay = (maxMB / 1024).toFixed(0);
+						unit = 'GB';
+					}
+					
 					storageInfo = {
-						usedGB: parseFloat(storage.used_gb.toFixed(2)),
-						maxGB: storage.max_storage_gb,
-						percentage: Math.min(Math.round(storage.usage_percentage), 100), // Cap at 100%
+						usedGB: parseFloat(usedDisplay),
+						maxGB: parseFloat(maxDisplay),
+						percentage: Math.min(Math.round(parseFloat(storage.storage_percentage)), 100), // Cap at 100%
 						documentCount: storage.document_count,
-						projectCount: storage.project_count
+						projectCount: storage.project_count,
+						unit: unit
 					};
 				}
 			} catch (error) {
 				console.error('Error loading storage data:', error);
+				// Fallback to old storage API if the new one fails
+				try {
+					const fallbackStorage = await get_storage_usage();
+					if (fallbackStorage) {
+						storageInfo = {
+							usedGB: parseFloat(fallbackStorage.used_gb.toFixed(2)),
+							maxGB: fallbackStorage.max_storage_gb,
+							percentage: Math.min(Math.round(fallbackStorage.usage_percentage), 100), // Cap at 100%
+							documentCount: fallbackStorage.document_count,
+							projectCount: fallbackStorage.project_count,
+							unit: 'GB'
+						};
+					}
+				} catch (fallbackError) {
+					console.error('Fallback storage error:', fallbackError);
+				}
 			} finally {
 				isLoadingStorage = false;
 			}
@@ -908,7 +944,7 @@
 									{#if isLoadingStorage}
 										<span class="small">Loading storage info...</span>
 									{:else}
-										{storageInfo.usedGB} GB of {storageInfo.maxGB} GB used
+										{storageInfo.usedGB} {storageInfo.unit} of {storageInfo.maxGB} {storageInfo.unit} used
 										<br><span class="small">{storageInfo.documentCount} documents, {storageInfo.projectCount} projects</span>
 									{/if}
 								</small>
