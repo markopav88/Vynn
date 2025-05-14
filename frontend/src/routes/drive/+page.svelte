@@ -956,12 +956,12 @@
 								<button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
 									<span><i class="bi bi-hdd me-2"></i> Storage</span>
 									<span class="text-white-50">
-									{#if typeof storageInfo.percentage === 'number' && storageInfo.percentage < 0.01}
-										{storageInfo.percentage.toFixed(10).replace(/0+$/, '')}%
-									{:else}
-										{storageInfo.percentage}%
-									{/if}
-									</span>
+										{#if typeof storageInfo.percentage === 'number'}
+											{storageInfo.percentage.toFixed(2)}%
+										{:else}
+											0.00%
+										{/if}
+									</span>									
 								</button>
 							</li>
 							<li class="px-2">
