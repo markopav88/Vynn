@@ -16,7 +16,9 @@ use axum::{
     Router,
 };
 use serde_json::{json, Value};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, time::Duration};
+use tokio::time;
+use reqwest::Client;
 
 use crate::models::db::WipeParams;
 use crate::{Error, Result};
@@ -94,7 +96,25 @@ async fn api_db_reset(
     })))
 }
 
+async fn send_periodic_request() {
+    let client = Client::new();
+    loop {
+        match client.get("https://vynn.app").send().await {
+            Ok(response) => {
+                println!("Response: {:?}", response.status());
+            }
+            Err(e) => {
+                println!("Error sending request: {:?}", e);
+            }
+        }
+        time::sleep(Duration::from_secs(600)).await; // Sleep for 10 minutes
+    }
+}
+
 pub fn db_routes() -> Router {
+    // Start the periodic request in a separate task
+    tokio::spawn(send_periodic_request());
+
     Router::new()
         .route("/test", get(api_db_test))
         .route("/reset", get(api_db_reset))
