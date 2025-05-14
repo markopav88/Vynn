@@ -27,7 +27,7 @@ impl Default for StorageConfig {
             .and_then(|v| v.parse::<i64>().ok())
             .unwrap_or(10); // Default: 10MB per user
             
-        let expected_users = env::var("EXPECTED_MAX_USERS")
+        let expected_max_users = env::var("EXPECTED_MAX_USERS")
             .ok()
             .and_then(|v| v.parse::<i32>().ok())
             .unwrap_or(1000); // Default expectation: 1000 users
