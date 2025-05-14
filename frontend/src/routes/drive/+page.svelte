@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import {
 		get_all_documents,
 		create_document,
@@ -93,6 +93,7 @@
 		unit: 'GB'
 	};
 	let isLoadingStorage = true;
+	let storageRefreshInterval: number;
 
 	// Add these new functions
 	$: if (showNewProjectModal) {
@@ -101,6 +102,73 @@
 
 	$: if (showNewDocumentModal) {
 		setTimeout(() => newDocumentNameInput?.focus(), 0);
+	}
+
+	// Function to refresh storage usage data
+	async function refreshStorageData() {
+		try {
+			console.log("Refreshing storage data...");
+			const storage = await get_user_storage();
+			if (storage) {
+				// Convert bytes to MB to display in appropriate units with high precision
+				const usedBytes = storage.storage_bytes || 0;
+				const maxBytes = storage.max_storage_bytes;
+				
+				// Calculate ultra-precise percentage
+				let ultraPrecisePercentage = (usedBytes / maxBytes) * 100;
+				let displayPercentage = ultraPrecisePercentage;
+				let preciseUsed;
+				let unit;
+				
+				// Choose the most appropriate unit for display
+				if (usedBytes < 1024) {
+					// Less than 1KB - show bytes
+					preciseUsed = usedBytes.toString();
+					unit = 'B';
+				} else if (usedBytes < 1024 * 1024) {
+					// Less than 1MB - show KB with high precision
+					preciseUsed = (usedBytes / 1024).toFixed(6);
+					unit = 'KB';
+				} else if (usedBytes < 1024 * 1024 * 1024) {
+					// Less than 1GB - show MB with high precision
+					preciseUsed = (usedBytes / (1024 * 1024)).toFixed(6);
+					unit = 'MB';
+				} else {
+					// Show GB with high precision
+					preciseUsed = (usedBytes / (1024 * 1024 * 1024)).toFixed(6);
+					unit = 'GB';
+				}
+				
+				// Format max storage in the matching unit
+				let preciseMax;
+				if (unit === 'B') {
+					preciseMax = maxBytes.toString();
+				} else if (unit === 'KB') {
+					preciseMax = (maxBytes / 1024).toFixed(2);
+				} else if (unit === 'MB') {
+					preciseMax = (maxBytes / (1024 * 1024)).toFixed(2);
+				} else {
+					preciseMax = (maxBytes / (1024 * 1024 * 1024)).toFixed(2);
+				}
+				
+				// For ultra-small percentages (near zero), show full precision
+				const formattedPercentage = ultraPrecisePercentage < 0.01 
+					? parseFloat(ultraPrecisePercentage.toFixed(16).replace(/0+$/, ''))
+					: Math.min(Math.round(ultraPrecisePercentage * 100) / 100, 100);
+				
+				storageInfo = {
+					usedGB: parseFloat(preciseUsed),
+					maxGB: parseFloat(preciseMax),
+					percentage: formattedPercentage,
+					documentCount: storage.document_count,
+					projectCount: storage.project_count,
+					unit: unit
+				};
+				console.log("Storage updated:", storageInfo);
+			}
+		} catch (error) {
+			console.error('Error refreshing storage data:', error);
+		}
 	}
 
 	onMount(async () => {
@@ -118,86 +186,12 @@
 				isLoading = false;
 			}
 			
-			// Load storage information using the dynamic storage API
-			try {
-				const storage = await get_user_storage();
-				if (storage) {
-					// Convert bytes to MB to display in appropriate units with high precision
-					const usedBytes = storage.storage_bytes || 0;
-					const maxBytes = storage.max_storage_bytes;
-					
-					// Calculate ultra-precise percentage
-					let ultraPrecisePercentage = (usedBytes / maxBytes) * 100;
-					let displayPercentage = ultraPrecisePercentage;
-					let preciseUsed;
-					let unit;
-					
-					// Choose the most appropriate unit for display
-					if (usedBytes < 1024) {
-						// Less than 1KB - show bytes
-						preciseUsed = usedBytes.toString();
-						unit = 'B';
-					} else if (usedBytes < 1024 * 1024) {
-						// Less than 1MB - show KB with high precision
-						preciseUsed = (usedBytes / 1024).toFixed(6);
-						unit = 'KB';
-					} else if (usedBytes < 1024 * 1024 * 1024) {
-						// Less than 1GB - show MB with high precision
-						preciseUsed = (usedBytes / (1024 * 1024)).toFixed(6);
-						unit = 'MB';
-					} else {
-						// Show GB with high precision
-						preciseUsed = (usedBytes / (1024 * 1024 * 1024)).toFixed(6);
-						unit = 'GB';
-					}
-					
-					// Format max storage in the matching unit
-					let preciseMax;
-					if (unit === 'B') {
-						preciseMax = maxBytes.toString();
-					} else if (unit === 'KB') {
-						preciseMax = (maxBytes / 1024).toFixed(2);
-					} else if (unit === 'MB') {
-						preciseMax = (maxBytes / (1024 * 1024)).toFixed(2);
-					} else {
-						preciseMax = (maxBytes / (1024 * 1024 * 1024)).toFixed(2);
-					}
-					
-					// For ultra-small percentages (near zero), show full precision
-					const formattedPercentage = ultraPrecisePercentage < 0.01 
-						? parseFloat(ultraPrecisePercentage.toFixed(16).replace(/0+$/, ''))
-						: Math.min(Math.round(ultraPrecisePercentage * 100) / 100, 100);
-					
-					storageInfo = {
-						usedGB: parseFloat(preciseUsed),
-						maxGB: parseFloat(preciseMax),
-						percentage: formattedPercentage,
-						documentCount: storage.document_count,
-						projectCount: storage.project_count,
-						unit: unit
-					};
-				}
-			} catch (error) {
-				console.error('Error loading storage data:', error);
-				// Fallback to old storage API if the new one fails
-				try {
-					const fallbackStorage = await get_storage_usage();
-					if (fallbackStorage) {
-						storageInfo = {
-							usedGB: parseFloat(fallbackStorage.used_gb.toFixed(6)),
-							maxGB: fallbackStorage.max_storage_gb,
-							percentage: parseFloat(fallbackStorage.usage_percentage.toFixed(16)),
-							documentCount: fallbackStorage.document_count,
-							projectCount: fallbackStorage.project_count,
-							unit: 'GB'
-						};
-					}
-				} catch (fallbackError) {
-					console.error('Fallback storage error:', fallbackError);
-				}
-			} finally {
-				isLoadingStorage = false;
-			}
+			// Initial load of storage information
+			await refreshStorageData();
+			isLoadingStorage = false;
+			
+			// Set up an interval to refresh storage data every 5 seconds
+			storageRefreshInterval = setInterval(refreshStorageData, 5000) as unknown as number;
 			
 			// Fetch all data in parallel
 			const [
@@ -894,6 +888,13 @@
 			showToast('An error occurred while removing the document from the project', 'error');
 		}
 	}
+
+	// Clean up the interval when the component is destroyed
+	onDestroy(() => {
+		if (storageRefreshInterval) {
+			clearInterval(storageRefreshInterval);
+		}
+	});
 </script>
 
 {#each toasts as toast, i}
