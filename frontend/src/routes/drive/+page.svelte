@@ -190,8 +190,8 @@
 			await refreshStorageData();
 			isLoadingStorage = false;
 			
-			// Set up an interval to refresh storage data every 5 seconds
-			storageRefreshInterval = setInterval(refreshStorageData, 5000) as unknown as number;
+			// Set up an interval to refresh storage data every 60 seconds
+			storageRefreshInterval = setInterval(refreshStorageData, 60000) as unknown as number;
 			
 			// Fetch all data in parallel
 			const [
