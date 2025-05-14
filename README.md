@@ -89,12 +89,12 @@ The application supports per-user limits and tracking:
 - Each non-paid user is limited to 3 projects and 10 documents by default
 - Each non-paid user is limited to 10 AI requests
 
-## License
-
-MIT
-
 ## Hosting
 - Database up on supabase
 - Backend and frontend up on render
 
 [Keep alive tool](https://keepalive.dashdashhard.com/)
+
+## License
+
+MIT
