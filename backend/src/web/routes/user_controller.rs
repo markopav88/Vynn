@@ -866,4 +866,5 @@ pub fn user_routes() -> Router {
         .route("/storage", get(api_get_storage_usage))
         .route("/user-storage", get(api_get_user_storage))
         .route("/search", get(api_search_users))
+        .route("/update", put(api_update_user))
 }
