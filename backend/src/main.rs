@@ -71,7 +71,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     */
     let user_api_routes = web::routes::user_controller::user_routes();
     let doc_api_routes = web::routes::doc_controller::doc_routes();
-    let db_api_routes = web::routes::db_controller::db_routes();
+    let db_api_routes = web::routes::db_controller::db_routes(pool.clone());
     let project_api_routes = web::routes::proj_controller::project_routes();
     let key_api_routes = web::routes::key_controller::key_routes();
     let writing_assistant_routes = web::routes::ai_controller::writing_assistant_routes();

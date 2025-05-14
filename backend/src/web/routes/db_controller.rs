@@ -30,17 +30,15 @@ use crate::{Error, Result};
 pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
     println!("->> {:<12} - test_db", "HANDLER");
 
-    // Run a simple query to test the database connection.
-    let result_row = sqlx::query!("SELECT 1 as number").fetch_one(&pool).await;
+    // Run a simple query to ping the database.
+    let result_row = sqlx::query("SELECT 1").fetch_one(&pool).await;
 
     match result_row {
-        Ok(record) => {
-            let number: i32 = record.number.unwrap_or(0);
-
+        Ok(_) => {
             // Create Success
             let success = Json(json!({
                 "result": {
-                    "success": number
+                    "success": true
                 }
             }));
 
@@ -96,9 +94,10 @@ async fn api_db_reset(
     })))
 }
 
-async fn send_periodic_request() {
+async fn send_periodic_request(pool: sqlx::PgPool) {
     let client = Client::new();
     loop {
+        // Send the HTTP GET request
         match client.get("https://vynn.app").send().await {
             Ok(response) => {
                 println!("Response: {:?}", response.status());
@@ -107,13 +106,27 @@ async fn send_periodic_request() {
                 println!("Error sending request: {:?}", e);
             }
         }
-        time::sleep(Duration::from_secs(600)).await; // Sleep for 10 minutes
+
+        // Run a simple query to ping the database.
+        let result_row = sqlx::query("SELECT 1").fetch_one(&pool).await;
+
+        match result_row {
+            Ok(_) => {
+                // Create Success
+                println!("Database ping successful.");
+            }
+            Err(e) => {
+                println!("Error connecting to database: {:?}", e);
+            }
+        }
+        time::sleep(Duration::from_secs(120)).await; // Sleep for 2 minutes
     }
 }
 
-pub fn db_routes() -> Router {
+pub fn db_routes(pool: sqlx::PgPool) -> Router {
     // Start the periodic request in a separate task
-    tokio::spawn(send_periodic_request());
+    let pool_clone = pool.clone(); // Clone the pool to pass to the task
+    tokio::spawn(send_periodic_request(pool_clone));
 
     Router::new()
         .route("/test", get(api_db_test))
