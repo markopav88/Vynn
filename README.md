@@ -92,3 +92,5 @@ The application supports per-user limits and tracking:
 ## License
 
 MIT
+
+[Kept alive with](https://keepalive.dashdashhard.com/)
