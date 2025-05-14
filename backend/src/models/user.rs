@@ -7,7 +7,7 @@ pub struct User {
     pub id: i32,
     pub name: String,
     pub email: String,
-    #[serde(skip_serializing)]
+    #[warn(dead_code)]
     pub password: String,
     pub ai_credits: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
