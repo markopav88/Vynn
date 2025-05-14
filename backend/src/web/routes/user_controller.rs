@@ -30,7 +30,7 @@ use argon2::{
 };
 use std::sync::OnceLock;
 
-use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
+use crate::models::user::{CreateUserPayload, LoginUserPayload, UpdateUserPayload, User};
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
@@ -61,7 +61,11 @@ pub async fn api_get_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, password, ai_credits, storage_bytes, max_projects, max_documents FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents 
+           FROM users WHERE id = $1"#,
         id
     )
     .fetch_one(&pool)
@@ -138,7 +142,12 @@ pub async fn api_create_user(
     // Insert the user with hashed password
     let result = sqlx::query_as!(
         User,
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, ai_credits",
+        r#"INSERT INTO users (name, email, password) 
+           VALUES ($1, $2, $3) 
+           RETURNING id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents"#,
         payload.name,
         payload.email,
         password_hash
@@ -194,7 +203,7 @@ pub async fn api_update_user(
     }
     
     // Validate password complexity
-    if payload.password.is_empty() {
+    if payload.password.is_none() || payload.password.as_ref().unwrap().is_empty() {
         // perform update without password
         let result = sqlx::query!(
             "UPDATE users
@@ -220,27 +229,29 @@ pub async fn api_update_user(
         })));
     }
     
+    let password = payload.password.as_ref().unwrap();
+    
     // Password complexity requirements:
     // 1. Minimum length of 8 characters
-    if payload.password.len() < 8 {
+    if password.len() < 8 {
         println!("->> {:<12} - password too short, minimum 8 characters required", "ERROR");
         return Err(Error::PasswordValidationError);
     }
     
     // 2. Contains at least one uppercase letter
-    if !payload.password.chars().any(|c| c.is_uppercase()) {
+    if !password.chars().any(|c| c.is_uppercase()) {
         println!("->> {:<12} - password must contain at least one uppercase letter", "ERROR");
         return Err(Error::PasswordValidationError);
     }
     
     // 3. Contains at least one number
-    if !payload.password.chars().any(|c| c.is_numeric()) {
+    if !password.chars().any(|c| c.is_numeric()) {
         println!("->> {:<12} - password must contain at least one number", "ERROR");
         return Err(Error::PasswordValidationError);
     }
     
     // 4. Contains at least one special character
-    if !payload.password.chars().any(|c| !c.is_alphanumeric()) {
+    if !password.chars().any(|c| !c.is_alphanumeric()) {
         println!("->> {:<12} - password must contain at least one special character", "ERROR");
         return Err(Error::PasswordValidationError);
     }
@@ -248,7 +259,7 @@ pub async fn api_update_user(
     // Hash the password before updating
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)
+    let password_hash = argon2.hash_password(password.as_bytes(), &salt)
         .map_err(|e| {
             println!("->> {:<12} - password hashing error: {:?}", "ERROR", e);
             Error::UserUpdateError { user_id: user_id.unwrap() }
@@ -288,7 +299,7 @@ pub async fn api_update_user(
 pub async fn api_login(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<LoginPayload>,
+    Json(payload): Json<LoginUserPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
     println!("Received login request for email: {}", payload.email);
@@ -624,7 +635,11 @@ pub async fn api_search_users(
     // Search for users with email containing the search term
     let users = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, ai_credits FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
+        r#"SELECT id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents 
+           FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
         format!("%{}%", search_term)
     )
     .fetch_all(&pool)
@@ -649,7 +664,11 @@ pub async fn api_get_current_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, password, ai_credits, storage_bytes, max_projects, max_documents FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents 
+           FROM users WHERE id = $1"#,
         user_id
     )
     .fetch_one(&pool)
@@ -748,37 +767,52 @@ pub async fn api_get_user_storage(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
-    // Get user's storage usage and limits
-    let user = sqlx::query!(
-        r#"SELECT 
-            storage_bytes, 
-            max_projects,
-            max_documents,
-            (SELECT COUNT(*) FROM projects p JOIN project_permissions pp ON p.id = pp.project_id 
-             WHERE pp.user_id = users.id AND pp.role = 'owner') as project_count,
-            (SELECT COUNT(*) FROM documents d JOIN document_permissions dp ON d.id = dp.document_id 
-             WHERE dp.user_id = users.id AND dp.role = 'owner') as document_count
-        FROM users
-        WHERE id = $1"#,
+    // Get project and document counts
+    let project_count = sqlx::query!(
+        r#"SELECT COUNT(*) as count FROM projects p 
+           JOIN project_permissions pp ON p.id = pp.project_id 
+           WHERE pp.user_id = $1 AND pp.role = 'owner'"#,
         user_id
     )
     .fetch_one(&pool)
     .await
     .map_err(|_| Error::UserNotFoundError { user_id })?;
+    
+    let document_count = sqlx::query!(
+        r#"SELECT COUNT(*) as count FROM documents d 
+           JOIN document_permissions dp ON d.id = dp.document_id 
+           WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::UserNotFoundError { user_id })?;
+    
+    // Calculate storage bytes (sum of document content lengths)
+    let storage_bytes = sqlx::query!(
+        r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
 
+    // Use hardcoded limits
+    let max_projects = 3;
+    let max_documents = 10;
+    
     // Return the storage usage information
     Ok(Json(json!({
-        "storage_bytes": user.storage_bytes,
-        "max_projects": user.max_projects,
-        "max_documents": user.max_documents,
-        "project_count": user.project_count,
-        "document_count": user.document_count,
-        "projects_percentage": if user.max_projects > 0 {
-            user.project_count.unwrap_or(0) as f64 / user.max_projects as f64 * 100.0
-        } else { 0.0 },
-        "documents_percentage": if user.max_documents > 0 {
-            user.document_count.unwrap_or(0) as f64 / user.max_documents as f64 * 100.0
-        } else { 0.0 }
+        "storage_bytes": storage_bytes.total_bytes,
+        "max_projects": max_projects,
+        "max_documents": max_documents,
+        "project_count": project_count.count,
+        "document_count": document_count.count,
+        "projects_percentage": (project_count.count.unwrap_or(0) as f64 / max_projects as f64 * 100.0),
+        "documents_percentage": (document_count.count.unwrap_or(0) as f64 / max_documents as f64 * 100.0)
     })))
 }
 

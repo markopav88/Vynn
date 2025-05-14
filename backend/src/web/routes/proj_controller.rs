@@ -132,15 +132,10 @@ async fn api_create_project(
     .await
     .map_err(|_| Error::DatabaseError)?;
     
-    let user = sqlx::query!(
-        "SELECT max_projects FROM users WHERE id = $1",
-        user_id
-    )
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| Error::DatabaseError)?;
+    // Use hardcoded default limit
+    let max_projects = 3;
     
-    if user_projects_count.count.unwrap_or(0) as i32 >= user.max_projects {
+    if user_projects_count.count.unwrap_or(0) as i32 >= max_projects {
         return Err(Error::LimitExceededError { message: "Project limit reached".to_string() });
     }
 

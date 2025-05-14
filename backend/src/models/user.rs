@@ -10,9 +10,12 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password: String,
     pub ai_credits: i32,
-    pub storage_bytes: i64,
-    pub max_projects: i32,
-    pub max_documents: i32
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_bytes: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_projects: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_documents: Option<i32>
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,4 +35,6 @@ pub struct LoginUserPayload {
 pub struct UpdateUserPayload {
     pub name: String,
     pub email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
 }
