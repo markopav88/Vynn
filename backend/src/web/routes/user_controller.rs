@@ -856,7 +856,7 @@ pub fn user_routes() -> Router {
     Router::new()
         .route("/", post(api_create_user))
         .route("/login", post(api_login))
-        .route("/logout", post(api_logout))
+        .route("/logout", get(api_logout))
         .route("/:id", get(api_get_user))
         .route("/:id", put(api_update_user))
         .route("/check-auth", get(api_check_auth))

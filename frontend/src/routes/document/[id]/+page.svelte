@@ -1366,6 +1366,18 @@
 
 	// Update the onMount function for proper initialization
 	onMount(async () => {
+		try {
+			const user = await get_current_user();
+			if (!user) {
+				// Redirect to login if not logged in
+				window.location.href = '/';
+			}
+		} catch (error) {
+			console.error('Error loading user data:', error);
+			showToast('Failed to load user data', 'error');
+			window.location.href = '/';
+		}
+
 		// Call loadPreferences on component mount
 		loadPreferences();
 

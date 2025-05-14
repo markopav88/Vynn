@@ -103,28 +103,23 @@
 					<div class="position-relative ms-md-5" style="margin-right: -10rem;">
 						<!-- Placeholder image -->
 						<div
-							class="bg-dark rounded-3 shadow-lg p-3 d-flex align-items-center justify-content-center"
-							style="width: 700px; height: 500px; border: 1px solid rgba(255,255,255,0.1);"
+							class="p-3 d-flex align-items-center justify-content-center"
+							style="width: 700px; height: 500px;"
 						>
-							<div class="text-center">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="80"
-									height="80"
-									fill="currentColor"
-									class="bi bi-code-square text-green mb-3"
-									viewBox="0 0 16 16"
-								>
-									<path
-										d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
-									/>
-									<path
-										d="M6.854 4.646a.5.5 0 0 1 0 .708L4.207 8l2.647 2.646a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 0 1 .708 0zm2.292 0a.5.5 0 0 0 0 .708L11.793 8l-2.647 2.646a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708 0z"
-									/>
-								</svg>
-								<p class="text-white-50">Vynn Editor Demo</p>
-								<p class="text-white-50 small">(Product screenshot will be displayed here)</p>
-							</div>
+						<div class="text-center" style="margin-left: 30px; margin-top: 30px; border-radius: 10%;" >
+							<video
+							  width="900"
+							  height="900"
+							  class="mb-3"
+							  autoplay
+							  loop
+							  muted
+							  playsinline
+							>
+							  <source src="/src/lib/assets/video.mp4" type="video/mp4" />
+							  Your browser does not support the video tag.
+							</video>
+						  </div>
 						</div>
 
 						<!-- Glow effect -->
