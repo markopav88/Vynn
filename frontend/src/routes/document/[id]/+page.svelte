@@ -66,7 +66,7 @@
 	// Constants for editor configuration
 	const LINE_HEIGHT = 24; // 1.5rem = 24px (assuming 16px font size)
 	const MIN_LINES = 30; // minimum lines to display
-	const MAX_COLUMN_WIDTH = 110; // maximum characters per line
+	const MAX_COLUMN_WIDTH = 109; // maximum characters per line
 	let documentReady = false; // to track when the document is ready to display
 	let projectDocumentsLoaded = false; // to track when project documents are loaded
 
@@ -4380,11 +4380,6 @@
 		activePartControls = partId;
 	}
 	
-	// Cancel hide is no longer needed since we're not using hover timeouts
-	function cancelHideControls() {
-		// This function remains to prevent bubbling of events
-		// when interacting with the controls themselves
-	}
 	
 	// Add a click handler to the document to close controls when clicking elsewhere
 	function setupOutsideClickHandler() {
@@ -5136,7 +5131,6 @@
 											{#if activePartControls === part.id}
 												<div 
 													class="part-controls"
-													on:mouseenter={cancelHideControls} 
 													role="group" 
 												>
 													<button 
@@ -5284,14 +5278,14 @@
 						title="Edit Keybindings"
 						aria-label="Edit keybindings"
 					>
-						<i class="bi bi-pencil-square" style="color: var(--secondary-accent-color)"></i>
+						<i class="bi bi-pencil-square" style="color: var(--primary-accent-color)"></i>
 					</button>
 					<button 
 						class="header-action-btn" 
 						on:click={() => (showCommands = false)} 
 						aria-label="Close commands reference"
 						title="Close"
-						style="color: var(--secondary-accent-color)"
+						style="color: var(--primary-accent-color)"
 					>
 						&times;
 					</button>
@@ -5389,6 +5383,7 @@
 				<h6 style="color: var(--secondary-text-color)">Editor</h6>
 				<ul>
 					<li style="color: var(--primary-text-color)"><span class="key">{toggleSheetKey}</span> Toggle Command Sheet</li>
+					<li style="color: var(--primary-text-color)"><span class="key">{toggleChatKey}</span> Toggle Command Sheet</li>
 				</ul>
 			</div>
 		</div>

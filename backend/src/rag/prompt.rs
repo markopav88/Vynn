@@ -322,3 +322,10 @@ pub fn construct_sanitize_text_prompt(text_with_markdown_html: &str) -> String {
         text_with_markdown_html
     )
 }
+
+pub fn construct_context_decision_prompt(user_prompt: &str) -> String {
+    format!(
+        "You are an AI assistant. Based on the following user prompt, decide if the AI needs context from the current document, the current project, or neither. Respond with only 'document', 'project', or 'none'.\n\nUser Prompt:\n{}\n\nResponse:",
+        user_prompt
+    )
+}
