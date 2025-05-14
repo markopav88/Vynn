@@ -47,6 +47,7 @@ use crate::rag::llm::QueryModel;
 use crate::rag::prompt;
 use crate::rag::retrieval;
 use pgvector::Vector;
+use crate::rag::prompt::construct_context_decision_prompt;
 
 /// GET handler for retrieving all writing sessions for current user.
 /// Accessible via: GET /api/writing-assistant
@@ -309,7 +310,10 @@ pub async fn api_send_writing_message(
     // Determine Project ID and Current Document Name for context retrieval
     let mut project_id_for_context: Option<i32> = None;
     let mut current_doc_name: Option<String> = None;
+    let mut current_doc_id: Option<i32> = None;
+    
     if let Some(doc_id) = session.document_id {
+        current_doc_id = Some(doc_id);
         // Fetch project ID and document name if document is linked
         let doc_info = sqlx::query!(
             r#"
@@ -325,99 +329,117 @@ pub async fn api_send_writing_message(
         .map_err(|_| Error::DatabaseError)?;
 
         if let Some(info) = doc_info {
-            project_id_for_context = Some(info.project_id); // Wrap in Some() to match Option type
+            project_id_for_context = Some(info.project_id); // Wrap in Some() to match Option<i32>
             current_doc_name = Some(info.name); // Store the name
         }
     }
 
-    // Retrieve relevant document chunks using semantic search
+    // Always retrieve relevant document chunks using semantic search
     println!("->> {:<12} - Retrieving relevant context via semantic search", "RAG FUNCTION");
     let k_value = 3;
     println!("->> {:<12} - Retrieving relevant chunks (k={}) for project_id: {:?}", "RETRIEVAL", k_value, project_id_for_context);
     
-    // Make relevant_chunks mutable
     let mut relevant_chunks = retrieval::semantic_search(
         &pool, 
         project_id_for_context,
         &user_embedding,
-        k_value // Use k_value variable
+        k_value
     ).await?;
     
-    // --- Fallback Context Retrieval: Full Project Content --- 
-    if relevant_chunks.is_empty() && session.document_id.is_some() {
-        println!("->> {:<12} - No relevant chunks found. Retrieving full project content as fallback.", "RETRIEVAL");
-        
-        let current_doc_id = session.document_id.unwrap(); // Safe due to check above
-        
-        // 1. Find the project_id for the current document
-        let project_info = sqlx::query!(
-            "SELECT project_id FROM document_projects WHERE document_id = $1",
-            current_doc_id
-        )
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| {
-            eprintln!("Database error fetching project_id for fallback: {:?}", e);
-            Error::DatabaseError
-        })?;
-
-        if let Some(info) = project_info {
-            let project_id = info.project_id;
-            println!("->> {:<12} - Found project_id {} for fallback context.", "RETRIEVAL", project_id);
-
-            // 2. Fetch all documents in that project
-            // Define a temporary struct for document content
-            struct DocumentContent {
-                id: i32,
-                name: Option<String>,
-                content: Option<String>,
+    println!("->> {:<12} - Semantic search retrieved {} chunks", "RETRIEVAL", relevant_chunks.len());
+    
+    // Use construct_context_decision_prompt to determine if we need additional context
+    println!("->> {:<12} - Determining context needs", "CONTEXT DECISION");
+    let decision_prompt = construct_context_decision_prompt(&payload.content);
+    let query_model = QueryModel::new()?;
+    let context_decision = query_model.query_model(&decision_prompt).await?;
+    let context_decision = context_decision.trim().to_lowercase();
+    
+    println!("->> {:<12} - Context decision: '{}'", "CONTEXT DECISION", context_decision);
+    
+    // Get additional context based on the LLM's decision
+    match context_decision.as_str() {
+        "document" => {
+            println!("->> {:<12} - Adding current document context", "CONTEXT ADDITION");
+            if let Some(doc_id) = current_doc_id {
+                // Fetch the current document's content
+                let document = sqlx::query!(
+                    r#"
+                    SELECT name, content
+                    FROM documents
+                    WHERE id = $1 AND is_trashed = false
+                    "#,
+                    doc_id
+                )
+                .fetch_optional(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?;
+                
+                if let Some(doc) = document {
+                    if let Some(content) = doc.content {
+                        let doc_name = doc.name;
+                        let doc_chunk = retrieval::RetrievedChunk {
+                            document_id: doc_id,
+                            document_name: doc_name,
+                            content,
+                        };
+                        println!("->> {:<12} - Added current document context: {} ({})", "CONTEXT ADDITION", doc_chunk.document_name, doc_chunk.content.len());
+                        relevant_chunks.push(doc_chunk);
+                    }
+                }
             }
-            let project_docs = sqlx::query_as!(DocumentContent,
-                r#"
-                SELECT id, name, content 
-                FROM documents 
-                WHERE id IN (SELECT document_id FROM document_projects WHERE project_id = $1)
-                  AND is_trashed = false
-                ORDER BY name ASC -- Or some other consistent order
-                "#,
-                project_id
-            )
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| {
-                eprintln!("Database error fetching project documents for fallback: {:?}", e);
-                Error::DatabaseError
-            })?;
-
-            // Store length before moving the vector
-            let project_docs_count = project_docs.len();
-            
-            // 3. Concatenate content
-            let mut full_project_content = String::new();
-            for doc in project_docs {
-                let doc_name = doc.name.unwrap_or_else(|| "Untitled".to_string());
-                let doc_content = doc.content.unwrap_or_default(); // Use empty string if null
-                // Add a header for each document
-                full_project_content.push_str(&format!("\n--- Document: {} (ID: {}) ---\n", doc_name, doc.id));
-                full_project_content.push_str(&doc_content);
-                full_project_content.push('\n');
+        },
+        "project" => {
+            println!("->> {:<12} - Adding project context", "CONTEXT ADDITION");
+            if let Some(project_id) = project_id_for_context {
+                // Define a temporary struct for document content
+                struct DocumentContent {
+                    id: i32,
+                    name: Option<String>,
+                    content: Option<String>,
+                }
+                
+                // Fetch all documents in the project
+                let project_docs = sqlx::query_as!(DocumentContent,
+                    r#"
+                    SELECT id, name, content 
+                    FROM documents 
+                    WHERE id IN (SELECT document_id FROM document_projects WHERE project_id = $1)
+                      AND is_trashed = false
+                    ORDER BY name ASC
+                    "#,
+                    project_id
+                )
+                .fetch_all(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?;
+                
+                let docs_count = project_docs.len();
+                println!("->> {:<12} - Retrieved {} documents from project", "CONTEXT ADDITION", docs_count);
+                
+                // Add each document as a separate chunk
+                for doc in project_docs {
+                    if let Some(content) = doc.content {
+                        // Only add non-empty content
+                        if !content.is_empty() {
+                            let doc_name = doc.name.unwrap_or_else(|| "Untitled".to_string());
+                            let doc_chunk = retrieval::RetrievedChunk {
+                                document_id: doc.id,
+                                document_name: doc_name,
+                                content,
+                            };
+                            println!("->> {:<12} - Added project document: {} ({})", "CONTEXT ADDITION", doc_chunk.document_name, doc_chunk.content.len());
+                            relevant_chunks.push(doc_chunk);
+                        }
+                    }
+                }
             }
-
-            if !full_project_content.is_empty() {
-                 println!("->> {:<12} - Concatenated content from {} documents ({} chars) for fallback.", "RETRIEVAL", project_docs_count, full_project_content.len());
-                // 4. Create a single fallback chunk
-                let fallback_chunk = retrieval::RetrievedChunk {
-                    document_id: -1, // Placeholder ID for full project context
-                    document_name: "Full Project Context".to_string(),
-                    content: full_project_content,
-                };
-                // 5. Replace relevant_chunks
-                relevant_chunks = vec![fallback_chunk];
-            } else {
-                 println!("->> {:<12} - Fallback triggered, but project documents have no content.", "RETRIEVAL");
-            }
-        } else {
-             println!("->> {:<12} - Fallback triggered, but could not find project_id for document {}.", "RETRIEVAL", current_doc_id);
+        },
+        "none" => {
+            println!("->> {:<12} - No additional context needed", "CONTEXT DECISION");
+        },
+        _ => {
+            println!("->> {:<12} - Unrecognized context decision: '{}', defaulting to no additional context", "CONTEXT DECISION", context_decision);
         }
     }
 
@@ -437,7 +459,7 @@ pub async fn api_send_writing_message(
     let final_prompt = prompt::construct_generic_prompt(
         &payload.content, 
         &chat_history, 
-        &relevant_chunks, // Pass the Vec<RetrievedChunk>
+        &relevant_chunks, // Pass the Vec<RetrievedChunk> that now includes both semantic search results and any additional context
         session.document_id, // Pass current doc ID
         current_doc_name.as_deref() // Pass current doc name as &str
     );
@@ -447,7 +469,7 @@ pub async fn api_send_writing_message(
 
     // --- Query LLM --- 
     println!("->> {:<12} - Querying LLM", "RAG FUNCTION");
-    let query_model = QueryModel::new()?;
+    // Query model was already initialized above
     let llm_response_content = query_model.query_model(&final_prompt).await?;
     println!("->> {:<12} - LLM response received: \"{}...\"", "RAG FUNCTION", llm_response_content.chars().take(70).collect::<String>());
 

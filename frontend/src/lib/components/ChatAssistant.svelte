@@ -618,7 +618,7 @@
 
     .message-user .message-content {
         background-color: var(--primary-accent-color); /* Bootstrap success green */
-        color: var(--primary-text-color);
+        color: var(--secondary-text-color);
         border-radius: 15px 15px 5px 15px; /* Chat bubble style */
     }
 

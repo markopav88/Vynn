@@ -1118,7 +1118,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 
 .navbar,
 .navbar-container {
-	position: relative !important;
+	position: relative;
 	z-index: 1000 !important;
 	width: 100% !important;
 	transform: translateY(5px); /* Match animation start state */
@@ -1298,12 +1298,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	margin-bottom: 1rem;
 	border-radius: 8px;
 	padding: 1rem;
-	background-color: rgba(10, 23, 33, 0.2);
+	background-color: var(--primary-color);
 	backdrop-filter: blur(15px);
 	min-height: 200px; /* Ensure it has some height */
 	font-family: var(--font-mono); /* Use monospace font for diff */
 	overflow: auto; /* Enable scrolling for long diffs */
 	white-space: pre-wrap; /* Respect whitespace */
+	width: 100%;
 }
 
 .suggestion-diff-view {
@@ -1311,13 +1312,18 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	line-height: 1.5;
 	padding: 0.5rem;
 	border-radius: 6px;
-	background-color: rgba(10, 23, 33, 0.2);
+	background-color: var(--primary-color);
 	backdrop-filter: blur(10px);
+	width: 100%;
 }
 
 /* Styles for diff parts - REPLACED old :global rules */
 .diff-part {
-	display: inline; /* Keep parts flowing like text */
+	display: inline;
+	font-size: 16px;
+	line-height: 1.5;
+	min-height: 1.5rem;
+	letter-spacing: 2.15px;
 	border-radius: 3px;
 	transition: background-color 0.2s ease;
 }

@@ -4380,11 +4380,6 @@
 		activePartControls = partId;
 	}
 	
-	// Cancel hide is no longer needed since we're not using hover timeouts
-	function cancelHideControls() {
-		// This function remains to prevent bubbling of events
-		// when interacting with the controls themselves
-	}
 	
 	// Add a click handler to the document to close controls when clicking elsewhere
 	function setupOutsideClickHandler() {
@@ -5136,7 +5131,6 @@
 											{#if activePartControls === part.id}
 												<div 
 													class="part-controls"
-													on:mouseenter={cancelHideControls} 
 													role="group" 
 												>
 													<button 
