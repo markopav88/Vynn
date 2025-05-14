@@ -93,4 +93,8 @@ The application supports per-user limits and tracking:
 
 MIT
 
-[Kept alive with](https://keepalive.dashdashhard.com/)
+## Hosting
+- Database up on supabase
+- Backend and frontend up on render
+
+[Keep alive tool](https://keepalive.dashdashhard.com/)
