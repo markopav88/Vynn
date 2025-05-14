@@ -9,7 +9,7 @@
 / api_get_all_keybindings       GET         /           - Get all users custom keybindings
 / api_add_update_keybinding     PUT         /:id        - Update or Add a keybinding by command id
 / api_delete_keybinding         DELETE      /:id        - Delete a keybinding by command id (Reset to Default)
-/
+/ api_reset_all_keybindings     DELETE      /reset      - Reset all user keybindings to default
 */
 
 use axum::routing::{delete, get, put};
@@ -19,6 +19,7 @@ use axum::{
 };
 use sqlx::PgPool;
 use tower_cookies::Cookies;
+use serde_json::{Value, json};
 
 use crate::models::commands::{Command, UserKeybinding, UpdateKeybindingPayload};
 use crate::{Error, Result};
@@ -149,10 +150,39 @@ pub async fn api_delete_keybinding(
     Ok(Json(command))
 }
 
+/// DELETE handler for resetting all user keybindings to default.
+/// Accessible via: DELETE /api/command/reset
+pub async fn api_reset_all_keybindings(
+    cookies: Cookies, 
+    Extension(pool): Extension<PgPool>
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - reset_all_keybindings", "HANDLER");
+
+    // Get user_id from cookies
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Delete all user keybindings
+    sqlx::query!(
+        "DELETE FROM user_keybindings WHERE user_id = $1",
+        user_id
+    )
+    .execute(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    Ok(Json(json!({
+        "result": {
+            "success": true,
+            "message": "All keybindings reset to default successfully"
+        }
+    })))
+}
+
 pub fn key_routes() -> Router {
     Router::new()
         .route("/default", get(api_get_all_commands))
         .route("/", get(api_get_all_keybindings))
+        .route("/reset", delete(api_reset_all_keybindings))
         .route("/:id", put(api_add_update_keybinding))
         .route("/:id", delete(api_delete_keybinding))
 }

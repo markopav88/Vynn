@@ -353,3 +353,29 @@ export function hexToRgba(hex: string, alpha: number = 1): string {
 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+
+/**
+ * Function to reset all user keybindings
+ * Calls: DELETE /api/command/reset
+ */
+export async function reset_all_keybindings(): Promise<boolean> {
+    const apiUrl = `${API_BASE_URL}/api/command/reset`;
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'DELETE',
+            credentials: 'include' // Important for sending/receiving cookies
+        });
+
+        if (response.ok) {
+            return true;
+        } else {
+            console.error('Failed to reset keybindings with status:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error resetting keybindings:', error);
+        return false;
+    }
+}

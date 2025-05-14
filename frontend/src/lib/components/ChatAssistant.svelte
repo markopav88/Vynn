@@ -362,7 +362,7 @@
 {#if isOpen}
 <!-- Use 'showing' class for transitions if desired -->
 <div class="offcanvas offcanvas-end show text-bg-dark" tabindex="-1" id="chatAssistantOffcanvas" aria-labelledby="chatAssistantLabel">
-    <div class="offcanvas-header border-bottom border-secondary" style="border-bottom-color: var(--primary-color)">
+    <div class="offcanvas-header border-bottom" style="border-color: var(--secondary-color);">
         <!-- Replace static title with Dropdown for sessions -->
         <div class="dropdown flex-grow-1 me-2">
             <button class="btn btn-dark dropdown-toggle w-100 text-start" type="button" id="sessionDropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
@@ -471,11 +471,11 @@
 
         <!-- Message Input Area -->
         {#if currentSessionId}
-            <div class="input-group p-3 border-top border-secondary">
+            <div class="input-group p-3">
                 <input
                     bind:this={messageInput}
                     type="text"
-                    class="form-control bg-transparent text-white border-secondary"
+                    class="form-control bg-transparent text-white "
                     
                     placeholder="Ask the AI..."
                     bind:value={newMessageContent}
@@ -511,12 +511,12 @@
         width: 450px
     }
     .offcanvas.offcanvas-end.show {
-        background-color: rgba(10, 23, 33, 0.60) !important;
+        background-color: var(--primary-color) !important;
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         border-radius: 8px;
+        border-color: var(--secondary-color);
         top: 165px;
-        /* Responsive height: subtract navbar + status bar (adjusted to 220px) */
         height: calc(100vh - 220px);
         max-height: calc(100vh - 220px);
         min-height: 300px;
@@ -535,23 +535,24 @@
         padding: 0;
     }
     .chat-body {
-        background-color: transparent;
+        background-color: var(--primary-color);
         flex: 1 1 auto;
         overflow-y: auto;
         padding-bottom: 110px; /* Increased to ensure input is always visible above footer/status bar */
         min-height: 0;
     }
     /* Make the input group sticky at the bottom of the chat */
-    .input-group.p-3.border-top {
+    .input-group.p-3 {
         position: sticky;
         bottom: 0;
         z-index: 2;
         border-radius: 0 0 8px 8px;
+        border-color: var(--secondary-color);
     }
     .offcanvas-header,
     /* Remove session list container styles */
     .input-group { /* Apply border to input area */
-        border-color: var(--primary-color);
+        border-color: var(--secondary-color);
     }
 
     .message-assistant .message-content {
@@ -581,7 +582,7 @@
     }
     .offcanvas-header .dropdown-toggle:hover,
     .offcanvas-header .dropdown-toggle:focus {
-        background-color: rgba(255, 255, 255, 0.15);
+        background-color: var(--secondary-color)
     }
 
     ::-webkit-scrollbar {
@@ -616,7 +617,7 @@
     }
 
     .message-user .message-content {
-        background-color: var(--primary-color); /* Bootstrap success green */
+        background-color: var(--primary-accent-color); /* Bootstrap success green */
         color: var(--primary-text-color);
         border-radius: 15px 15px 5px 15px; /* Chat bubble style */
     }

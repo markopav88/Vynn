@@ -735,8 +735,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	top: 165px;
 	right: 20px;
 	width: 300px;
-	background-color: rgba(18, 18, 18, 0.9);
-	border: 1px solid rgba(16, 185, 129, 0.5);
+	background-color: var(--primary-color);
+	border: 1px solid var(--secondary-color);
 	border-radius: 8px;
 	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 	color: #e5e5e5;
@@ -769,11 +769,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 	position: sticky;
 	top: 0;
 	padding: 10px 15px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	border-bottom: 1px solid var(--secondary-accent-color);
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	background-color: rgba(18, 18, 18, 0.95);
+	background-color: var(--secondary-color);
 	z-index: 2;
 }
 
