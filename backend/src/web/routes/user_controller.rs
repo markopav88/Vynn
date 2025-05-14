@@ -789,7 +789,7 @@ pub async fn api_get_user_storage(
     .await
     .map_err(|_| Error::UserNotFoundError { user_id })?;
     
-    // Calculate storage bytes (sum of document content lengths)
+    // Calculate storage bytes (sum of document content lengths) - with precise character counting
     let storage_bytes = sqlx::query!(
         r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
            FROM documents d
@@ -811,6 +811,11 @@ pub async fn api_get_user_storage(
     let db_total = StorageManager::get_total_db_allocated();
     let db_usage_percentage = StorageManager::get_db_usage_percentage(&pool).await.unwrap_or(0.0);
     
+    // Calculate ultra-precise percentages
+    let storage_percentage = (storage_bytes.total_bytes.unwrap_or(0) as f64 / max_storage_bytes as f64) * 100.0;
+    let projects_percentage = (project_count.count.unwrap_or(0) as f64 / max_projects as f64) * 100.0;
+    let documents_percentage = (document_count.count.unwrap_or(0) as f64 / max_documents as f64) * 100.0;
+    
     // Return the storage usage information with detailed byte-level precision
     Ok(Json(json!({
         // Raw byte counts for maximum precision
@@ -820,16 +825,17 @@ pub async fn api_get_user_storage(
         // Database overview
         "database_info": {
             "total_size_bytes": db_total,
-            "total_size_gb": format!("{:.2}", db_total as f64 / (1024.0 * 1024.0 * 1024.0)),
+            "total_size_gb": format!("{:.6}", db_total as f64 / (1024.0 * 1024.0 * 1024.0)),
             "used_bytes": db_size,
-            "used_percentage": format!("{:.2}", db_usage_percentage)
+            "used_percentage": format!("{:.6}", db_usage_percentage)
         },
         
         // Formatted values for different units
         "storage_bytes_formatted": {
             "bytes": storage_bytes.total_bytes.unwrap_or(0),
-            "kb": format!("{:.6}", storage_bytes.total_bytes.unwrap_or(0) as f64 / 1024.0),
-            "mb": format!("{:.8}", storage_bytes.total_bytes.unwrap_or(0) as f64 / (1024.0 * 1024.0))
+            "kb": format!("{:.10}", storage_bytes.total_bytes.unwrap_or(0) as f64 / 1024.0),
+            "mb": format!("{:.10}", storage_bytes.total_bytes.unwrap_or(0) as f64 / (1024.0 * 1024.0)),
+            "gb": format!("{:.10}", storage_bytes.total_bytes.unwrap_or(0) as f64 / (1024.0 * 1024.0 * 1024.0))
         },
         
         // Counts and limits
@@ -838,10 +844,10 @@ pub async fn api_get_user_storage(
         "project_count": project_count.count,
         "document_count": document_count.count,
         
-        // Percentages with high precision
-        "storage_percentage": format!("{:.10}", (storage_bytes.total_bytes.unwrap_or(0) as f64 / max_storage_bytes as f64 * 100.0)),
-        "projects_percentage": format!("{:.2}", (project_count.count.unwrap_or(0) as f64 / max_projects as f64 * 100.0)),
-        "documents_percentage": format!("{:.2}", (document_count.count.unwrap_or(0) as f64 / max_documents as f64 * 100.0))
+        // Percentages with extreme precision for even the tiniest storage usage
+        "storage_percentage": storage_percentage,
+        "projects_percentage": projects_percentage,
+        "documents_percentage": documents_percentage
     })))
 }
 

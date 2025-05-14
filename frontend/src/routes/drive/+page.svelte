@@ -122,28 +122,56 @@
 			try {
 				const storage = await get_user_storage();
 				if (storage) {
-					// Convert bytes to MB to display in appropriate units
-					const usedMB = parseFloat((storage.storage_bytes_formatted.mb).replace(/,/g, ''));
-					const maxMB = storage.max_storage_bytes / (1024 * 1024);
+					// Convert bytes to MB to display in appropriate units with high precision
+					const usedBytes = storage.storage_bytes || 0;
+					const maxBytes = storage.max_storage_bytes;
 					
-					// Update display in MB instead of GB if less than 1GB
-					let usedDisplay, maxDisplay, unit;
-					if (maxMB < 1000) {
-						// Display in MB
-						usedDisplay = usedMB.toFixed(2);
-						maxDisplay = maxMB.toFixed(0);
+					// Calculate ultra-precise percentage
+					let ultraPrecisePercentage = (usedBytes / maxBytes) * 100;
+					let displayPercentage = ultraPrecisePercentage;
+					let preciseUsed;
+					let unit;
+					
+					// Choose the most appropriate unit for display
+					if (usedBytes < 1024) {
+						// Less than 1KB - show bytes
+						preciseUsed = usedBytes.toString();
+						unit = 'B';
+					} else if (usedBytes < 1024 * 1024) {
+						// Less than 1MB - show KB with high precision
+						preciseUsed = (usedBytes / 1024).toFixed(6);
+						unit = 'KB';
+					} else if (usedBytes < 1024 * 1024 * 1024) {
+						// Less than 1GB - show MB with high precision
+						preciseUsed = (usedBytes / (1024 * 1024)).toFixed(6);
 						unit = 'MB';
 					} else {
-						// Display in GB
-						usedDisplay = (usedMB / 1024).toFixed(2);
-						maxDisplay = (maxMB / 1024).toFixed(0);
+						// Show GB with high precision
+						preciseUsed = (usedBytes / (1024 * 1024 * 1024)).toFixed(6);
 						unit = 'GB';
 					}
 					
+					// Format max storage in the matching unit
+					let preciseMax;
+					if (unit === 'B') {
+						preciseMax = maxBytes.toString();
+					} else if (unit === 'KB') {
+						preciseMax = (maxBytes / 1024).toFixed(2);
+					} else if (unit === 'MB') {
+						preciseMax = (maxBytes / (1024 * 1024)).toFixed(2);
+					} else {
+						preciseMax = (maxBytes / (1024 * 1024 * 1024)).toFixed(2);
+					}
+					
+					// For ultra-small percentages (near zero), show full precision
+					const formattedPercentage = ultraPrecisePercentage < 0.01 
+						? parseFloat(ultraPrecisePercentage.toFixed(16).replace(/0+$/, ''))
+						: Math.min(Math.round(ultraPrecisePercentage * 100) / 100, 100);
+					
 					storageInfo = {
-						usedGB: parseFloat(usedDisplay),
-						maxGB: parseFloat(maxDisplay),
-						percentage: Math.min(Math.round(parseFloat(storage.storage_percentage)), 100), // Cap at 100%
+						usedGB: parseFloat(preciseUsed),
+						maxGB: parseFloat(preciseMax),
+						percentage: formattedPercentage,
 						documentCount: storage.document_count,
 						projectCount: storage.project_count,
 						unit: unit
@@ -156,9 +184,9 @@
 					const fallbackStorage = await get_storage_usage();
 					if (fallbackStorage) {
 						storageInfo = {
-							usedGB: parseFloat(fallbackStorage.used_gb.toFixed(2)),
+							usedGB: parseFloat(fallbackStorage.used_gb.toFixed(6)),
 							maxGB: fallbackStorage.max_storage_gb,
-							percentage: Math.min(Math.round(fallbackStorage.usage_percentage), 100), // Cap at 100%
+							percentage: parseFloat(fallbackStorage.usage_percentage.toFixed(16)),
 							documentCount: fallbackStorage.document_count,
 							projectCount: fallbackStorage.project_count,
 							unit: 'GB'
@@ -926,7 +954,13 @@
 							<li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
 								<button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
 									<span><i class="bi bi-hdd me-2"></i> Storage</span>
-									<span class="text-white-50">{storageInfo.percentage}%</span>
+									<span class="text-white-50">
+									{#if typeof storageInfo.percentage === 'number' && storageInfo.percentage < 0.01}
+										{storageInfo.percentage.toFixed(10).replace(/0+$/, '')}%
+									{:else}
+										{storageInfo.percentage}%
+									{/if}
+									</span>
 								</button>
 							</li>
 							<li class="px-2">
@@ -934,7 +968,7 @@
 									<div
 										class="progress-bar bg-green"
 										role="progressbar"
-										style="width: {storageInfo.percentage}%;"
+										style="width: {typeof storageInfo.percentage === 'number' ? Math.max(0.1, storageInfo.percentage) : 0.1}%;"
 										aria-valuenow="{storageInfo.percentage}"
 										aria-valuemin="0"
 										aria-valuemax="100"
