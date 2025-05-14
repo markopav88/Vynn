@@ -73,38 +73,4 @@ impl StorageManager {
         
         Ok((current_size as f64 / total_size as f64) * 100.0)
     }
-    
-    /// Get remaining available storage
-    pub async fn get_remaining_storage(pool: &PgPool) -> Result<i64, sqlx::Error> {
-        let current_size = Self::get_db_size(pool).await?;
-        let total_size = Self::get_total_db_allocated();
-        
-        Ok(total_size - current_size)
-    }
-    
-    /// Get user count
-    pub async fn get_user_count(pool: &PgPool) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query!(
-            r#"
-            SELECT COUNT(*) as count FROM users
-            "#
-        )
-        .fetch_one(pool)
-        .await?;
-        
-        Ok(result.count.unwrap_or(0) as i32)
-    }
-    
-    /// Check if system has enough storage for new users
-    pub async fn has_capacity_for_new_users(pool: &PgPool) -> Result<bool, sqlx::Error> {
-        let config = StorageConfig::default();
-        let current_users = Self::get_user_count(pool).await?;
-        let remaining_storage = Self::get_remaining_storage(pool).await?;
-        
-        // Calculate if we have room for more users
-        let expected_storage_per_new_user = config.default_user_quota;
-        let remaining_users_capacity = remaining_storage / expected_storage_per_new_user as i64;
-        
-        Ok(remaining_users_capacity > 0 && current_users < config.expected_max_users)
-    }
 } 

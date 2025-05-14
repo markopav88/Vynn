@@ -859,9 +859,11 @@ pub fn user_routes() -> Router {
         .route("/logout", post(api_logout))
         .route("/:id", get(api_get_user))
         .route("/:id", put(api_update_user))
-        .route("/profile-pic/:id", get(api_get_profile_image))
-        .route("/profile-pic", post(api_upload_profile_image))
+        .route("/check-auth", get(api_check_auth))
+        .route("/:id/profile-image", get(api_get_profile_image))
+        .route("/profile-image", post(api_upload_profile_image))
         .route("/current", get(api_get_current_user))
         .route("/storage", get(api_get_storage_usage))
         .route("/user-storage", get(api_get_user_storage))
+        .route("/search", get(api_search_users))
 }
