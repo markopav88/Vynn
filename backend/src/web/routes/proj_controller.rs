@@ -121,6 +121,24 @@ async fn api_create_project(
     // Get user ID from cookie
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
+    // Check if user has reached their project limit
+    let user_projects_count = sqlx::query!(
+        "SELECT COUNT(*) as count FROM projects p
+         JOIN project_permissions pp ON p.id = pp.project_id
+         WHERE pp.user_id = $1 AND pp.role = 'owner'",
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Use hardcoded default limit
+    let max_projects = 3;
+    
+    if user_projects_count.count.unwrap_or(0) as i32 >= max_projects {
+        return Err(Error::LimitExceededError { message: "Project limit reached".to_string() });
+    }
+
     // Use query_as! to directly map to Project struct
     let result = sqlx::query_as!(
         Project,

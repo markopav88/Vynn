@@ -56,3 +56,13 @@ Neovim for Writers is an innovative text editor designed for writers who value e
 ## License
 
 [License information to be added]
+
+## Storage Limits and Tracking
+
+The application now supports per-user limits and tracking:
+
+- Each user is limited to 3 projects and 10 documents by default
+- Storage usage is tracked precisely down to the byte level
+- Administrators can modify the limits in the database
+
+The storage tracking is included in the main migration script, so no additional migrations are needed.

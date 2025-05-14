@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import {
 		get_all_documents,
 		create_document,
@@ -23,14 +23,14 @@
 		delete_project,
 		get_shared_projects
 	} from '$lib/ts/drive';
-	import { add_document_to_project, get_project_documents } from '$lib/ts/project';
+	import { add_document_to_project, get_project_documents, remove_document_from_project } from '$lib/ts/project';
 	import type { Project } from '$lib/ts/drive';
 
 	import Navbar from '$lib/components/Navbar.svelte';
 
 	import '$lib/assets/style/drive.css';
 
-	import { get_current_user } from '$lib/ts/user'
+	import { get_current_user, get_storage_usage, get_user_storage } from '$lib/ts/user'
 
 	import Toast from '$lib/components/Toast.svelte';
 
@@ -83,6 +83,18 @@
 	let newProjectNameInput: HTMLInputElement;
 	let newDocumentNameInput: HTMLInputElement;
 
+	// Add these variables for storage information
+	let storageInfo = {
+		usedGB: 0,
+		maxGB: 10,
+		percentage: 0,
+		documentCount: 0,
+		projectCount: 0,
+		unit: 'GB'
+	};
+	let isLoadingStorage = true;
+	let storageRefreshInterval: number;
+
 	// Add these new functions
 	$: if (showNewProjectModal) {
 		setTimeout(() => newProjectNameInput?.focus(), 0);
@@ -90,6 +102,73 @@
 
 	$: if (showNewDocumentModal) {
 		setTimeout(() => newDocumentNameInput?.focus(), 0);
+	}
+
+	// Function to refresh storage usage data
+	async function refreshStorageData() {
+		try {
+			console.log("Refreshing storage data...");
+			const storage = await get_user_storage();
+			if (storage) {
+				// Convert bytes to MB to display in appropriate units with high precision
+				const usedBytes = storage.storage_bytes || 0;
+				const maxBytes = storage.max_storage_bytes;
+				
+				// Calculate ultra-precise percentage
+				let ultraPrecisePercentage = (usedBytes / maxBytes) * 100;
+				let displayPercentage = ultraPrecisePercentage;
+				let preciseUsed;
+				let unit;
+				
+				// Choose the most appropriate unit for display
+				if (usedBytes < 1024) {
+					// Less than 1KB - show bytes
+					preciseUsed = usedBytes.toString();
+					unit = 'B';
+				} else if (usedBytes < 1024 * 1024) {
+					// Less than 1MB - show KB with high precision
+					preciseUsed = (usedBytes / 1024).toFixed(6);
+					unit = 'KB';
+				} else if (usedBytes < 1024 * 1024 * 1024) {
+					// Less than 1GB - show MB with high precision
+					preciseUsed = (usedBytes / (1024 * 1024)).toFixed(6);
+					unit = 'MB';
+				} else {
+					// Show GB with high precision
+					preciseUsed = (usedBytes / (1024 * 1024 * 1024)).toFixed(6);
+					unit = 'GB';
+				}
+				
+				// Format max storage in the matching unit
+				let preciseMax;
+				if (unit === 'B') {
+					preciseMax = maxBytes.toString();
+				} else if (unit === 'KB') {
+					preciseMax = (maxBytes / 1024).toFixed(2);
+				} else if (unit === 'MB') {
+					preciseMax = (maxBytes / (1024 * 1024)).toFixed(2);
+				} else {
+					preciseMax = (maxBytes / (1024 * 1024 * 1024)).toFixed(2);
+				}
+				
+				// For ultra-small percentages (near zero), show full precision
+				const formattedPercentage = ultraPrecisePercentage < 0.01 
+					? parseFloat(ultraPrecisePercentage.toFixed(16).replace(/0+$/, ''))
+					: Math.min(Math.round(ultraPrecisePercentage * 100) / 100, 100);
+				
+				storageInfo = {
+					usedGB: parseFloat(preciseUsed),
+					maxGB: parseFloat(preciseMax),
+					percentage: formattedPercentage,
+					documentCount: storage.document_count,
+					projectCount: storage.project_count,
+					unit: unit
+				};
+				console.log("Storage updated:", storageInfo);
+			}
+		} catch (error) {
+			console.error('Error refreshing storage data:', error);
+		}
 	}
 
 	onMount(async () => {
@@ -106,6 +185,14 @@
 			} finally {
 				isLoading = false;
 			}
+			
+			// Initial load of storage information
+			await refreshStorageData();
+			isLoadingStorage = false;
+			
+			// Set up an interval to refresh storage data every 5 seconds
+			storageRefreshInterval = setInterval(refreshStorageData, 5000) as unknown as number;
+			
 			// Fetch all data in parallel
 			const [
 				docsResult,
@@ -768,6 +855,46 @@
 			}
 		}
 	}
+
+	// Add this new function for removing documents from projects
+	async function handleRemoveFromProject(event: Event, document: Document) {
+		event.stopPropagation(); // Prevent document click
+		
+		if (!currentProject) return;
+		
+		const confirmed = confirm(`Are you sure you want to remove "${document.name}" from project "${currentProject.name}"?`);
+		if (!confirmed) return;
+		
+		try {
+			const success = await remove_document_from_project(parseInt(currentProject.id), document.id);
+			
+			if (success) {
+				// Update our project documents map
+				const currentDocs = projectDocumentsMap.get(currentProject.id) || [];
+				projectDocumentsMap.set(
+					currentProject.id,
+					currentDocs.filter(id => id !== document.id)
+				);
+				
+				// Remove from displayed documents in the current view
+				displayedDocuments = displayedDocuments.filter(d => d.id !== document.id);
+				
+				showToast(`Document "${document.name}" removed from project "${currentProject.name}"`, 'success');
+			} else {
+				showToast('Failed to remove document from project', 'error');
+			}
+		} catch (error) {
+			console.error('Error removing document from project:', error);
+			showToast('An error occurred while removing the document from the project', 'error');
+		}
+	}
+
+	// Clean up the interval when the component is destroyed
+	onDestroy(() => {
+		if (storageRefreshInterval) {
+			clearInterval(storageRefreshInterval);
+		}
+	});
 </script>
 
 {#each toasts as toast, i}
@@ -828,7 +955,13 @@
 							<li class="d-flex justify-content-between nav-item mt-2 pt-2 border-top border-dark">
 								<button class="nav-link text-white w-100 d-flex justify-content-between" style="cursor: default;">
 									<span><i class="bi bi-hdd me-2"></i> Storage</span>
-									<span class="text-white-50">25%</span>
+									<span class="text-white-50">
+									{#if typeof storageInfo.percentage === 'number' && storageInfo.percentage < 0.01}
+										{storageInfo.percentage.toFixed(10).replace(/0+$/, '')}%
+									{:else}
+										{storageInfo.percentage}%
+									{/if}
+									</span>
 								</button>
 							</li>
 							<li class="px-2">
@@ -836,13 +969,20 @@
 									<div
 										class="progress-bar bg-green"
 										role="progressbar"
-										style="width: 25%;"
-										aria-valuenow="25"
+										style="width: {typeof storageInfo.percentage === 'number' ? Math.max(0.1, storageInfo.percentage) : 0.1}%;"
+										aria-valuenow="{storageInfo.percentage}"
 										aria-valuemin="0"
 										aria-valuemax="100"
 									></div>
 								</div>
-								<small class="text-white-50 ps-1">2.5 GB of 10 GB used</small>
+								<small class="text-white-50 ps-1">
+									{#if isLoadingStorage}
+										<span class="small">Loading storage info...</span>
+									{:else}
+										{storageInfo.usedGB} {storageInfo.unit} of {storageInfo.maxGB} {storageInfo.unit} used
+										<br><span class="small">{storageInfo.documentCount} documents, {storageInfo.projectCount} projects</span>
+									{/if}
+								</small>
 							</li>
 						</ul>
 					</div>
@@ -1150,6 +1290,16 @@
 													>
 														<i class="bi bi-share"></i>
 													</button>
+													{#if currentProject}
+													<button
+														class="action-icon remove-icon"
+														on:click={(e) => handleRemoveFromProject(e, document)}
+														title="Remove from project"
+														aria-label={`Remove document ${document.name} from project`}
+													>
+														<i class="bi bi-box-arrow-up-right"></i>
+													</button>
+													{/if}
 													<button
 														class="action-icon delete-icon"
 														on:click={(e) => handleTrashDocument(e, document)}

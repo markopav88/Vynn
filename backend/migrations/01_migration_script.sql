@@ -27,7 +27,10 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    ai_credits INT NOT NULL DEFAULT 10
+    ai_credits INT NOT NULL DEFAULT 10,
+    storage_bytes BIGINT NOT NULL DEFAULT 0,
+    max_projects INT NOT NULL DEFAULT 3,
+    max_documents INT NOT NULL DEFAULT 10
 );
 
 -- Create projects table
@@ -327,3 +330,12 @@ SELECT setval('projects_id_seq', (SELECT MAX(id) FROM projects));
 SELECT setval('documents_id_seq', (SELECT MAX(id) FROM documents));
 SELECT setval('commands_command_id_seq', (SELECT MAX(command_id) FROM commands));
 SELECT setval('default_preferences_preference_id_seq', (SELECT MAX(preference_id) FROM default_preferences));
+
+-- Update the storage_bytes column for existing users based on their document content
+UPDATE users
+SET storage_bytes = (
+    SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0)
+    FROM documents d
+    JOIN document_permissions dp ON d.id = dp.document_id
+    WHERE dp.user_id = users.id AND dp.role = 'owner'
+);

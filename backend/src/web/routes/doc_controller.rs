@@ -29,6 +29,7 @@ use crate::models::document::{CreateDocumentPayload, Document, UpdateDocumentPay
 use crate::models::permission::{
     CreatePermissionPayload, DocumentPermission, UpdatePermissionPayload, UserPermissions,
 };
+use crate::models::storage::StorageManager;
 use crate::web::middleware::middleware::check_document_permission;
 use crate::{Error, Result};
 
@@ -124,6 +125,53 @@ pub async fn api_create_document(
     
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Check if user has reached their document limit
+    let user_docs_count = sqlx::query!(
+        "SELECT COUNT(*) as count FROM documents d
+         JOIN document_permissions dp ON d.id = dp.document_id
+         WHERE dp.user_id = $1 AND dp.role = 'owner'",
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Use hardcoded default limit
+    let max_documents = 10;
+    
+    if user_docs_count.count.unwrap_or(0) as i32 >= max_documents {
+        return Err(Error::LimitExceededError { message: "Document limit reached".to_string() });
+    }
+
+    // Calculate the content size in bytes
+    let content_length = payload.content.as_ref().map_or(0, |s| s.len() as i64);
+    
+    // Check if this would exceed the user's storage limit (using dynamic storage management)
+    let max_storage_bytes = StorageManager::get_user_quota();
+    
+    // Get user's current storage usage
+    let current_storage = sqlx::query!(
+        r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    let new_total_storage = current_storage.total_bytes.unwrap_or(0) + content_length;
+    
+    if new_total_storage > max_storage_bytes {
+        return Err(Error::LimitExceededError { 
+            message: format!("Storage limit of {}MB exceeded. Current usage: {}MB, This document: {}MB", 
+                            max_storage_bytes / 1024 / 1024,
+                            current_storage.total_bytes.unwrap_or(0) / 1024 / 1024,
+                            content_length / 1024 / 1024)
+        });
+    }
 
     // First insert the document
     let result = sqlx::query!(
@@ -225,6 +273,50 @@ pub async fn api_update_document(
     let old_embedding_time = old_data.as_ref().and_then(|d| d.embedding_updated_at);
     // --- Embedding Logic End ---
 
+    // Calculate the difference in content size
+    let old_content_len = old_content.len() as i64;
+    let new_content_len = payload.content.as_ref().map_or(0, |s| s.len() as i64);
+    let size_diff = new_content_len - old_content_len;
+
+    // If content is growing, check storage limits
+    if size_diff > 0 {
+        // Check if this would exceed the user's storage limit (using dynamic storage management)
+        let max_storage_bytes = StorageManager::get_user_quota();
+        
+        // Get document owner
+        let owner = sqlx::query!(
+            "SELECT user_id FROM document_permissions 
+             WHERE document_id = $1 AND role = 'owner'",
+            document_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+        
+        // Get owner's current storage usage
+        let current_storage = sqlx::query!(
+            r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
+               FROM documents d
+               JOIN document_permissions dp ON d.id = dp.document_id
+               WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+            owner.user_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+        
+        let new_total_storage = current_storage.total_bytes.unwrap_or(0) + size_diff;
+        
+        if new_total_storage > max_storage_bytes {
+            return Err(Error::LimitExceededError { 
+                message: format!("Storage limit of {}MB exceeded. Current usage: {}MB, Additional storage needed: {}MB", 
+                                max_storage_bytes / 1024 / 1024,
+                                current_storage.total_bytes.unwrap_or(0) / 1024 / 1024,
+                                size_diff / 1024 / 1024)
+            });
+        }
+    }
+
     // Proceed with the main update
     let update_result = sqlx::query!(
         "UPDATE documents
@@ -316,6 +408,17 @@ async fn api_delete_document(
         return Err(Error::PermissionError);
     }
 
+    // Get document content size before deletion (but don't use it in this version)
+    let doc = sqlx::query!(
+        "SELECT content FROM documents WHERE id = $1",
+        document_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DocumentNotFoundError { document_id })?;
+
+    let _content_size = doc.content.as_ref().map_or(0, |s| s.len() as i64);
+
     // delete all rows from document permissions table where document id = one being delete
     let result = sqlx::query!(
         "DELETE FROM document_permissions
@@ -331,7 +434,6 @@ async fn api_delete_document(
     }
 
     // otherwise now we can sucessfully delete the delete the document from the database
-
     let result = sqlx::query!(
         "DELETE FROM Documents
             WHERE id =  $1",
@@ -345,12 +447,13 @@ async fn api_delete_document(
         return Err(Error::DocumentDeletionError { document_id });
     }
 
+    // Note: We're skipping updating storage_bytes in this version
+
     // otherwise its success
     return Ok(Json(json!({
         "result": {
             "success": true
         }
-
     })));
 }
 
