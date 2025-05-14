@@ -20,6 +20,7 @@
 
 	// Check for auth token and registered=true query parameter
 	onMount(async () => {
+		document.title = "Vynn - Login";
 		try {
 			// Check authentication status using backend API with a timeout
 			const authCheckPromise = check_auth();

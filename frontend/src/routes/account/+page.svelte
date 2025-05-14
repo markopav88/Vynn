@@ -235,6 +235,7 @@
 	}
 
 	onMount(async () => {
+		document.title = "Vynn - Account";
 		try {
 			const user = await get_current_user();
 			if (user) {

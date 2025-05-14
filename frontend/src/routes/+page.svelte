@@ -18,6 +18,7 @@
 
 	onMount(() => {
 		(async () => {
+			document.title = "Vynn - AI Powered";
 			try {
 				const authCheckPromise = check_auth();
 				const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(false), 3000));

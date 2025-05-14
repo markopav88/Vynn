@@ -172,6 +172,7 @@
 	}
 
 	onMount(async () => {
+		document.title = "Vynn - Drive";
 		try {
 			try {
 				const user = await get_current_user();

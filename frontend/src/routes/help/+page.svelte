@@ -17,6 +17,7 @@
     let message = '';
     
     onMount(async () => {
+        document.title = "Vynn - Help";
         try {
             // Complete the auth check first
             isLoggedIn = await check_auth();

@@ -22,6 +22,7 @@
 	let pageLoaded = false;
 
 	onMount(async () => {
+		document.title = "Vynn - Signup";
 		// Check authentication status using backend API
 		const isAuthenticated = await check_auth();
 
