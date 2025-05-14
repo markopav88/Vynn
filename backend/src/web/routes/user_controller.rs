@@ -61,7 +61,7 @@ pub async fn api_get_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, password, ai_credits, storage_bytes, max_projects, max_documents FROM users WHERE id = $1"#,
         id
     )
     .fetch_one(&pool)
@@ -649,7 +649,7 @@ pub async fn api_get_current_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, password, ai_credits, storage_bytes, max_projects, max_documents FROM users WHERE id = $1"#,
         user_id
     )
     .fetch_one(&pool)
@@ -736,18 +736,63 @@ pub async fn api_get_storage_usage(
     })))
 }
 
+/// GET handler for retrieving a user's storage usage and limits.
+/// Accessible via: GET /api/user/storage
+/// Frontend: user.ts/get_user_storage()
+pub async fn api_get_user_storage(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - get_user_storage", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get user's storage usage and limits
+    let user = sqlx::query!(
+        r#"SELECT 
+            storage_bytes, 
+            max_projects,
+            max_documents,
+            (SELECT COUNT(*) FROM projects p JOIN project_permissions pp ON p.id = pp.project_id 
+             WHERE pp.user_id = users.id AND pp.role = 'owner') as project_count,
+            (SELECT COUNT(*) FROM documents d JOIN document_permissions dp ON d.id = dp.document_id 
+             WHERE dp.user_id = users.id AND dp.role = 'owner') as document_count
+        FROM users
+        WHERE id = $1"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::UserNotFoundError { user_id })?;
+
+    // Return the storage usage information
+    Ok(Json(json!({
+        "storage_bytes": user.storage_bytes,
+        "max_projects": user.max_projects,
+        "max_documents": user.max_documents,
+        "project_count": user.project_count,
+        "document_count": user.document_count,
+        "projects_percentage": if user.max_projects > 0 {
+            user.project_count.unwrap_or(0) as f64 / user.max_projects as f64 * 100.0
+        } else { 0.0 },
+        "documents_percentage": if user.max_documents > 0 {
+            user.document_count.unwrap_or(0) as f64 / user.max_documents as f64 * 100.0
+        } else { 0.0 }
+    })))
+}
+
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
-        .route("/login", post(api_login))
         .route("/", post(api_create_user))
-        .route("/update", put(api_update_user))
+        .route("/login", post(api_login))
+        .route("/logout", post(api_logout))
         .route("/:id", get(api_get_user))
-        .route("/logout", get(api_logout))
-        .route("/check-auth", get(api_check_auth))
-        .route("/profile-image", post(api_upload_profile_image))
-        .route("/:id/profile-image", get(api_get_profile_image))
-        .route("/search", get(api_search_users))
+        .route("/:id", put(api_update_user))
+        .route("/profile-pic/:id", get(api_get_profile_image))
+        .route("/profile-pic", post(api_upload_profile_image))
         .route("/current", get(api_get_current_user))
         .route("/storage", get(api_get_storage_usage))
+        .route("/user-storage", get(api_get_user_storage))
 }

@@ -125,6 +125,32 @@ pub async fn api_create_document(
     // get user_id from cookies
     let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
 
+    // Check if user has reached their document limit
+    let user_docs_count = sqlx::query!(
+        "SELECT COUNT(*) as count FROM documents d
+         JOIN document_permissions dp ON d.id = dp.document_id
+         WHERE dp.user_id = $1 AND dp.role = 'owner'",
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    let user = sqlx::query!(
+        "SELECT max_documents FROM users WHERE id = $1",
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    if user_docs_count.count.unwrap_or(0) as i32 >= user.max_documents {
+        return Err(Error::LimitExceededError { message: "Document limit reached".to_string() });
+    }
+
+    // Calculate the content size in bytes
+    let content_length = payload.content.as_ref().map_or(0, |s| s.len() as i64);
+
     // First insert the document
     let result = sqlx::query!(
         "INSERT INTO documents (name, content, user_id, created_at, updated_at) 
@@ -153,6 +179,20 @@ pub async fn api_create_document(
 
             if let Err(_) = permissions {
                 return Err(Error::PermissionCreationError);
+            }
+
+            // Update the user's storage usage
+            if content_length > 0 {
+                let _ = sqlx::query!(
+                    "UPDATE users 
+                     SET storage_bytes = storage_bytes + $1 
+                     WHERE id = $2",
+                    content_length,
+                    user_id
+                )
+                .execute(&pool)
+                .await
+                .map_err(|_| Error::DatabaseError)?;
             }
 
             // Then fetch the document by id
@@ -225,6 +265,11 @@ pub async fn api_update_document(
     let old_embedding_time = old_data.as_ref().and_then(|d| d.embedding_updated_at);
     // --- Embedding Logic End ---
 
+    // Calculate the difference in content size
+    let old_content_len = old_content.len() as i64;
+    let new_content_len = payload.content.as_ref().map_or(0, |s| s.len() as i64);
+    let size_diff = new_content_len - old_content_len;
+
     // Proceed with the main update
     let update_result = sqlx::query!(
         "UPDATE documents
@@ -241,6 +286,31 @@ pub async fn api_update_document(
     // Check if the main update failed
     if update_result.is_err() || update_result.unwrap().rows_affected() == 0 {
         return Err(Error::DocumentUpdateError { document_id });
+    }
+
+    // Update the user's storage usage if there was a change in content size
+    if size_diff != 0 {
+        // Get the document owner
+        let owner = sqlx::query!(
+            "SELECT user_id FROM document_permissions 
+             WHERE document_id = $1 AND role = 'owner'",
+            document_id
+        )
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+
+        // Update the owner's storage usage
+        let _ = sqlx::query!(
+            "UPDATE users 
+             SET storage_bytes = storage_bytes + $1 
+             WHERE id = $2",
+            size_diff,
+            owner.user_id
+        )
+        .execute(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
     }
 
     let should_update_embedding = match old_embedding_time {
@@ -316,6 +386,17 @@ async fn api_delete_document(
         return Err(Error::PermissionError);
     }
 
+    // Get document content size before deletion
+    let doc = sqlx::query!(
+        "SELECT content FROM documents WHERE id = $1",
+        document_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DocumentNotFoundError { document_id })?;
+
+    let content_size = doc.content.as_ref().map_or(0, |s| s.len() as i64);
+
     // delete all rows from document permissions table where document id = one being delete
     let result = sqlx::query!(
         "DELETE FROM document_permissions
@@ -331,7 +412,6 @@ async fn api_delete_document(
     }
 
     // otherwise now we can sucessfully delete the delete the document from the database
-
     let result = sqlx::query!(
         "DELETE FROM Documents
             WHERE id =  $1",
@@ -345,12 +425,25 @@ async fn api_delete_document(
         return Err(Error::DocumentDeletionError { document_id });
     }
 
+    // Update the user's storage usage
+    if content_size > 0 {
+        let _ = sqlx::query!(
+            "UPDATE users 
+             SET storage_bytes = storage_bytes - $1 
+             WHERE id = $2",
+            content_size,
+            user_id
+        )
+        .execute(&pool)
+        .await
+        .map_err(|_| Error::DatabaseError)?;
+    }
+
     // otherwise its success
     return Ok(Json(json!({
         "result": {
             "success": true
         }
-
     })));
 }
 
