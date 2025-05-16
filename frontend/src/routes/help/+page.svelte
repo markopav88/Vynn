@@ -107,6 +107,7 @@
 
 <svelte:head>
     <title>Help & Support | Vynn</title>
+    <link rel="stylesheet" href="$lib/assets/style/help.css">
 </svelte:head>
 
 <div class="bg-black min-vh-100 d-flex flex-column">
@@ -330,44 +331,4 @@
             </div>
         </div>
     {/if}
-</div>
-
-<style>
-    /* Customize accordion styles */
-    :global(.accordion-button:not(.collapsed)) {
-        background-color: rgba(16, 185, 129, 0.1) !important;
-        color: var(--color-primary) !important;
-        box-shadow: none !important;
-    }
-    
-    :global(.accordion-button:focus) {
-        box-shadow: none !important;
-        border-color: rgba(16, 185, 129, 0.5) !important;
-    }
-    
-    :global(.accordion-button::after) {
-        filter: invert(1);
-    }
-    
-    /* Style for keyboard keys */
-    kbd {
-        background-color: #333;
-        border: 1px solid #666;
-        border-radius: 3px;
-        color: #fff;
-        display: inline-block;
-        font-size: 0.9em;
-        padding: 2px 5px;
-    }
-
-    /* Fix for hero element positioning */
-    :global(.container.py-5) {
-        padding-top: 7rem !important; /* Ensure space for navbar */
-        transition: padding-top 0.2s ease;
-    }
-
-    /* Ensure proper page section spacing */
-    :global(.row.justify-content-center.mb-5) {
-        margin-top: 1rem;
-    }
-</style> 
+</div> 

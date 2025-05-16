@@ -1,0 +1,48 @@
+.popular-badge {
+    font-size: 0.9rem;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transform: translateY(-50%);
+}
+
+.featured-card {
+    transform: translateY(-20px);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+    border: 2px solid rgba(16, 185, 129, 0.3) !important;
+    z-index: 1;
+}
+
+.text-green {
+    color: #10b981;
+    text-decoration: none;
+}
+
+.bg-green {
+    background-color: #10b981;
+}
+
+.btn-green {
+    background-color: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.btn-green:hover {
+    background-color: #0d9668;
+    border-color: #0d9668;
+    color: white;
+}
+
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.featured-card:hover {
+    transform: translateY(-25px);
+} 
