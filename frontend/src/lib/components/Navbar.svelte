@@ -4,10 +4,14 @@
 	import { logout, get_current_user, get_profile_image_url, check_auth } from '$lib/ts/user';
 	import logo from '$lib/assets/logo.png';
 	import profileDefault from '$lib/assets/profile-image.png';
+	import { page } from '$app/stores';
 
 	export let isLoggedIn = false;
 	let userId: number | null = null;
 	let profileImage = profileDefault;
+	let isDrivePage = false;
+
+	$: isDrivePage = $page.url.pathname === '/drive';
 
 	onMount(async () => {
 		if (isLoggedIn) {
@@ -77,7 +81,7 @@
 	}
 </script>
 
-<nav class="navbar navbar-expand navbar-dark bg-black">
+<nav class="navbar navbar-expand navbar-dark bg-black custom-navbar" class:fixed-nav={isDrivePage}>
 	<div class="container-fluid">
 		<!-- Logo and Brand Name -->
 		<button class="navbar-brand d-flex align-items-center" type="button" tabindex="0" on:click={handleLogoClick} style="border: none; background: none; padding: 0;">
@@ -146,17 +150,18 @@
 </nav>
 
 <style>
-	nav {
-		border-bottom: none;
-		position: relative;
+	/* Make styles specific and prevent Bootstrap overrides */
+	nav.navbar.custom-navbar {
+		border-bottom: none !important;
+		position: relative !important;
 		isolation: isolate;
 		z-index: 1000;
-		height: 60px;
-		min-height: 60px;
-		max-height: 60px;
-		padding-top: 0;
-		padding-bottom: 0;
-		display: flex;
+		height: 60px !important;
+		min-height: 60px !important;
+		max-height: 60px !important;
+		padding-top: 0 !important;
+		padding-bottom: 0 !important;
+		display: flex !important;
 		align-items: center;
 		box-sizing: border-box;
 		background-color: rgba(10, 23, 33, 0.95);
@@ -164,50 +169,84 @@
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 	}
 
-	.navbar-brand span {
+	/* Add fixed positioning for drive page */
+	nav.navbar.custom-navbar.fixed-nav {
+		position: fixed !important;
+		top: 0;
+		left: 0;
+		right: 0;
+	}
+
+	/* Ensure brand styles are specific */
+	.navbar.custom-navbar .navbar-brand {
+		display: flex;
+		align-items: center;
+		padding: 0;
+		margin: 0;
+		color: var(--color-text) !important;
+	}
+
+	.navbar.custom-navbar .navbar-brand span {
 		letter-spacing: 0.05em;
 		font-size: 1.5rem;
 	}
 
+	/* Make nav links styles specific */
+	.navbar.custom-navbar .nav-link {
+		color: var(--color-text) !important;
+		transition: color 0.2s ease;
+		padding: 0.5rem 1rem;
+	}
+
+	.navbar.custom-navbar .nav-link:hover {
+		color: var(--color-primary) !important;
+	}
+
 	/* Ensure navbar stays horizontal on all screen sizes */
 	@media (max-width: 992px) {
-		.navbar-collapse {
-			display: flex;
+		.navbar.custom-navbar .navbar-collapse {
+			display: flex !important;
 		}
 
-		.navbar-nav {
-			flex-direction: row;
+		.navbar.custom-navbar .navbar-nav {
+			flex-direction: row !important;
 		}
 
-		.nav-item {
+		.navbar.custom-navbar .nav-item {
 			white-space: nowrap;
 		}
 	}
 
 	@media (max-width: 576px) {
-		.nav-item {
+		.navbar.custom-navbar .nav-item {
 			margin-left: 0.5rem !important;
 			margin-right: 0.5rem !important;
 		}
 
-		.navbar-brand img {
+		.navbar.custom-navbar .navbar-brand img {
 			height: 40px;
 			width: 40px;
 		}
 
-		.navbar-brand span {
+		.navbar.custom-navbar .navbar-brand span {
 			font-size: 1.2rem;
 		}
 	}
 
-	/* Profile image hover effect */
-	.profile-img {
+	/* Dropdown menu styles */
+	.navbar.custom-navbar .dropdown-menu {
+		background-color: rgba(10, 23, 33, 0.95) !important;
+		border: 1px solid var(--color-border) !important;
+		margin-top: 0.5rem;
+	}
+
+	.navbar.custom-navbar .dropdown-item {
+		color: var(--color-text) !important;
 		transition: all 0.2s ease;
 	}
 
-	.profile-img:hover {
-		transform: scale(1.05);
-		box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+	.navbar.custom-navbar .dropdown-item:hover {
+		background-color: rgba(16, 185, 129, 0.1) !important;
+		color: var(--color-primary) !important;
 	}
-
 </style>

@@ -16,8 +16,11 @@
 / - shouldAgentShowDiffProactively: The main exported function that determines if a diff
 /                                   should be shown. It calls a backend service to get
 /                                   this decision.
+/                                   Test: test_ai.rs/test_decide_proactive_diff_success()
 / - fetchProactiveDiffDecisionFromAPI: (Internal) Handles the actual API call to the
-/                                        backend endpoint that provides the True/False decision.
+/                                     backend endpoint that provides the True/False decision.
+/ - sanitizeText: Sends text to the backend for HTML and Markdown sanitization.
+/                Test: test_ai.rs/test_sanitize_text_success()
 */
 
 /**
