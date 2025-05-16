@@ -556,7 +556,7 @@
     }
 
     .message-assistant .message-content {
-        background-color: var(--secondary-color); /* Darker gray for assistant - made slightly transparent */
+        background-color: var(--secondary-accent-color); /* Darker gray for assistant - made slightly transparent */
         color: var(--secondary-text-color);
         border-radius: 15px 15px 15px 5px; /* Chat bubble style */
         margin-left:1px
@@ -617,7 +617,7 @@
     }
 
     .message-user .message-content {
-        background-color: var(--primary-accent-color); /* Bootstrap success green */
+        background-color: var(--secondary-color); /* Bootstrap success green */
         color: var(--secondary-text-color);
         border-radius: 15px 15px 5px 15px; /* Chat bubble style */
     }

@@ -5290,14 +5290,14 @@
 						title="Edit Keybindings"
 						aria-label="Edit keybindings"
 					>
-						<i class="bi bi-pencil-square" style="color: var(--primary-accent-color)"></i>
+						<i class="bi bi-pencil-square" style="color: var(--primary-color)"></i>
 					</button>
 					<button 
 						class="header-action-btn" 
 						on:click={() => (showCommands = false)} 
 						aria-label="Close commands reference"
 						title="Close"
-						style="color: var(--primary-accent-color)"
+						style="color: var(--primary-color)"
 					>
 						&times;
 					</button>
