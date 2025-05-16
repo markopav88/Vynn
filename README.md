@@ -5,6 +5,9 @@
 A minimal, keyboard-driven document storage and processing solution that combines the speed and power of Neovim with the simplicity of modern writing tools and intelligent RAG agents to create a fast, customizable workspace for writers, researchers, and note takers.
 
 ## Demo
+<div align="center">
+    <img src="https://github.com/CFdefense/CFdefense.github.io/blob/main/public/media/projects/Vynn.gif?raw=true" alt="Description of the GIF" width="750">
+</div>
 
 ## Overview
 
