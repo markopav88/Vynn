@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import {onMount} from 'svelte';
 
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 
 	let isLoggedIn = false;
 	let path = $page.params.catchall || 'the requested page';
+
+	onMount(async() => {
+		document.title = "Vynn - Error";
+	})
 </script>
 
 <div class="bg-black min-vh-100 d-flex flex-column">
@@ -16,7 +21,7 @@
 			<div class="mb-4">
 				<i class="bi bi-tools text-green" style="font-size: 5rem;"></i>
 			</div>
-			<h1 class="fw-bold mb-4">Work in Progress</h1>
+			<h1 class="fw-bold mbonMount-4">Work in Progress</h1>
 			<p class="fs-4 text-white-50 mb-5">
 				We're currently building <span class="text-green">{path}</span>.<br />
 				Check back soon for updates!

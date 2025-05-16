@@ -38,6 +38,8 @@
 	let editingUser: (DocumentUser | ProjectUser) | null = null;
 	let currentUserId: number = 2; // Hard-coding the current user ID to ensure it's set before rendering
 
+	const API_BASE_URL = process.env.API_BASE_URL;
+
 	// Update the reactive statement for isOpen to wait for the userId to be set first
 	$: if (isOpen) {
 		// Don't call loadUsers directly, it will be called after user ID is loaded
@@ -52,7 +54,7 @@
 
 		try {
 			isSearching = true;
-			const response = await fetch(`http://localhost:3001/api/users/search?q=${encodeURIComponent(query)}`, {
+			const response = await fetch(`${API_BASE_URL}/api/users/search?q=${encodeURIComponent(query)}`, {
 				credentials: 'include'
 			});
 

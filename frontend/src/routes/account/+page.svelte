@@ -15,7 +15,8 @@
 		check_background_image,
 		upload_background_image,
 		reset_background_image,
-		hexToRgba
+		hexToRgba,
+		reset_all_keybindings
 	} from '$lib/ts/account';
 	import { keybindings, type KeyboardInput } from '$lib/ts/keybindings';
 	import Navbar from '$lib/components/Navbar.svelte';
@@ -234,6 +235,7 @@
 	}
 
 	onMount(async () => {
+		document.title = "Vynn - Account";
 		try {
 			const user = await get_current_user();
 			if (user) {
@@ -1457,6 +1459,24 @@
 											{/each}
 										</tbody>
 									</table>
+								</div>
+								
+								<!-- Reset All Keybindings Button -->
+								<div class="mb-4">
+									<button 
+										class="btn btn-outline-danger" 
+										on:click={async () => {
+											const success = await reset_all_keybindings();
+											if (success) {
+												showToast('All keybindings reset to default', 'success');
+												await loadKeybindings(); // Reload keybindings to reflect changes
+											} else {
+												showToast('Failed to reset keybindings', 'error');
+											}
+										}}
+									>
+										<i class="bi bi-arrow-counterclockwise me-2"></i> Reset All Keybindings
+									</button>
 								</div>
 							{/if}
 						</div>

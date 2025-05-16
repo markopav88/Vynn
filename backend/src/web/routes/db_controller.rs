@@ -16,7 +16,9 @@ use axum::{
     Router,
 };
 use serde_json::{json, Value};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, time::Duration};
+use tokio::time;
+use reqwest::Client;
 
 use crate::models::db::WipeParams;
 use crate::{Error, Result};
@@ -28,17 +30,15 @@ use crate::{Error, Result};
 pub async fn api_db_test(Extension(pool): Extension<sqlx::PgPool>) -> Result<Json<Value>> {
     println!("->> {:<12} - test_db", "HANDLER");
 
-    // Run a simple query to test the database connection.
-    let result_row = sqlx::query!("SELECT 1 as number").fetch_one(&pool).await;
+    // Run a simple query to ping the database.
+    let result_row = sqlx::query("SELECT 1").fetch_one(&pool).await;
 
     match result_row {
-        Ok(record) => {
-            let number: i32 = record.number.unwrap_or(0);
-
+        Ok(_) => {
             // Create Success
             let success = Json(json!({
                 "result": {
-                    "success": number
+                    "success": true
                 }
             }));
 
@@ -94,7 +94,40 @@ async fn api_db_reset(
     })))
 }
 
-pub fn db_routes() -> Router {
+async fn send_periodic_request(pool: sqlx::PgPool) {
+    let client = Client::new();
+    loop {
+        // Send the HTTP GET request
+        match client.get("https://vynn.app").send().await {
+            Ok(response) => {
+                println!("Response: {:?}", response.status());
+            }
+            Err(e) => {
+                println!("Error sending request: {:?}", e);
+            }
+        }
+
+        // Run a simple query to ping the database.
+        let result_row = sqlx::query("SELECT 1").fetch_one(&pool).await;
+
+        match result_row {
+            Ok(_) => {
+                // Create Success
+                println!("Database ping successful.");
+            }
+            Err(e) => {
+                println!("Error connecting to database: {:?}", e);
+            }
+        }
+        time::sleep(Duration::from_secs(120)).await; // Sleep for 2 minutes
+    }
+}
+
+pub fn db_routes(pool: sqlx::PgPool) -> Router {
+    // Start the periodic request in a separate task
+    let pool_clone = pool.clone(); // Clone the pool to pass to the task
+    tokio::spawn(send_periodic_request(pool_clone));
+
     Router::new()
         .route("/test", get(api_db_test))
         .route("/reset", get(api_db_reset))

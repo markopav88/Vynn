@@ -56,7 +56,10 @@ pub enum Error {
     
     // Preference Errors
     PreferenceNotFoundError { preference_id: i32 },
-    BackgroudImageError
+    BackgroudImageError,
+    
+    // Limit Errors
+    LimitExceededError { message: String }
 }
 
 #[derive(Debug, Clone, strum_macros::AsRefStr)]
@@ -131,6 +134,9 @@ impl Error {
 
             // Preference Errors
             Self::PreferenceNotFoundError { .. } => (StatusCode::NOT_FOUND, ClientError::RESOURCE_NOT_FOUND),
+
+            // Limit Errors
+            Self::LimitExceededError { .. } => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),
 
             // Fallback for any other unmapped error
             _ => (StatusCode::INTERNAL_SERVER_ERROR, ClientError::SERVICE_ERROR),

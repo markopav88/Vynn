@@ -12,12 +12,37 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import heroBackground from '$lib/assets/hero-background.png';
+	import '$lib/assets/style/homepage.css';
 
 	let isLoggedIn = false;
 	let pageLoaded = false;
+	let isTerminalVisible = true;
+	let isTerminalMinimized = false;
+	let hasLoadedOnce = false;
+
+	function handleClose() {
+		isTerminalVisible = false;
+		isTerminalMinimized = false; // Reset minimized state when closing
+		// Reappear after 2 seconds
+		setTimeout(() => {
+			isTerminalVisible = true;
+		}, 50);
+	}
+
+	function handleMinimize() {
+		isTerminalMinimized = !isTerminalMinimized;
+		if (isTerminalMinimized) {
+			isTerminalVisible = true; // Ensure terminal stays visible when minimized
+		}
+	}
+
+	function handleMaximize() {
+		window.location.href = '/tutorial';
+	}
 
 	onMount(() => {
 		(async () => {
+			document.title = "Vynn - AI Powered";
 			try {
 				const authCheckPromise = check_auth();
 				const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(false), 3000));
@@ -37,13 +62,28 @@
 
 		// Animation setup
 		const handleScroll = () => {
-			const elements = document.querySelectorAll('.fade-in:not(.visible)');
-			elements.forEach((el) => {
-				const rect = el.getBoundingClientRect();
-				if (rect.top < window.innerHeight * 0.8) {
-					el.classList.add('visible');
-				}
-			});
+			if (!hasLoadedOnce) {
+				const fadeElements = document.querySelectorAll('.fade-in:not(.visible), .hero-fade:not(.visible)');
+				fadeElements.forEach((el) => {
+					const rect = el.getBoundingClientRect();
+					if (rect.top < window.innerHeight * 0.8) {
+						el.classList.add('visible');
+						// If this is a hero section element, mark it as loaded
+						if (el.classList.contains('hero-fade')) {
+							hasLoadedOnce = true;
+						}
+					}
+				});
+			} else {
+				// Only handle non-hero fade elements after initial load
+				const fadeElements = document.querySelectorAll('.fade-in:not(.visible)');
+				fadeElements.forEach((el) => {
+					const rect = el.getBoundingClientRect();
+					if (rect.top < window.innerHeight * 0.8) {
+						el.classList.add('visible');
+					}
+				});
+			}
 		};
 
 		window.addEventListener('scroll', handleScroll, { passive: true });
@@ -69,7 +109,7 @@
 		<div class="container py-5">
 			<!-- Header that spans full width -->
 			<div class="row mb-4">
-				<div class="col-12 text-center fade-in">
+				<div class="col-12 text-center hero-fade hero-title">
 					<h1 class="fw-bold" style="font-size: 6rem; line-height: 1.1;">
 						Write using the Power of<br />
 						<span class="text-green">Neovim + AI</span>
@@ -80,60 +120,71 @@
 			<!-- Content in two columns -->
 			<div class="row py-3 align-items-center">
 				<!-- Left side: Text content -->
-				<div class="col-md-6 text-center fade-in" style="margin-top: -2rem;">
-					<p class="fs-4 text-white-50 mb-4">
-						Experience the perfect blend of Neovim's efficiency and AI assistance designed specifically for writers.
-						Craft your stories, articles, and content with unprecedented speed and creativity.
-					</p>
+				<div class="col-md-{isTerminalVisible ? '6' : '12'} hero-fade hero-content" 
+					 class:text-center={!isTerminalVisible}
+					 class:visible={hasLoadedOnce}
+					 style="margin-top: {isTerminalVisible ? '-2rem' : '0'}">
+					<div class="content-wrapper" class:centered-content={!isTerminalVisible}>
+						<p class="fs-4 text-white-50 mb-4">
+							Experience the perfect blend of Neovim's efficiency and AI assistance designed specifically for writers.
+							Craft your stories, articles, and content with unprecedented speed and creativity.
+						</p>
 
-					<p class="fs-5 text-white-50 mb-5">
-						Vynn combines the power of Vim's keyboard-centric editing with state-of-the-art AI to help you write faster,
-						smarter, and more creatively. Whether you're drafting a novel, writing technical documentation, or crafting
-						marketing copy, Vynn provides the tools you need to excel.
-					</p>
+						<p class="fs-5 text-white-50 mb-5">
+							Vynn combines the power of Vim's keyboard-centric editing with state-of-the-art AI to help you write faster,
+							smarter, and more creatively. Whether you're drafting a novel, writing technical documentation, or crafting
+							marketing copy, Vynn provides the tools you need to excel.
+						</p>
 
-					<div class="d-flex gap-4 justify-content-center">
-						<a href="/editor" class="btn btn-green btn-lg px-4 py-2"> Try Vynn Editor </a>
-						<a href="/tutorial" class="btn btn-outline-light btn-lg px-4 py-2"> View Tutorial </a>
+						<div class="d-flex gap-4 hero-fade hero-buttons" class:visible={hasLoadedOnce} class:justify-content-center={!isTerminalVisible}>
+							<a href="/editor" class="btn btn-green btn-lg px-4 py-2"> Try Vynn Editor </a>
+							<a href="/tutorial" class="btn btn-outline-light btn-lg px-4 py-2"> View Tutorial </a>
+						</div>
 					</div>
 				</div>
 
-				<!-- Right side: Demo image -->
-				<div class="col-md-6 mt-15 mt-md-0 d-flex justify-content-end fade-in" style="margin-top: -10rem;">
-					<div class="position-relative ms-md-5" style="margin-right: -10rem;">
-						<!-- Placeholder image -->
-						<div
-							class="bg-dark rounded-3 shadow-lg p-3 d-flex align-items-center justify-content-center"
-							style="width: 700px; height: 500px; border: 1px solid rgba(255,255,255,0.1);"
-						>
-							<div class="text-center">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="80"
-									height="80"
-									fill="currentColor"
-									class="bi bi-code-square text-green mb-3"
-									viewBox="0 0 16 16"
+				<!-- Right side: Terminal -->
+				{#if isTerminalVisible}
+				<div class="col-md-6 mt-15 mt-md-0 d-flex justify-content-end hero-fade hero-terminal" 
+					 class:visible={hasLoadedOnce}
+					 style="margin-top: 0">
+					<div class="position-relative ms-md-5 video-container" 
+						 class:minimized={isTerminalMinimized}>
+						<div class="terminal-window">
+							<div class="terminal-header">
+								<div class="terminal-buttons">
+									<button type="button" class="terminal-button close" 
+											on:click={() => isTerminalVisible = false}
+											on:keydown={(e) => e.key === 'Enter' && (isTerminalVisible = false)}
+											aria-label="Close terminal"></button>
+									<button type="button" class="terminal-button minimize" 
+											on:click={handleMinimize}
+											on:keydown={(e) => e.key === 'Enter' && handleMinimize()}
+											aria-label="Minimize terminal"></button>
+									<button type="button" class="terminal-button maximize" 
+											on:click={handleMaximize}
+											on:keydown={(e) => e.key === 'Enter' && handleMaximize()}
+											aria-label="Maximize terminal"></button>
+								</div>
+								<div class="terminal-title"></div>
+							</div>
+							<div class="video-wrapper">
+								<video
+									class="demo-video"
+									autoplay
+									loop
+									muted
+									playsinline
 								>
-									<path
-										d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
-									/>
-									<path
-										d="M6.854 4.646a.5.5 0 0 1 0 .708L4.207 8l2.647 2.646a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 0 1 .708 0zm2.292 0a.5.5 0 0 0 0 .708L11.793 8l-2.647 2.646a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708 0z"
-									/>
-								</svg>
-								<p class="text-white-50">Vynn Editor Demo</p>
-								<p class="text-white-50 small">(Product screenshot will be displayed here)</p>
+									<source src="/video.mp4" type="video/mp4" />
+									Your browser does not support the video tag.
+								</video>
 							</div>
 						</div>
-
-						<!-- Glow effect -->
-						<div
-							class="position-absolute top-50 start-50 translate-middle"
-							style="width: 100%; height: 100%; background: radial-gradient(circle, rgba(16,185,129,0.2) 0%, rgba(0,0,0,0) 70%); z-index: -1;"
-						></div>
+						<div class="glow-effect"></div>
 					</div>
 				</div>
+				{/if}
 			</div>
 		</div>
 	</section>
@@ -357,55 +408,3 @@
 	<!-- Use the Footer component -->
 	<Footer />
 </div>
-
-<style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		background-color: #000;
-		color: #fff;
-		font-family:
-			-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue',
-			sans-serif;
-	}
-
-	.popular-badge {
-		font-size: 1rem;
-		font-weight: bold;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		transform: translateY(-10px);
-	}
-
-	.featured-card {
-		transform: translateY(-20px);
-		box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
-		border: 2px solid rgba(16, 185, 129, 0.3) !important;
-		z-index: 1;
-	}
-
-	/* Simple fade-in animation */
-	.fade-in {
-		opacity: 0;
-		transform: translateY(30px);
-		transition:
-			opacity 0.8s ease,
-			transform 0.8s ease;
-	}
-
-	:global(.fade-in.visible) {
-		opacity: 1;
-		transform: translateY(0);
-	}
-
-	/* Add staggered delays for siblings */
-	.row > .fade-in:nth-child(1) {
-		transition-delay: 0.1s;
-	}
-	.row > .fade-in:nth-child(2) {
-		transition-delay: 0.3s;
-	}
-	.row > .fade-in:nth-child(3) {
-		transition-delay: 0.5s;
-	}
-</style>

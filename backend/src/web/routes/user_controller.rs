@@ -30,7 +30,8 @@ use argon2::{
 };
 use std::sync::OnceLock;
 
-use crate::models::user::{CreateUserPayload, LoginPayload, UpdateUserPayload, User};
+use crate::models::user::{CreateUserPayload, LoginUserPayload, UpdateUserPayload, User};
+use crate::models::storage::StorageManager;
 use crate::{Error, Result};
 use backend::get_user_id_from_cookie;
 
@@ -61,7 +62,11 @@ pub async fn api_get_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents 
+           FROM users WHERE id = $1"#,
         id
     )
     .fetch_one(&pool)
@@ -138,7 +143,12 @@ pub async fn api_create_user(
     // Insert the user with hashed password
     let result = sqlx::query_as!(
         User,
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, ai_credits",
+        r#"INSERT INTO users (name, email, password) 
+           VALUES ($1, $2, $3) 
+           RETURNING id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents"#,
         payload.name,
         payload.email,
         password_hash
@@ -194,7 +204,7 @@ pub async fn api_update_user(
     }
     
     // Validate password complexity
-    if payload.password.is_empty() {
+    if payload.password.is_none() || payload.password.as_ref().unwrap().is_empty() {
         // perform update without password
         let result = sqlx::query!(
             "UPDATE users
@@ -220,27 +230,29 @@ pub async fn api_update_user(
         })));
     }
     
+    let password = payload.password.as_ref().unwrap();
+    
     // Password complexity requirements:
     // 1. Minimum length of 8 characters
-    if payload.password.len() < 8 {
+    if password.len() < 8 {
         println!("->> {:<12} - password too short, minimum 8 characters required", "ERROR");
         return Err(Error::PasswordValidationError);
     }
     
     // 2. Contains at least one uppercase letter
-    if !payload.password.chars().any(|c| c.is_uppercase()) {
+    if !password.chars().any(|c| c.is_uppercase()) {
         println!("->> {:<12} - password must contain at least one uppercase letter", "ERROR");
         return Err(Error::PasswordValidationError);
     }
     
     // 3. Contains at least one number
-    if !payload.password.chars().any(|c| c.is_numeric()) {
+    if !password.chars().any(|c| c.is_numeric()) {
         println!("->> {:<12} - password must contain at least one number", "ERROR");
         return Err(Error::PasswordValidationError);
     }
     
     // 4. Contains at least one special character
-    if !payload.password.chars().any(|c| !c.is_alphanumeric()) {
+    if !password.chars().any(|c| !c.is_alphanumeric()) {
         println!("->> {:<12} - password must contain at least one special character", "ERROR");
         return Err(Error::PasswordValidationError);
     }
@@ -248,7 +260,7 @@ pub async fn api_update_user(
     // Hash the password before updating
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)
+    let password_hash = argon2.hash_password(password.as_bytes(), &salt)
         .map_err(|e| {
             println!("->> {:<12} - password hashing error: {:?}", "ERROR", e);
             Error::UserUpdateError { user_id: user_id.unwrap() }
@@ -288,7 +300,7 @@ pub async fn api_update_user(
 pub async fn api_login(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
-    Json(payload): Json<LoginPayload>,
+    Json(payload): Json<LoginUserPayload>,
 ) -> Result<Json<Value>> {
     println!("->> {:<12} - api_login", "HANDLER");
     println!("Received login request for email: {}", payload.email);
@@ -624,7 +636,11 @@ pub async fn api_search_users(
     // Search for users with email containing the search term
     let users = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, ai_credits FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
+        r#"SELECT id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents 
+           FROM users WHERE email ILIKE $1 ORDER BY email LIMIT 10"#,
         format!("%{}%", search_term)
     )
     .fetch_all(&pool)
@@ -649,7 +665,11 @@ pub async fn api_get_current_user(
 
     let result = sqlx::query_as!(
         User,
-        r#"SELECT id, name, email, ai_credits FROM users WHERE id = $1"#,
+        r#"SELECT id, name, email, password, ai_credits, 
+           NULL::BIGINT as storage_bytes, 
+           NULL::INT as max_projects, 
+           NULL::INT as max_documents 
+           FROM users WHERE id = $1"#,
         user_id
     )
     .fetch_one(&pool)
@@ -661,17 +681,190 @@ pub async fn api_get_current_user(
     }
 }
 
+/// GET handler for retrieving the user's storage usage data.
+/// Accessible via: GET /api/users/storage
+/// Frontend: user.ts/get_storage_usage()
+pub async fn api_get_storage_usage(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - get_storage_usage", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::UserIdUpdateError)?;
+    
+    // Calculate document storage
+    // We'll count characters in content as a proxy for storage space (1 char = ~1-4 bytes)
+    let document_storage = sqlx::query!(
+        r#"
+        SELECT SUM(LENGTH(COALESCE(content, ''))) as total_size
+        FROM documents d
+        JOIN document_permissions dp ON d.id = dp.document_id
+        WHERE dp.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Count number of documents
+    let document_count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM documents d
+        JOIN document_permissions dp ON d.id = dp.document_id
+        WHERE dp.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Count number of projects
+    let project_count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM projects p
+        JOIN project_permissions pp ON p.id = pp.project_id
+        WHERE pp.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+    
+    // Convert document content size to megabytes (assuming 1 char ≈ 1 byte for simplicity)
+    let size_bytes = document_storage.total_size.unwrap_or(0) as f64;
+    let size_mb = size_bytes / (1024.0 * 1024.0);
+    
+    // Calculate storage usage percentage (assuming 10GB limit)
+    let max_storage_gb = 10.0;
+    let size_gb = size_mb / 1024.0;
+    let usage_percentage = (size_gb / max_storage_gb) * 100.0;
+    
+    Ok(Json(json!({
+        "used_bytes": size_bytes,
+        "used_mb": size_mb,
+        "used_gb": size_gb,
+        "max_storage_gb": max_storage_gb,
+        "usage_percentage": usage_percentage,
+        "document_count": document_count.count,
+        "project_count": project_count.count
+    })))
+}
+
+/// GET handler for retrieving a user's storage usage and limits.
+/// Accessible via: GET /api/user/storage
+/// Frontend: user.ts/get_user_storage()
+pub async fn api_get_user_storage(
+    cookies: Cookies,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<Value>> {
+    println!("->> {:<12} - get_user_storage", "HANDLER");
+
+    // Get user ID from cookie
+    let user_id = get_user_id_from_cookie(&cookies).ok_or(Error::PermissionError)?;
+
+    // Get project and document counts
+    let project_count = sqlx::query!(
+        r#"SELECT COUNT(*) as count FROM projects p 
+           JOIN project_permissions pp ON p.id = pp.project_id 
+           WHERE pp.user_id = $1 AND pp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::UserNotFoundError { user_id })?;
+    
+    let document_count = sqlx::query!(
+        r#"SELECT COUNT(*) as count FROM documents d 
+           JOIN document_permissions dp ON d.id = dp.document_id 
+           WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::UserNotFoundError { user_id })?;
+    
+    // Calculate storage bytes (sum of document content lengths) - with precise character counting
+    let storage_bytes = sqlx::query!(
+        r#"SELECT COALESCE(SUM(LENGTH(COALESCE(d.content, ''))), 0) as total_bytes
+           FROM documents d
+           JOIN document_permissions dp ON d.id = dp.document_id
+           WHERE dp.user_id = $1 AND dp.role = 'owner'"#,
+        user_id
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| Error::DatabaseError)?;
+
+    // Get dynamic storage limits
+    let max_projects = 3; // Project limit remains fixed
+    let max_documents = 10; // Document limit remains fixed
+    let max_storage_bytes = StorageManager::get_user_quota();
+    
+    // Get overall database statistics
+    let db_size = StorageManager::get_db_size(&pool).await.unwrap_or(0);
+    let db_total = StorageManager::get_total_db_allocated();
+    let db_usage_percentage = StorageManager::get_db_usage_percentage(&pool).await.unwrap_or(0.0);
+    
+    // Calculate ultra-precise percentages
+    let storage_percentage = (storage_bytes.total_bytes.unwrap_or(0) as f64 / max_storage_bytes as f64) * 100.0;
+    let projects_percentage = (project_count.count.unwrap_or(0) as f64 / max_projects as f64) * 100.0;
+    let documents_percentage = (document_count.count.unwrap_or(0) as f64 / max_documents as f64) * 100.0;
+    
+    // Return the storage usage information with detailed byte-level precision
+    Ok(Json(json!({
+        // Raw byte counts for maximum precision
+        "storage_bytes": storage_bytes.total_bytes,
+        "max_storage_bytes": max_storage_bytes,
+        
+        // Database overview
+        "database_info": {
+            "total_size_bytes": db_total,
+            "total_size_gb": format!("{:.6}", db_total as f64 / (1024.0 * 1024.0 * 1024.0)),
+            "used_bytes": db_size,
+            "used_percentage": format!("{:.6}", db_usage_percentage)
+        },
+        
+        // Formatted values for different units
+        "storage_bytes_formatted": {
+            "bytes": storage_bytes.total_bytes.unwrap_or(0),
+            "kb": format!("{:.10}", storage_bytes.total_bytes.unwrap_or(0) as f64 / 1024.0),
+            "mb": format!("{:.10}", storage_bytes.total_bytes.unwrap_or(0) as f64 / (1024.0 * 1024.0)),
+            "gb": format!("{:.10}", storage_bytes.total_bytes.unwrap_or(0) as f64 / (1024.0 * 1024.0 * 1024.0))
+        },
+        
+        // Counts and limits
+        "max_projects": max_projects,
+        "max_documents": max_documents,
+        "project_count": project_count.count,
+        "document_count": document_count.count,
+        
+        // Percentages with extreme precision for even the tiniest storage usage
+        "storage_percentage": storage_percentage,
+        "projects_percentage": projects_percentage,
+        "documents_percentage": documents_percentage
+    })))
+}
+
 // Combine user-related routes into one Router instance.
 pub fn user_routes() -> Router {
     Router::new()
-        .route("/login", post(api_login))
         .route("/", post(api_create_user))
-        .route("/update", put(api_update_user))
-        .route("/:id", get(api_get_user))
+        .route("/login", post(api_login))
         .route("/logout", get(api_logout))
+        .route("/:id", get(api_get_user))
+        .route("/:id", put(api_update_user))
         .route("/check-auth", get(api_check_auth))
-        .route("/profile-image", post(api_upload_profile_image))
         .route("/:id/profile-image", get(api_get_profile_image))
-        .route("/search", get(api_search_users))
+        .route("/profile-image", post(api_upload_profile_image))
         .route("/current", get(api_get_current_user))
+        .route("/storage", get(api_get_storage_usage))
+        .route("/user-storage", get(api_get_user_storage))
+        .route("/search", get(api_search_users))
+        .route("/update", put(api_update_user))
 }
