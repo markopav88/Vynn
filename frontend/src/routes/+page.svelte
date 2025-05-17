@@ -135,7 +135,7 @@
 						</p>
 
 						<div class="d-flex gap-4 hero-fade hero-buttons justify-content-center" class:visible={hasLoadedOnce}>
-							<a href="/editor" class="btn btn-green btn-lg px-4 py-2"> Try Vynn Editor </a>
+							<a href="/login" class="btn btn-green btn-lg px-4 py-2"> Try Vynn Editor </a>
 							<a href="/tutorial" class="btn btn-outline-light btn-lg px-4 py-2"> View Tutorial </a>
 						</div>
 					</div>
