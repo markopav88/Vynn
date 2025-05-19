@@ -65,6 +65,7 @@ Vynn utilizes multiple fine-tuned AI Agents to leverage document-diff generation
 - Sqlx
 - rust-langchain
 - tower
+- docker
 
 ## Getting Started
 
