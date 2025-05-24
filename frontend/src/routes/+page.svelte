@@ -120,24 +120,22 @@
 			<!-- Content in two columns -->
 			<div class="row py-3 align-items-center">
 				<!-- Left side: Text content -->
-				<div class="col-md-{isTerminalVisible ? '6' : '12'} hero-fade hero-content" 
-					 class:text-center={!isTerminalVisible}
+				<div class="col-md-{isTerminalVisible ? '6' : '12'} hero-fade hero-content text-center" 
 					 class:visible={hasLoadedOnce}
 					 style="margin-top: {isTerminalVisible ? '-2rem' : '0'}">
 					<div class="content-wrapper" class:centered-content={!isTerminalVisible}>
 						<p class="fs-4 text-white-50 mb-4">
-							Experience the perfect blend of Neovim's efficiency and AI assistance designed specifically for writers.
-							Craft your stories, articles, and content with unprecedented speed and creativity.
+							Unleash your creativity with the power of Neovim and AI assistance, helping writers craft stunning content with unmatched speed and efficiency.
 						</p>
 
 						<p class="fs-5 text-white-50 mb-5">
-							Vynn combines the power of Vim's keyboard-centric editing with state-of-the-art AI to help you write faster,
+							Vynn combines the power of NeoVim's keyboard-centric editing with state-of-the-art AI to help you write faster,
 							smarter, and more creatively. Whether you're drafting a novel, writing technical documentation, or crafting
 							marketing copy, Vynn provides the tools you need to excel.
 						</p>
 
-						<div class="d-flex gap-4 hero-fade hero-buttons" class:visible={hasLoadedOnce} class:justify-content-center={!isTerminalVisible}>
-							<a href="/editor" class="btn btn-green btn-lg px-4 py-2"> Try Vynn Editor </a>
+						<div class="d-flex gap-4 hero-fade hero-buttons justify-content-center" class:visible={hasLoadedOnce}>
+							<a href="/login" class="btn btn-green btn-lg px-4 py-2"> Try Vynn Editor </a>
 							<a href="/tutorial" class="btn btn-outline-light btn-lg px-4 py-2"> View Tutorial </a>
 						</div>
 					</div>

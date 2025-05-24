@@ -130,16 +130,6 @@
 	text-decoration: underline;
 }
 
-/* Navbar fixed positioning */
-nav.navbar {
-	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	width: 100%; /* Ensure it spans full width */
-	z-index: 1100;
-}
-
 /* Remove focus outline */
 .form-control:focus {
 	box-shadow: none;

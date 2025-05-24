@@ -51,8 +51,8 @@ fn get_default_background_image() -> (Vec<u8>, &'static str) {
 
 /// GET handler for retrieving all preferences for the current user.
 /// Accessible via: GET /api/preference/
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_get_all_preferences()
+/// Frontend: account.ts/get_all_preferences()
 pub async fn api_get_all_preferences(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -87,8 +87,8 @@ pub async fn api_get_all_preferences(
 
 /// GET handler for retrieving a specific preference for the current user.
 /// Accessible via: GET /api/preference/:id
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_get_specific_preference()
+/// Frontend: account.ts/get_all_preferences() (accessed indirectly)
 pub async fn api_get_preference(
     cookies: Cookies,
     Path(preference_id): Path<i32>,
@@ -128,8 +128,8 @@ pub async fn api_get_preference(
 
 /// PUT handler for updating a specific preference for the current user.
 /// Accessible via: PUT /api/preference/:id
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_update_specific_preference()
+/// Frontend: account.ts/update_preference()
 pub async fn api_update_preference(
     cookies: Cookies,
     Path(preference_id): Path<i32>,
@@ -180,8 +180,8 @@ pub async fn api_update_preference(
 
 /// DELETE handler for resetting a specific preference to its default value.
 /// Accessible via: DELETE /api/preference/:id
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_reset_specific_preference()
+/// Frontend: account.ts/reset_preference()
 pub async fn api_reset_preference(
     cookies: Cookies,
     Path(preference_id): Path<i32>,
@@ -225,8 +225,8 @@ pub async fn api_reset_preference(
 
 /// DELETE handler for resetting all preferences to their default values.
 /// Accessible via: DELETE /api/preference/
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_reset_all_preferences()
+/// Frontend: account.ts/reset_all_preferences()
 pub async fn api_reset_all_preferences(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -255,8 +255,8 @@ pub async fn api_reset_all_preferences(
 
 /// POST handler for uploading a background image
 /// Accessible via: POST /api/preference/background
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_upload_background_image()
+/// Frontend: account.ts/upload_background_image()
 pub async fn api_upload_background_image(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -308,9 +308,8 @@ pub async fn api_upload_background_image(
 
 /// GET handler for retrieving a background image
 /// Accessible via: GET /api/preference/background
-/// If no user_id is provided, returns the current user's background
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_get_background_image()
+/// Frontend: account.ts/check_background_image()
 pub async fn api_get_background_image(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>
@@ -349,8 +348,8 @@ pub async fn api_get_background_image(
 
 /// DELETE handler for deleting a background image
 /// Accessible via: DELETE /api/preference/background
-/// Test: TODO: Add tests
-/// Frontend: TODO: Add frontend call
+/// Test: test_preferences.rs/test_delete_background_image()
+/// Frontend: account.ts/reset_background_image()
 pub async fn api_delete_background_image(
     cookies: Cookies,
     Extension(pool): Extension<PgPool>,
@@ -379,6 +378,8 @@ pub async fn api_delete_background_image(
 
 /// GET handler for retrieving the default background image
 /// Accessible via: GET /api/preference/default-background
+/// Test: test_preferences.rs/test_get_default_background_image()
+/// Frontend: account.ts/check_background_image() (used internally)
 pub async fn api_get_default_background_image() -> Result<impl axum::response::IntoResponse> {
     println!("->> {:<12} - get_default_background_image", "HANDLER");
 
